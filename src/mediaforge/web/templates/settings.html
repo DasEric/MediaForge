@@ -59,41 +59,56 @@ function setUiLanguage(lang) {
   ══════════════════════════════════════════════════════ -->
   <div class="settings-tab-panel" id="tab-general">
     <div class="settings-section" id="legacyImportSection" style="display:none;">
-      <h2>{{ _('Import from previous installation') }}</h2>
-      <div class="settings-hint" style="margin-bottom:14px;" id="legacyImportHint">
-        {{ _('A previous AniWorld Downloader installation was detected. Your data is imported automatically on first start; use the button below to copy any remaining files. An existing database is never overwritten.') }}
+      <h2>{{ _('Data from previous installation') }}</h2>
+      <div class="settings-hint" style="margin-bottom:14px;">
+        {{ _('A previous AniWorld Downloader installation (~/.aniworld) was detected. Your settings, download history, users and profiles are imported automatically the first time MediaForge starts — so everything is usually already here. Use "Import remaining files" only if something appears to be missing; an existing database is never overwritten. You can hide this notice once you are done, or if you do not want to import.') }}
       </div>
-      <div style="padding:0 22px 14px;">
-        <button class="btn btn-secondary" id="legacyImportBtn" type="button">{{ _('Import legacy data') }}</button>
-        <span id="legacyImportStatus" style="margin-left:10px;font-size:0.82rem;color:var(--text-muted);"></span>
+      <div id="legacyImportImportedNote" class="settings-hint" style="display:none;margin-bottom:14px;color:var(--success,#3fb950);"></div>
+      <div style="padding:0 22px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="legacyImportBtn" type="button">{{ _('Import remaining files') }}</button>
+        <button class="btn btn-secondary" id="legacyImportHideBtn" type="button">{{ _('Hide') }}</button>
+        <span id="legacyImportStatus" style="font-size:0.82rem;color:var(--text-muted);"></span>
       </div>
     </div>
     <script>
     (function () {
       var sec = document.getElementById('legacyImportSection');
       var btn = document.getElementById('legacyImportBtn');
+      var hideBtn = document.getElementById('legacyImportHideBtn');
+      var note = document.getElementById('legacyImportImportedNote');
       var status = document.getElementById('legacyImportStatus');
       if (!sec || !btn) return;
+      var csrf = function () { return (window.CSRF_TOKEN || ''); };
       fetch('/api/settings/legacy-import').then(function (r) { return r.json(); }).then(function (d) {
-        if (d && d.legacy_exists) {
-          sec.style.display = '';
-          if (d.already_imported) status.textContent = '{{ _('Already imported.') }}';
+        if (!d || !d.legacy_exists || d.dismissed) return;   // stay hidden
+        sec.style.display = '';
+        if (d.already_imported && note) {
+          note.style.display = '';
+          note.textContent = '{{ _('Your data was already imported automatically on first start.') }}';
         }
       }).catch(function () {});
       btn.addEventListener('click', function () {
         btn.disabled = true;
         status.textContent = '{{ _('Importing…') }}';
-        fetch('/api/settings/legacy-import', { method: 'POST', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') } })
+        fetch('/api/settings/legacy-import', { method: 'POST', headers: { 'X-CSRFToken': csrf() } })
           .then(function (r) { return r.json(); })
           .then(function (d) {
             btn.disabled = false;
             if (d && d.ok) {
               var n = (d.copied || []).length;
-              status.textContent = n + ' {{ _('item(s) imported.') }}' + (d.restart_required_for_db ? ' {{ _('Restart to load an imported database.') }}' : '');
+              status.textContent = n === 0
+                ? '{{ _('Nothing left to import — everything is already here.') }}'
+                : n + ' {{ _('item(s) imported.') }}' + (d.restart_required_for_db ? ' {{ _('Restart to load an imported database.') }}' : '');
             } else {
               status.textContent = '{{ _('Nothing to import.') }}';
             }
           }).catch(function () { btn.disabled = false; status.textContent = '{{ _('Import failed.') }}'; });
+      });
+      if (hideBtn) hideBtn.addEventListener('click', function () {
+        hideBtn.disabled = true;
+        fetch('/api/settings/legacy-import/dismiss', { method: 'POST', headers: { 'X-CSRFToken': csrf() } })
+          .then(function () { sec.style.display = 'none'; })
+          .catch(function () { hideBtn.disabled = false; });
       });
     })();
     </script>

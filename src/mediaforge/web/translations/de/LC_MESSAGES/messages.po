@@ -3917,3 +3917,20 @@ msgstr "Nichts zu importieren."
 
 msgid "Import failed."
 msgstr "Import fehlgeschlagen."
+
+# ── legacy import card (dismiss/description) ──
+
+msgid "Data from previous installation"
+msgstr "Daten aus vorheriger Installation"
+
+msgid "A previous AniWorld Downloader installation (~/.aniworld) was detected. Your settings, download history, users and profiles are imported automatically the first time MediaForge starts — so everything is usually already here. Use \"Import remaining files\" only if something appears to be missing; an existing database is never overwritten. You can hide this notice once you are done, or if you do not want to import."
+msgstr "Eine vorherige AniWorld-Downloader-Installation (~/.aniworld) wurde erkannt. Deine Einstellungen, der Download-Verlauf, Benutzer und Profile werden beim ersten Start von MediaForge automatisch übernommen — normalerweise ist also bereits alles da. Nutze „Fehlende Dateien importieren\" nur, falls etwas zu fehlen scheint; eine bestehende Datenbank wird nie überschrieben. Du kannst diesen Hinweis ausblenden, wenn du fertig bist oder nicht importieren möchtest."
+
+msgid "Import remaining files"
+msgstr "Fehlende Dateien importieren"
+
+msgid "Your data was already imported automatically on first start."
+msgstr "Deine Daten wurden beim ersten Start bereits automatisch übernommen."
+
+msgid "Nothing left to import — everything is already here."
+msgstr "Nichts mehr zu importieren — es ist bereits alles da."

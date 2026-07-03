@@ -5502,7 +5502,9 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     def api_settings_legacy_import_status():
         """Report whether data from a previous AniWorld install can be imported."""
         from ..legacy_import import detect_legacy
-        return jsonify(detect_legacy())
+        status = detect_legacy()
+        status["dismissed"] = get_setting("legacy_import_dismissed", "0") == "1"
+        return jsonify(status)
 
     @app.route("/api/settings/legacy-import", methods=["POST"])
     def api_settings_legacy_import_run():
@@ -5520,6 +5522,12 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         summary["db_replaced"] = False
         summary["restart_required_for_db"] = status["new_has_db"] and status["legacy_has_db"]
         return jsonify(summary)
+
+    @app.route("/api/settings/legacy-import/dismiss", methods=["POST"])
+    def api_settings_legacy_import_dismiss():
+        """Permanently hide the legacy-import card (already imported / not wanted)."""
+        set_setting("legacy_import_dismissed", "1")
+        return jsonify({"ok": True})
 
     @app.route("/api/settings/mediaplayer", methods=["GET"])
     def api_settings_mediaplayer_get():

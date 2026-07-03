@@ -129,7 +129,7 @@ jobs:
     if: needs.create-release.outputs.exists == 'false'
     runs-on: ubuntu-latest
     environment:
-      name: pypiforge
+      name: mediaforge
       url: https://pypi.org/project/mediaforge/
     permissions:
       contents: write
