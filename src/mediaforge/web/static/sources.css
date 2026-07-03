@@ -139,14 +139,6 @@
   user-select: none;
 }
 
-.source-sec-check input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  margin: 0;
-}
-
 .source-section-toggle:disabled {
   opacity: 0.4;
   cursor: not-allowed;

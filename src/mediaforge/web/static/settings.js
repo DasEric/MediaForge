@@ -1909,9 +1909,9 @@ function _renderSourceOrder() {
       const vis = _sourceState.sections_visible[prov] || { new: true, popular: true };
       const bothVisible = vis.new && vis.popular;
       sectionCtrls =
-        '<label class="source-sec-check"><input type="checkbox" ' + (vis.new ? "checked" : "") +
+        '<label class="source-sec-check"><input type="checkbox" class="chb-main" ' + (vis.new ? "checked" : "") +
           ' onchange="toggleSourceSectionVisible(\'' + prov + '\',\'new\')"> ' + t("Neu", "New") + '</label>' +
-        '<label class="source-sec-check"><input type="checkbox" ' + (vis.popular ? "checked" : "") +
+        '<label class="source-sec-check"><input type="checkbox" class="chb-main" ' + (vis.popular ? "checked" : "") +
           ' onchange="toggleSourceSectionVisible(\'' + prov + '\',\'popular\')"> ' + t("Beliebt", "Popular") + '</label>' +
         '<button type="button" class="source-section-toggle" ' + (bothVisible ? "" : "disabled") +
           ' title="' + t("Reihenfolge der Bereiche", "Order of the sections") + '"' +
