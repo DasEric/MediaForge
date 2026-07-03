@@ -278,21 +278,124 @@ def set_active_dns_mode(mode):
     ACTIVE_DNS_MODE = mode or "system"
 
 
-def chromium_dns_args():
-    """Chromium command-line args that route the browser's own DNS through the
-    project-configured DoH resolver (so the captcha browser uses the same DNS as
-    the rest of the app, not the OS/ISP resolver).
+# IP-form DoH templates: using the resolver IP (which is in the cert SAN) rather
+# than its hostname means Chromium does NOT have to bootstrap the DoH server name
+# through the OS/ISP resolver first.
+_CHROMIUM_DOH_IP_TEMPLATES = {
+    "cloudflare": "https://1.1.1.1/dns-query",
+    "google":     "https://8.8.8.8/dns-query",
+    "quad9":      "https://9.9.9.9/dns-query",
+}
 
-    Only the DoH presets can be mapped onto Chromium; for "system"/"custom"
-    modes we return no args, matching the niquests fallback to system DNS.
+# DoH JSON ("application/dns-json") endpoints used to resolve the ISP-blocked
+# site hosts in-process, through the SAME project DoH that already works for
+# niquests/yt-dlp -- never the ISP resolver.
+_DOH_JSON_ENDPOINTS = {
+    "cloudflare": "https://cloudflare-dns.com/dns-query",
+    "google":     "https://dns.google/resolve",
+    "quad9":      "https://dns.quad9.net:5053/dns-query",
+}
+
+# Hosts that German ISPs (CUII) DNS-block and that the captcha browser must
+# reach directly.  These are pinned with --host-resolver-rules so Chromium uses
+# the DoH-resolved IP and never queries the ISP resolver for them.
+_CHROMIUM_MAP_HOSTS = (
+    "s.to", "www.s.to",
+    "serienstream.to", "www.serienstream.to",
+    "aniworld.to", "www.aniworld.to",
+    "filmpalast.to", "www.filmpalast.to",
+)
+
+_CHROMIUM_MAP_LOCK = threading.Lock()
+_CHROMIUM_MAP_CACHE = {"mode": None, "ts": 0.0, "rules": []}
+_CHROMIUM_MAP_TTL = 600  # re-resolve the pinned hosts at most every 10 minutes
+
+
+def _looks_like_ipv4(value):
+    parts = str(value).split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(0 <= int(part) <= 255 for part in parts)
+    except ValueError:
+        return False
+
+
+def _doh_resolve_a(hostname, endpoint):
+    """Resolve *hostname* to an IPv4 string via the given DoH JSON *endpoint*.
+
+    Uses GLOBAL_SESSION, which itself resolves through the project DoH, so this
+    lookup never touches the ISP resolver.  Best-effort: returns None on any
+    failure (the host then falls back to Chromium\'s own DoH switches).
     """
-    template = _CHROMIUM_DOH_TEMPLATES.get(ACTIVE_DNS_MODE)
-    if not template:
+    try:
+        resp = GLOBAL_SESSION.get(
+            endpoint,
+            params={"name": hostname, "type": "A"},
+            headers={"accept": "application/dns-json"},
+            timeout=(4, 6),
+        )
+        for ans in (resp.json().get("Answer") or []):
+            if ans.get("type") == 1:  # A record
+                ip = str(ans.get("data", "")).strip()
+                if _looks_like_ipv4(ip):
+                    return ip
+    except Exception:
+        pass
+    return None
+
+
+def _chromium_host_map_rules():
+    """Build (and cache) the --host-resolver-rules MAP entries for the blocked
+    site hosts, resolved via the active project DoH."""
+    import time as _time
+    endpoint = _DOH_JSON_ENDPOINTS.get(ACTIVE_DNS_MODE)
+    if not endpoint:
         return []
-    return [
+    with _CHROMIUM_MAP_LOCK:
+        now = _time.monotonic()
+        cache = _CHROMIUM_MAP_CACHE
+        if (cache["mode"] == ACTIVE_DNS_MODE and cache["rules"]
+                and now - cache["ts"] < _CHROMIUM_MAP_TTL):
+            return list(cache["rules"])
+        rules = []
+        for host in _CHROMIUM_MAP_HOSTS:
+            ip = _doh_resolve_a(host, endpoint)
+            if ip:
+                rules.append("MAP %s %s" % (host, ip))
+        if rules:  # cache only a usable result; retry next launch otherwise
+            cache["mode"] = ACTIVE_DNS_MODE
+            cache["ts"] = now
+            cache["rules"] = list(rules)
+        return rules
+
+
+def chromium_dns_args():
+    """Chromium args that force the captcha browser onto the project DNS.
+
+    The DoH command-line switches alone are unreliable: in "secure" mode
+    Chromium still bootstraps the DoH server *hostname* via the OS/ISP resolver,
+    and some builds/profiles ignore the switch entirely -- so the browser
+    silently falls back to the ISP resolver and hits the ISP block, even though
+    in-process DoH (niquests/yt-dlp) works.  We therefore also resolve the
+    ISP-blocked site hosts here through the same project DoH and pin them with
+    --host-resolver-rules, so Chromium never asks the ISP resolver for them.
+
+    Only the DoH presets can be mapped onto Chromium; "system"/"custom" modes
+    return no args (matching the niquests fallback to system DNS).
+    """
+    ip_template = _CHROMIUM_DOH_IP_TEMPLATES.get(ACTIVE_DNS_MODE)
+    if not ip_template:
+        return []
+    args = [
+        "--enable-features=DnsOverHttps",
         "--dns-over-https-mode=secure",
-        "--dns-over-https-templates=" + template,
+        "--dns-over-https-templates=" + ip_template,
     ]
+    rules = _chromium_host_map_rules()
+    if rules:
+        args.append("--host-resolver-rules=" + ",".join(rules))
+    return args
 
 
 # Set once curl_cffi's Curl.perform has been wrapped to inject DoH.
