@@ -4009,3 +4009,32 @@ msgstr "WebGL-Renderer-Spoof (nur auf Servern/Docker ohne GPU sinnvoll)"
 
 msgid "Captcha timeout (seconds, empty = default)"
 msgstr "Captcha-Timeout (Sekunden, leer = Standard)"
+
+# -- settings.html: nachgezogene Bestands-Strings --
+
+msgid "Add time"
+msgstr "Zeit hinzufügen"
+
+msgid "Adds a Media category to the statistics page with movie, series and episode counts based on your media library."
+msgstr "Fügt der Statistikseite eine Medien-Kategorie mit Anzahl an Filmen, Serien und Episoden basierend auf deiner Mediathek hinzu."
+
+msgid "Automatically delete download-history entries older than the selected period. Runs about hourly."
+msgstr "Löscht automatisch Download-Verlaufseinträge, die älter als der gewählte Zeitraum sind. Läuft etwa stündlich."
+
+msgid "Interval"
+msgstr "Intervall"
+
+msgid "Keep history for"
+msgstr "Verlauf aufbewahren für"
+
+msgid "Time Format"
+msgstr "Zeitformat"
+
+msgid "Unlimited"
+msgstr "Unbegrenzt"
+
+msgid "Weekly schedule"
+msgstr "Wöchentlicher Zeitplan"
+
+msgid "days"
+msgstr "Tage"
