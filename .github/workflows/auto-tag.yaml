@@ -3,7 +3,7 @@ name: Auto-release on version bump
 on:
   push:
     branches:
-      - models
+      - main
     paths:
       - pyproject.toml
 

@@ -34,7 +34,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 PACKAGE = "mediaforge"
 REPO_URL = "https://github.com/PD-Codes/MediaForge.git"
-DEV_BRANCH = "models"
+DEV_BRANCH = "main"
 DEV_SPEC = f"git+{REPO_URL}@{DEV_BRANCH}"
 
 CONFIG_DIR = Path.home() / ".mediaforge"
@@ -417,7 +417,7 @@ def start_update(target_channel: str | None = None) -> dict:
     target = (target_channel or current_channel).lower()
     if target not in ("stable", "dev"):
         raise UpdateError(f"invalid channel '{target}'")
-    # A dev/branch install (git+...@models) keeps a static version string
+    # A dev/branch install (git+...@main) keeps a static version string
     # across commits, so plain --upgrade is a no-op: pip sees the same
     # version and never re-clones. Force a reinstall for dev so the newest
     # commit is actually pulled, not just on a channel switch.

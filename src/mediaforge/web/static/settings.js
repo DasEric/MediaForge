@@ -1341,7 +1341,7 @@ function _applyUpdateData(data) {
       }
       if (changelog) changelog.style.display = "none";
       if (pipCmd) pipCmd.textContent =
-        'pip install --upgrade "git+https://github.com/PD-Codes/MediaForge.git@models"';
+        'pip install --upgrade "git+https://github.com/PD-Codes/MediaForge.git@main"';
     } else {
       // Release install: neue Version verfügbar
       if (bannerText) bannerText.textContent =t("Version " + data.latest_version + " verfügbar (installiert: " + data.local_version + ")","Version " + data.latest_version + " available (installed: " + data.local_version + ")");

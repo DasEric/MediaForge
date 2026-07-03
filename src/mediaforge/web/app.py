@@ -2439,7 +2439,7 @@ def _get_display_version():
     Return the version string shown in the UI.
 
     - Release install (``@v2.1.6``):  ``"2.1.6"``
-    - Dev install    (``@models``):   ``"2.1.6-dev+abc1234"``
+    - Dev install    (``@main``):   ``"2.1.6-dev+abc1234"``
     """
     base = _get_version()
     if not base:
@@ -2457,7 +2457,7 @@ _GITHUB_RELEASES_URL = (
     "https://api.github.com/repos/PD-Codes/MediaForge/releases/latest"
 )
 _GITHUB_COMMITS_URL = (
-    "https://api.github.com/repos/PD-Codes/MediaForge/commits/models"
+    "https://api.github.com/repos/PD-Codes/MediaForge/commits/main"
 )
 _UPDATE_CHECK_INTERVAL = 24 * 60 * 60  # 24 hours
 
@@ -2495,7 +2495,7 @@ def _fetch_latest_release():
 
 
 def _fetch_latest_commit_sha():
-    """Return the full SHA of the latest commit on the models branch."""
+    """Return the full SHA of the latest commit on the main branch."""
     import json
     import urllib.request as _ureq
 
@@ -2525,14 +2525,14 @@ def _do_update_check():
     _update_cache["is_dev_install"] = is_dev
 
     if is_dev:
-        # Dev install: compare our commit SHA against the latest on models branch
+        # Dev install: compare our commit SHA against the latest on main branch
         latest_sha = _fetch_latest_commit_sha()
         if latest_sha and full_commit_hash:
             update_available = not latest_sha.startswith(full_commit_hash[:7]) and latest_sha != full_commit_hash
             _update_cache["update_available"] = update_available
             _update_cache["latest_version"] = latest_sha[:7]
             _update_cache["release_url"] = (
-                "https://github.com/PD-Codes/MediaForge/commits/models"
+                "https://github.com/PD-Codes/MediaForge/commits/main"
             )
             _update_cache["release_notes"] = None
             _update_cache["error"] = None
@@ -11220,4 +11220,4 @@ def start_web_ui(
         try:
             server.run()
         except (KeyboardInterrupt, SystemExit):
-            _graceful_shutdown()
+            _graceful_shutdo
