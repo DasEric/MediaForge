@@ -3980,3 +3980,32 @@ msgstr "App jetzt neu starten"
 
 msgid "Restarts MediaForge with the same startup arguments — without installing an update. Running downloads pause and resume afterwards."
 msgstr "Startet MediaForge mit denselben Startargumenten neu — ohne ein Update zu installieren. Laufende Downloads werden pausiert und danach fortgesetzt."
+
+# -- settings.html: Captcha options --
+
+msgid "Captcha options"
+msgstr "Captcha-Optionen"
+
+msgid "Solve manually (no auto-click) — only your own click on the checkbox counts"
+msgstr "Manuell lösen (kein Auto-Klick) — nur dein eigener Klick auf die Checkbox zählt"
+
+msgid "Show the captcha window on screen (do not move it off-screen)"
+msgstr "Captcha-Fenster sichtbar zeigen (nicht off-screen schieben)"
+
+msgid "Network ad-blocker active (turn off if the captcha does not load)"
+msgstr "Netzwerk-Adblocker aktiv (abschalten, falls das Captcha nicht lädt)"
+
+msgid "Ad-tab guard active (auto-closes pop-up ad tabs)"
+msgstr "Ad-Tab-Wächter aktiv (schließt Werbe-Tabs automatisch)"
+
+msgid "Ad-overlay remover active (recommended — off can let clicks be hijacked)"
+msgstr "Ad-Overlay-Entferner aktiv (empfohlen — aus kann Klicks kapern)"
+
+msgid "User-agent sync active (recommended — keeps the cf_clearance cookie valid)"
+msgstr "User-Agent-Sync aktiv (empfohlen — hält das cf_clearance-Cookie gültig)"
+
+msgid "WebGL renderer spoof (only useful on servers/Docker without a GPU)"
+msgstr "WebGL-Renderer-Spoof (nur auf Servern/Docker ohne GPU sinnvoll)"
+
+msgid "Captcha timeout (seconds, empty = default)"
+msgstr "Captcha-Timeout (Sekunden, leer = Standard)"

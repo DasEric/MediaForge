@@ -134,8 +134,17 @@ async function loadSettings() {
     if (dnsModeEl) { dnsModeEl.value = data.dns_mode || "system"; onDnsModeChange(); }
     if (dnsServerEl) dnsServerEl.value = data.dns_server || "";
 
-    const persistProfileEl = document.getElementById("browserPersistentProfile");
-    if (persistProfileEl) persistProfileEl.checked = data.browser_persistent_profile === "1";
+    const _setCb = (id, on) => { const el = document.getElementById(id); if (el) el.checked = !!on; };
+    _setCb("browserPersistentProfile", data.browser_persistent_profile === "1");
+    _setCb("captchaAdblock",        (data.captcha_adblock ?? "1") === "1");
+    _setCb("captchaAdtabGuard",     (data.captcha_adtab_guard ?? "1") === "1");
+    _setCb("captchaOverlayRemoval", (data.captcha_overlay_removal ?? "1") === "1");
+    _setCb("captchaUaSync",         (data.captcha_ua_sync ?? "1") === "1");
+    _setCb("captchaWebglSpoof",     (data.captcha_webgl_spoof ?? "0") === "1");
+    _setCb("captchaManual",         (data.captcha_manual ?? "0") === "1");
+    _setCb("captchaVisible",        (data.captcha_visible ?? "0") === "1");
+    const captchaTimeoutEl = document.getElementById("captchaTimeout");
+    if (captchaTimeoutEl) captchaTimeoutEl.value = data.captcha_timeout || "";
 
     const webBaseUrlEl = document.getElementById("webBaseUrl");
     if (webBaseUrlEl) webBaseUrlEl.value = data.web_base_url || "";
@@ -999,20 +1008,29 @@ async function saveDnsSettings() {
 
 // ─── Captcha / Browser tab ──────────────────────────────────────────────────
 
-async function saveBrowserProfile() {
-  const cb = document.getElementById("browserPersistentProfile");
-  const enabled = !!(cb && cb.checked);
+async function saveCaptchaSettings() {
+  const g = (id) => document.getElementById(id);
+  const cb = (id) => !!(g(id) && g(id).checked);
+  const payload = {
+    persistent_profile: cb("browserPersistentProfile"),
+    manual:             cb("captchaManual"),
+    visible:            cb("captchaVisible"),
+    adblock:            cb("captchaAdblock"),
+    adtab_guard:        cb("captchaAdtabGuard"),
+    overlay_removal:    cb("captchaOverlayRemoval"),
+    ua_sync:            cb("captchaUaSync"),
+    webgl_spoof:        cb("captchaWebglSpoof"),
+    timeout:            ((g("captchaTimeout") && g("captchaTimeout").value) || "").trim(),
+  };
   try {
     const resp = await fetch("/api/settings/browser", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ persistent_profile: enabled }),
+      body: JSON.stringify(payload),
     });
     const data = await resp.json();
     if (data.ok) {
-      showToast(enabled
-        ? t("Persistentes Profil aktiv — greift beim nächsten Captcha", "Persistent profile enabled — applies on the next captcha")
-        : t("Persistentes Profil deaktiviert", "Persistent profile disabled"), "success");
+      showToast(t("Captcha-Einstellungen gespeichert — greifen beim nächsten Captcha", "Captcha settings saved — apply on the next captcha"), "success");
     } else {
       showToast(data.error || t("Fehler beim Speichern", "Error saving"), "error");
     }

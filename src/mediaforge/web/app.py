@@ -2731,6 +2731,47 @@ def _sync_db_settings_to_env():
             os.environ[env_key] = val
 
 
+def _apply_captcha_env():
+    """Map the captcha/browser DB settings onto the environment variables read
+    by mediaforge.playwright.captcha.  Protective features default to ON, so a
+    stored "0" translates into the corresponding MEDIAFORGE_..._NO_/kill-switch.
+    Note: DNS routing is intentionally NOT toggleable and has no setting here."""
+    import os
+
+    def _on(key, default):
+        return get_setting(key, default) == "1"
+
+    # Protective features (default ON) — turning them off sets the NO_ kill-switch
+    for db_key, no_env in (
+        ("captcha_adblock",         "MEDIAFORGE_NO_ADBLOCK"),
+        ("captcha_adtab_guard",     "MEDIAFORGE_CAPTCHA_NO_ADTAB_GUARD"),
+        ("captcha_overlay_removal", "MEDIAFORGE_CAPTCHA_NO_OVERLAY_REMOVAL"),
+        ("captcha_ua_sync",         "MEDIAFORGE_CAPTCHA_NO_UA_SYNC"),
+    ):
+        if _on(db_key, "1"):
+            os.environ.pop(no_env, None)
+        else:
+            os.environ[no_env] = "1"
+
+    # Opt-in features (default OFF)
+    for db_key, env in (
+        ("captcha_webgl_spoof", "MEDIAFORGE_SPOOF_WEBGL"),
+        ("captcha_manual",      "MEDIAFORGE_CAPTCHA_MANUAL"),
+        ("captcha_visible",     "MEDIAFORGE_CAPTCHA_VISIBLE"),
+    ):
+        if _on(db_key, "0"):
+            os.environ[env] = "1"
+        else:
+            os.environ.pop(env, None)
+
+    # Solve timeout in seconds (empty = code default)
+    to = (get_setting("captcha_timeout", "") or "").strip()
+    if to.isdigit() and int(to) > 0:
+        os.environ["MEDIAFORGE_CAPTCHA_TIMEOUT"] = str(int(to))
+    else:
+        os.environ.pop("MEDIAFORGE_CAPTCHA_TIMEOUT", None)
+
+
 _tmdb_keywords_worker_started = False
 
 def _tmdb_keywords_sync_worker():
@@ -3060,6 +3101,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     # after the setting is toggled in the WebUI.
     if get_setting("browser_persistent_profile", "0") == "1":
         os.environ["MEDIAFORGE_PERSISTENT_PROFILE"] = "1"
+
+    # Apply captcha/browser toggles (ad-blocker, overlay removal, manual solve,
+    # visible window, timeout, ...).  DNS routing stays hard-wired, not here.
+    _apply_captcha_env()
 
     # Start library file watcher (watchdog-based, event-driven rescans)
     from .library_watcher import get_watcher as _get_lib_watcher
@@ -5220,6 +5265,14 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 "dns_mode":                  get_setting("dns_mode", "system"),
                 "dns_server":                get_setting("dns_server", ""),
                 "browser_persistent_profile": get_setting("browser_persistent_profile", "0"),
+                "captcha_adblock":            get_setting("captcha_adblock",         "1"),
+                "captcha_adtab_guard":        get_setting("captcha_adtab_guard",     "1"),
+                "captcha_overlay_removal":    get_setting("captcha_overlay_removal", "1"),
+                "captcha_ua_sync":            get_setting("captcha_ua_sync",         "1"),
+                "captcha_webgl_spoof":        get_setting("captcha_webgl_spoof",     "0"),
+                "captcha_manual":             get_setting("captcha_manual",          "0"),
+                "captcha_visible":            get_setting("captcha_visible",         "0"),
+                "captcha_timeout":            get_setting("captcha_timeout",         ""),
                 "cineinfo": {
                     "tmdb_api_key":   get_setting("cineinfo_tmdb_api_key",   ""),
                     "country":        get_setting("cineinfo_country",        "DE"),
@@ -6838,14 +6891,42 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         if not _is_admin:
             return jsonify({"error": "forbidden"}), 403
         data = request.get_json(silent=True) or {}
-        enabled = bool(data.get("persistent_profile"))
-        set_setting("browser_persistent_profile", "1" if enabled else "0")
-        if enabled:
+
+        def _b(key):
+            return "1" if data.get(key) else "0"
+
+        if "persistent_profile" in data:
+            set_setting("browser_persistent_profile", _b("persistent_profile"))
+        for key, db_key in (
+            ("adblock",         "captcha_adblock"),
+            ("adtab_guard",     "captcha_adtab_guard"),
+            ("overlay_removal", "captcha_overlay_removal"),
+            ("ua_sync",         "captcha_ua_sync"),
+            ("webgl_spoof",     "captcha_webgl_spoof"),
+            ("manual",          "captcha_manual"),
+            ("visible",         "captcha_visible"),
+        ):
+            if key in data:
+                set_setting(db_key, _b(key))
+        if "timeout" in data:
+            raw = str(data.get("timeout", "")).strip()
+            if raw == "":
+                set_setting("captcha_timeout", "")
+            else:
+                try:
+                    v = int(raw)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "invalid timeout"}), 400
+                set_setting("captcha_timeout", str(max(10, min(1800, v))))
+
+        # Persistent profile env (applies live on the next captcha)
+        if get_setting("browser_persistent_profile", "0") == "1":
             os.environ["MEDIAFORGE_PERSISTENT_PROFILE"] = "1"
             os.environ.pop("MEDIAFORGE_NO_PERSISTENT_PROFILE", None)
         else:
             os.environ.pop("MEDIAFORGE_PERSISTENT_PROFILE", None)
-        return jsonify({"ok": True, "persistent_profile": enabled})
+        _apply_captcha_env()
+        return jsonify({"ok": True})
 
     @app.route("/api/browser/profile/clear", methods=["POST"])
     def api_browser_profile_clear():

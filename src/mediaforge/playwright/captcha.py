@@ -62,6 +62,8 @@ _REMOVE_AD_OVERLAYS_JS = """
 
 def _remove_ad_overlays(page) -> None:
     """Remove invisible full-page ad-overlay <a> elements before clicking."""
+    if _env_flag("MEDIAFORGE_CAPTCHA_NO_OVERLAY_REMOVAL"):
+        return
     try:
         page.evaluate(_REMOVE_AD_OVERLAYS_JS)
     except Exception:
@@ -359,14 +361,33 @@ def _network_adblock_enabled() -> bool:
     return os.environ.get("MEDIAFORGE_NO_ADBLOCK", "0") != "1"
 
 
+def _env_flag(name: str) -> bool:
+    """True when the given environment variable is set to "1"."""
+    import os
+    return os.environ.get(name, "0") == "1"
+
+
+def _captcha_timeout(default_seconds: int) -> int:
+    """Captcha solve timeout in seconds; overridable via MEDIAFORGE_CAPTCHA_TIMEOUT
+    (falls back to *default_seconds* when unset or invalid)."""
+    import os
+    raw = os.environ.get("MEDIAFORGE_CAPTCHA_TIMEOUT", "")
+    try:
+        v = int(raw)
+        return v if v > 0 else default_seconds
+    except (ValueError, TypeError):
+        return default_seconds
+
+
 def _install_stealth(context, ad_home=None, weiter_event=None) -> None:
     """Install ad + fingerprint defences on a patchright context: continuous
     overlay removal, optional WebGL spoof, and (when *ad_home* is given) the
     network ad-blocker."""
-    try:
-        context.add_init_script(_AD_OVERLAY_OBSERVER_JS)
-    except Exception:
-        pass
+    if not _env_flag("MEDIAFORGE_CAPTCHA_NO_OVERLAY_REMOVAL"):
+        try:
+            context.add_init_script(_AD_OVERLAY_OBSERVER_JS)
+        except Exception:
+            pass
     if _webgl_spoof_enabled():
         try:
             context.add_init_script(_WEBGL_SPOOF_JS)
@@ -384,6 +405,8 @@ def _sync_session_user_agent(page) -> None:
     a Linux Chromium while the session UA defaults to a random Windows string —
     a guaranteed mismatch — so copy the browser UA onto the session.
     """
+    if _env_flag("MEDIAFORGE_CAPTCHA_NO_UA_SYNC"):
+        return
     try:
         ua = page.evaluate("() => navigator.userAgent")
     except Exception:
@@ -466,6 +489,13 @@ def _click_turnstile(page, logger=None) -> bool:
 
     Returns True if a click was performed.
     """
+    if _env_flag("MEDIAFORGE_CAPTCHA_MANUAL"):
+        # Manual mode: never synthesise a click.  Report success so the caller
+        # stops auto-clicking and simply polls for the token that the user's own
+        # click (CLI window / streamed WebUI) will produce.
+        if logger:
+            logger.debug("Captcha manual mode — auto-click skipped, waiting for user")
+        return True
     def _looks_like_turnstile(u):
         u = (u or "").lower()
         return ("challenges.cloudflare.com" in u
@@ -684,7 +714,7 @@ def _solve_captcha_cli(url: str) -> bool:
                 page = context.new_page()
                 page.goto(url, wait_until="domcontentloaded")
 
-                timeout = 300  # 5 minutes
+                timeout = _captcha_timeout(300)  # default 5 minutes
                 start = _time.time()
                 solved = False
                 turnstile_clicked = False
@@ -810,7 +840,7 @@ def _solve_captcha_interactive(url: str, queue_id: int) -> bool:
             # Hardened context: persistent profile, realistic locale/timezone/
             # viewport, overlay + WebGL defences.  No network ad-block here — this
             # generic solver must let foreign provider iframes load.
-            _handle = _launch_browser_context(p, offscreen=True)
+            _handle = _launch_browser_context(p, offscreen=not _env_flag("MEDIAFORGE_CAPTCHA_VISIBLE"))
             context = _handle.context
             page = context.new_page()
             page.goto(url)
@@ -818,7 +848,7 @@ def _solve_captcha_interactive(url: str, queue_id: int) -> bool:
 
             solved = False
             turnstile_clicked = False
-            for _ in range(300):  # up to ~5 minutes
+            for _ in range(_captcha_timeout(300)):  # ~1s per iteration
                 # Stream screenshot to Web UI
                 try:
                     shot = page.screenshot(type="jpeg", quality=65)
@@ -1024,7 +1054,7 @@ def solve_sto_modal(episode_url: str, provider_name: str, language_label: str,
             # Hardened, ad-blocked context: persistent profile, realistic
             # locale/timezone/viewport, overlay + WebGL fingerprint defences.
             _handle = _launch_browser_context(
-                p, offscreen=(queue_id is not None),
+                p, offscreen=(queue_id is not None) and not _env_flag("MEDIAFORGE_CAPTCHA_VISIBLE"),
                 ad_home=sto_netloc, weiter_event=_weiter_submitted,
             )
             context = _handle.context
@@ -1061,11 +1091,13 @@ def solve_sto_modal(episode_url: str, provider_name: str, language_label: str,
                         with _ad_tab_lock:
                             _provider_tab_urls.append(pu)
                     else:
-                        # Ad tab from overlay click — close immediately
-                        try:
-                            new_pg.close()
-                        except Exception:
-                            pass
+                        # Ad tab from overlay click — close immediately, unless
+                        # the ad-tab guard has been disabled.
+                        if not _env_flag("MEDIAFORGE_CAPTCHA_NO_ADTAB_GUARD"):
+                            try:
+                                new_pg.close()
+                            except Exception:
+                                pass
                 except Exception:
                     try:
                         new_pg.close()
@@ -1133,7 +1165,7 @@ def solve_sto_modal(episode_url: str, provider_name: str, language_label: str,
             last_turnstile_click = 0.0
             start = _time.time()
 
-            while _time.time() - start < 90:
+            while _time.time() - start < _captcha_timeout(90):
                 # WebUI: stream screenshots + forward user clicks
                 if session_obj is not None:
                     try:
