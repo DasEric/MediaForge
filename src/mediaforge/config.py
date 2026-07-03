@@ -384,18 +384,19 @@ def chromium_dns_args():
     Only the DoH presets can be mapped onto Chromium; "system"/"custom" modes
     return no args (matching the niquests fallback to system DNS).
     """
-    ip_template = _CHROMIUM_DOH_IP_TEMPLATES.get(ACTIVE_DNS_MODE)
-    if not ip_template:
+    # Only the DoH presets can be resolved via the project DoH JSON API.
+    if ACTIVE_DNS_MODE not in _DOH_JSON_ENDPOINTS:
         return []
-    args = [
-        "--enable-features=DnsOverHttps",
-        "--dns-over-https-mode=secure",
-        "--dns-over-https-templates=" + ip_template,
-    ]
+    # Pin ONLY the ISP-blocked site hosts to their DoH-resolved IPs.  We do NOT
+    # force global secure DoH on the browser: every other host (Cloudflare
+    # Turnstile, gstatic, ...) resolves via the normal OS resolver, exactly like
+    # a normal browser.  Forcing secure DoH could break Turnstile token issuance
+    # on networks where DoH is flaky/filtered while adding nothing here -- the
+    # only hosts that must bypass the ISP resolver are already pinned below.
     rules = _chromium_host_map_rules()
     if rules:
-        args.append("--host-resolver-rules=" + ",".join(rules))
-    return args
+        return ["--host-resolver-rules=" + ",".join(rules)]
+    return []
 
 
 # Set once curl_cffi's Curl.perform has been wrapped to inject DoH.
