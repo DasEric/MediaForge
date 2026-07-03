@@ -1,0 +1,233 @@
+/* ============================================================
+   Self-update — full-screen install overlay.
+   Global (loaded on every page). Responsive / mobile friendly.
+   ============================================================ */
+
+.update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none;            /* toggled to flex via JS */
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 8, 14, 0.82);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: update-fade-in 0.2s ease;
+}
+
+@keyframes update-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.update-overlay-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-card, #16162a);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-modal, 0 24px 64px rgba(0, 0, 0, 0.8));
+  padding: 38px 32px 30px;
+  text-align: center;
+  color: var(--text-primary, #f0f0f8);
+}
+
+/* Spinner ------------------------------------------------------ */
+.update-spinner {
+  width: 58px;
+  height: 58px;
+  margin: 4px auto 22px;
+  border-radius: 50%;
+  border: 5px solid var(--accent-soft, rgba(124, 58, 237, 0.2));
+  border-top-color: var(--accent, #7c3aed);
+  animation: update-spin 0.9s linear infinite;
+}
+
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Result icon -------------------------------------------------- */
+.update-overlay-icon {
+  width: 62px;
+  height: 62px;
+  margin: 2px auto 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.update-overlay-icon.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success, #22c55e);
+  border: 2px solid var(--success, #22c55e);
+}
+.update-overlay-icon.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error, #ef4444);
+  border: 2px solid var(--error, #ef4444);
+}
+
+.update-overlay-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.update-overlay-text {
+  font-size: 0.92rem;
+  color: var(--text-secondary, #9191b0);
+  margin: 0 0 6px;
+  line-height: 1.45;
+}
+
+.update-overlay-version {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(124, 58, 237, 0.15));
+  color: var(--accent, #7c3aed);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Collapsible log --------------------------------------------- */
+.update-overlay-log {
+  margin: 18px 0 0;
+  text-align: left;
+}
+.update-overlay-log > summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #9191b0);
+  user-select: none;
+  margin-bottom: 8px;
+}
+.update-overlay-log pre {
+  background: var(--input-bg, #1e1e30);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 12px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--text-secondary, #c4c4d4);
+}
+
+/* Actions ------------------------------------------------------ */
+.update-overlay-actions {
+  margin-top: 22px;
+}
+.update-overlay-btn {
+  min-width: 150px;
+  padding: 11px 22px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--bg-elevated, #1a1a28);
+  color: var(--text-primary, #f0f0f8);
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.update-overlay-btn:hover {
+  background: var(--bg-hover, #22223a);
+}
+.update-overlay-btn.primary {
+  background: var(--accent, #7c3aed);
+  border-color: var(--accent, #7c3aed);
+  color: #fff;
+}
+.update-overlay-btn.primary:hover {
+  background: var(--accent-hover, #6d28d9);
+}
+
+.update-overlay-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted, #55556a);
+  margin: 16px 0 0;
+  line-height: 1.4;
+}
+
+/* ============================================================
+   Settings — channel switch + install button + auto-update card
+   ============================================================ */
+.update-channel-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--input-bg, #1e1e30);
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.1));
+}
+.update-channel-btn {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #9191b0);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.update-channel-btn.active {
+  background: var(--accent, #7c3aed);
+  color: #fff;
+}
+.update-channel-btn:not(.active):hover {
+  color: var(--text-primary, #f0f0f8);
+}
+
+.update-install-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--accent, #7c3aed);
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.update-install-btn:hover { background: var(--accent-hover, #6d28d9); }
+
+.auto-update-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 22px 18px;
+}
+.auto-update-field { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.auto-update-time-input {
+  width: 140px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.1));
+  background: var(--input-bg, #1e1e30);
+  color: var(--text-primary, #f0f0f8);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .update-overlay { padding: 14px; }
+  .update-overlay-card { padding: 30px 20px 24px; }
+  .update-overlay-title { font-size: 1.15rem; }
+  .update-overlay-btn { width: 100%; }
+  .auto-update-block { padding: 4px 14px 16px; }
+}

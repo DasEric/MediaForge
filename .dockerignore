@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Tests
+tests/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Dev / editor
+.venv/
+venv/
+.env
+*.env
+.idea/
+.vscode/
+*.swp
+
+# Docker itself
+Dockerfile
+.dockerignore
+docker-compose.yaml
+
+# Docs / examples
+examples/

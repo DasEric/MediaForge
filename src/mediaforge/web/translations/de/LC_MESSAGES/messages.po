@@ -1,0 +1,3919 @@
+# German translations for MediaForge
+# msgid = English source (template key)
+# msgstr = German translation
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-06-28 13:22+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+# ── base.html ──────────────────────────────────────────────────────────────
+msgid "Discover"
+msgstr "Entdecken"
+
+msgid "Home"
+msgstr "Startseite"
+
+msgid "Favorites"
+msgstr "Favoriten"
+
+msgid "Library"
+msgstr "Mediathek"
+
+msgid "Queue"
+msgstr "Warteschlange"
+
+msgid "Upscaling"
+msgstr "Upscaling"
+
+msgid "Advanced Search"
+msgstr "Erweiterte Suche"
+
+msgid "Management"
+msgstr "Verwaltung"
+
+msgid "Statistics"
+msgstr "Statistiken"
+
+msgid "System"
+msgstr "System"
+
+# notifications.html
+msgid "Notifications"
+msgstr "Benachrichtigungen"
+
+# integrations.html
+msgid "Integrations"
+msgstr "Integrationen"
+
+# encoding.html
+msgid "Encoding"
+msgstr "Kodierung"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Log out"
+msgstr "Abmelden"
+
+msgid "Customize appearance"
+msgstr "Erscheinungsbild anpassen"
+
+msgid "Appearance"
+msgstr "Erscheinungsbild"
+
+msgid "Open menu"
+msgstr "Menü öffnen"
+
+msgid "Remove completed, failed and cancelled entries"
+msgstr "Abgeschlossene, fehlgeschlagene und abgebrochene Einträge entfernen"
+
+msgid "Clear entries"
+msgstr "Einträge löschen"
+
+msgid "Close"
+msgstr "Schließen"
+
+msgid "All"
+msgstr "Alle"
+
+msgid "Running"
+msgstr "Läuft"
+
+msgid "Queued"
+msgstr "Wartend"
+
+msgid "Done"
+msgstr "Fertig"
+
+msgid "Partial"
+msgstr "Teilweise"
+
+msgid "Failed"
+msgstr "Fehler"
+
+msgid "Pause downloads"
+msgstr "Downloads pausieren"
+
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+msgid "Accent Color"
+msgstr "Akzentfarbe"
+
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+msgid "Delete title?"
+msgstr "Titel löschen?"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Delete"
+msgstr "Löschen"
+
+msgid "Move title"
+msgstr "Titel verschieben"
+
+msgid "Move"
+msgstr "Verschieben"
+
+msgid "to a different location."
+msgstr "in einen anderen Speicherort."
+
+msgid "Destination"
+msgstr "Ziel-Speicherort"
+
+msgid "Moving"
+msgstr "Verschiebe"
+
+msgid "In background"
+msgstr "Im Hintergrund"
+
+msgid "Reading media information..."
+msgstr "Lese Medieninformationen aus..."
+
+msgid "Solve Captcha"
+msgstr "Captcha lösen"
+
+msgid "Loading browser screenshot..."
+msgstr "Lade Browser-Screenshot..."
+
+msgid "Starting transcoder..."
+msgstr "Transcoding wird gestartet\\u2026"
+
+msgid "Close (Esc)"
+msgstr "Schließen (Esc)"
+
+msgid "Play/Pause (Space)"
+msgstr "Play/Pause (Leertaste)"
+
+msgid "Mute (M)"
+msgstr "Stummschalten (M)"
+
+msgid "Fullscreen"
+msgstr "Vollbild"
+
+msgid "Fullscreen (F)"
+msgstr "Vollbild (F)"
+
+# ── setup.html ────────────────────────────────────────────────────────────
+msgid "Setup"
+msgstr "Einrichtung"
+
+msgid "Initial Setup"
+msgstr "Ersteinrichtung"
+
+msgid ""
+"No admin account exists yet. Create the first admin account to get "
+"started."
+msgstr ""
+"Es existiert noch kein Admin-Konto. Erstelle das erste Admin-Konto um "
+"loszulegen."
+
+msgid "Admin username"
+msgstr "Admin-Benutzername"
+
+msgid "Password (min. 8 characters)"
+msgstr "Passwort (mind. 8 Zeichen)"
+
+msgid "Confirm password"
+msgstr "Passwort bestätigen"
+
+msgid "Create admin account"
+msgstr "Admin-Konto erstellen"
+
+# ── settings.html ─────────────────────────────────────────────────────────
+msgid "Configuration & Management"
+msgstr "Konfiguration & Verwaltung"
+
+msgid "Your .env has been imported"
+msgstr "Deine .env wurde importiert"
+
+msgid "All settings from"
+msgstr "Alle Einstellungen aus"
+
+msgid "are now stored in the database. The file is no longer needed."
+msgstr ""
+"sind jetzt in der Datenbank gespeichert. Die Datei wird nicht mehr "
+"benötigt."
+
+msgid "Delete .env now"
+msgstr ".env jetzt löschen"
+
+msgid "General"
+msgstr "Allgemein"
+
+msgid "Design"
+msgstr "Design"
+
+msgid "Downloads"
+msgstr "Downloads"
+
+msgid "Network"
+msgstr "Netzwerk"
+
+msgid "Authentication"
+msgstr "Authentifizierung"
+
+msgid "Updates"
+msgstr "Updates"
+
+msgid "Project & Support"
+msgstr "Projekt & Support"
+
+msgid ""
+"MediaForge is an open-source project. For questions, bugs, "
+"or feature ideas please visit our GitHub repository."
+msgstr ""
+"MediaForge ist ein Open-Source-Projekt. Bei Fragen, Fehlern "
+"oder für neue Feature-Ideen besuche bitte unser GitHub Repository."
+
+msgid "Language"
+msgstr "Sprache"
+
+msgid "Choose the interface language. The page reloads automatically."
+msgstr "Wähle die Oberflächensprache. Die Seite lädt automatisch neu."
+
+msgid "Media Statistics"
+msgstr "Medien-Statistik"
+
+msgid "Show Media category on the statistics page"
+msgstr "Kategorie „Media“ auf der Statistikseite anzeigen"
+
+msgid ""
+"Adds a Media category to the statistics page with movie, series and "
+"episode counts based on your media library. Also an watcher will be "
+"enabled"
+msgstr ""
+"Fügt der Statistikseite eine Kategorie „Media“ mit Film-, Serien- und "
+"Episodenzahlen aus deiner Mediathek hinzu. Auch ein Watcher wird "
+"aktiviert!"
+
+msgid "Incomplete series"
+msgstr "Unvollständige Serien"
+
+msgid "Series with missing episodes will be listed here."
+msgstr "Serien mit fehlenden Episoden werden hier aufgelistet."
+
+msgid "Debug Mode"
+msgstr "Debug-Modus"
+
+msgid "Enable debug logging"
+msgstr "Debug-Logging aktivieren"
+
+msgid "Writes detailed logs. Takes effect immediately — no restart needed."
+msgstr "Schreibt ausführliche Logs. Sofort wirksam — kein Neustart nötig."
+
+msgid "Enable Web Console"
+msgstr "Web Konsole aktivieren"
+
+msgid "Web Console"
+msgstr "Web Konsole"
+
+msgid "Show the console output directly here in the Web UI"
+msgstr "Zeige die Konsolenausgabe direkt hier im Web UI"
+
+msgid "Custom Color"
+msgstr "Benutzerdefinierte Farbe"
+
+msgid "Reset appearance"
+msgstr "Design zurücksetzen"
+
+msgid "Advanced Settings"
+msgstr "Erweiterte Einstellungen"
+
+msgid "These settings only change the design minimally."
+msgstr "Diese Einstellungen ändern das Design nur minimal."
+
+msgid "Add glow effect"
+msgstr "Glow-Effekt hinzufügen"
+
+msgid "A glow highlight for active menu items in the accent color"
+msgstr "Eine Glow-Markierung aktiver Menüpunkte in der Akzentfarbe"
+
+msgid "Change header color with accent color"
+msgstr "Header-Farbe mit der Akzentfarbe ändern"
+
+msgid "Fade header color for easier readability"
+msgstr "Header-Farbe verblassen für eine leichtere Lesbarkeit"
+
+msgid "Invert header color"
+msgstr "Header-Farbe umkehren"
+
+msgid "Skeleton Loader"
+msgstr "Skeleton Loader"
+
+msgid "An animated loading indicator for items not yet loaded in the overview"
+msgstr ""
+"Ein animiertes Laden in der Übersichtsanzeige für noch nicht geladene "
+"Elemente"
+
+msgid "Color highlight for selection"
+msgstr "Farbliche Markierung der Auswahl"
+
+msgid "A highlight when hovering over a movie or series in the accent color"
+msgstr "Eine Markierung beim Hovern über Filme oder Serien in der Akzentfarbe"
+
+msgid "Color highlight for currently downloading items"
+msgstr "Farbliche Markierung aktiver Downloads in der Übersicht"
+
+msgid "A highlight for currently downloading items in the accent color"
+msgstr "Eine Markierung für aktive Downloads in der Akzentfarbe"
+
+msgid "\"Button Press\" animation when clicking a button or link"
+msgstr "\"Button Press\"-Animation beim Klicken auf einen Button oder Link"
+
+#, python-format
+msgid "Button becomes slightly brighter and 5%% smaller on click"
+msgstr "Button wird etwas heller und um 5%% kleiner beim Klick"
+
+msgid "Icon animations"
+msgstr "Icon-Animationen"
+
+msgid "Icons animate on hover in menus"
+msgstr "Icons bewegen sich beim Hovern in den Menüs"
+
+msgid "Download Settings"
+msgstr "Download-Einstellungen"
+
+msgid "Download Path"
+msgstr "Download-Pfad"
+
+msgid "Save"
+msgstr "Speichern"
+
+msgid "Changes take effect immediately for new downloads."
+msgstr "Änderungen wirken sich sofort auf neue Downloads aus."
+
+msgid "Default Language"
+msgstr "Standardsprache"
+
+msgid "Download Language"
+msgstr "Sprache für Downloads"
+
+msgid "Default Provider"
+msgstr "Standard-Anbieter"
+
+msgid "Used as default when adding a new download."
+msgstr "Wird als Vorgabe beim Hinzufügen eines neuen Downloads verwendet."
+
+msgid "File Naming Template"
+msgstr "Datei-Namensvorlage"
+
+msgid "Placeholders:"
+msgstr "Platzhalter:"
+
+msgid "Separate languages into folders"
+msgstr "Sprachen in Ordner trennen"
+
+msgid "Downloads are sorted by language (e.g. german-dub/, english-sub/)."
+msgstr "Downloads werden nach Sprache sortiert (z.B. german-dub/, english-sub/)."
+
+msgid "Disable English subtitle downloads"
+msgstr "Englische Untertitel-Downloads deaktivieren"
+
+msgid "Hides English Sub from the language selection."
+msgstr "Blendet Englisch Sub aus der Sprachauswahl aus."
+
+msgid "Enable movie subfolders (Filmpalast)"
+msgstr "Film-Unterordner aktivieren (Filmpalast)"
+
+msgid "Each movie gets its own subfolder — recommended for Jellyfin."
+msgstr "Jeder Film erhält einen eigenen Unterordner — empfohlen für Jellyfin."
+
+msgid "Bandwidth & Schedule"
+msgstr "Bandbreite & Zeitfenster"
+
+msgid "Bandwidth Limit"
+msgstr "Bandbreiten-Limit"
+
+msgid "Max download speed (KB/s)"
+msgstr "Max. Download-Geschwindigkeit (KB/s)"
+
+msgid ""
+"Throttles all downloads to this speed. 0 = unlimited. Applies to new "
+"downloads."
+msgstr ""
+"Drosselt alle Downloads auf diese Geschwindigkeit. 0 = unbegrenzt. Gilt "
+"für neue Downloads."
+
+msgid "Download Time Window"
+msgstr "Download-Zeitfenster"
+
+msgid "Only download during a specific time window"
+msgstr "Nur innerhalb eines bestimmten Zeitfensters herunterladen"
+
+msgid "From"
+msgstr "Von"
+
+msgid "Until"
+msgstr "Bis"
+
+msgid ""
+"New downloads only start within this window (server local time). "
+"Overnight windows like 22:00–06:00 are supported. Running downloads are "
+"not interrupted."
+msgstr ""
+"Neue Downloads starten nur innerhalb dieses Fensters (lokale Serverzeit)."
+" Über-Nacht-Fenster wie 22:00–06:00 werden unterstützt. Laufende "
+"Downloads werden nicht unterbrochen."
+
+msgid "Custom Paths"
+msgstr "Benutzerdefinierte Pfade"
+
+msgid "Add Path"
+msgstr "Pfad hinzufügen"
+
+msgid "Name (e.g. NAS)"
+msgstr "Name (z.B. NAS)"
+
+msgid "Add"
+msgstr "Hinzufügen"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Path"
+msgstr "Pfad"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Auto-Sync Defaults"
+msgstr "Auto-Sync Standards"
+
+msgid "Schedule"
+msgstr "Zeitplan"
+
+msgid "1 hour"
+msgstr "1 Stunde"
+
+msgid "2 hours"
+msgstr "2 Stunden"
+
+msgid "4 hours"
+msgstr "4 Stunden"
+
+msgid "8 hours"
+msgstr "8 Stunden"
+
+msgid "12 hours"
+msgstr "12 Stunden"
+
+msgid "16 hours"
+msgstr "16 Stunden"
+
+msgid "24 hours"
+msgstr "24 Stunden"
+
+msgid "Custom path unavailable"
+msgstr "Custom Path nicht erreichbar"
+
+msgid "Skip sync"
+msgstr "Sync überspringen"
+
+msgid "Wait (Hold)"
+msgstr "Warten (Hold)"
+
+msgid ""
+"How often Auto-Sync checks for new episodes. Language and provider are "
+"defaults for new sync jobs."
+msgstr ""
+"Wie oft Auto-Sync nach neuen Episoden sucht. Sprache und Anbieter sind "
+"Standardwerte für neue Sync-Jobs."
+
+msgid "Custom path unavailable:"
+msgstr "Custom Path nicht erreichbar:"
+
+msgid ""
+"Defines what Auto-Sync should do when the assigned custom path is not "
+"available. This is the default for all new jobs but can be overridden per"
+" job."
+msgstr ""
+"Legt fest was der Auto-Sync tun soll wenn der zugewiesene Custom Path "
+"nicht verfügbar ist. Gilt als Standard für alle neuen Jobs — kann aber "
+"pro Job individuell überschrieben werden."
+
+msgid "Auto-Sync Error Handling"
+msgstr "Auto-Sync Fehler-Handling"
+
+msgid "Retries on error"
+msgstr "Wiederholungen bei Fehlern"
+
+msgid "No retries"
+msgstr "Keine Wiederholungen"
+
+msgid "1 retry"
+msgstr "1 Wiederholung"
+
+msgid "2 retries"
+msgstr "2 Wiederholungen"
+
+msgid "3 retries"
+msgstr "3 Wiederholungen"
+
+msgid "Time between attempts"
+msgstr "Zeit zwischen den Versuchen"
+
+msgid "No delay"
+msgstr "Keine Wartezeit"
+
+msgid "1 minute"
+msgstr "1 Minute"
+
+msgid "2 minutes"
+msgstr "2 Minuten"
+
+msgid "3 minutes"
+msgstr "3 Minuten"
+
+msgid "4 minutes"
+msgstr "4 Minuten"
+
+msgid "5 minutes"
+msgstr "5 Minuten"
+
+msgid ""
+"Defines how often and at what interval a failed Auto-Sync is retried "
+"before it is considered permanently failed."
+msgstr ""
+"Legt fest wie oft und in welchem Abstand ein fehlgeschlagener Auto-Sync "
+"wiederholt wird, bevor er als endgültig gescheitert gilt."
+
+msgid "Adaptive Auto-Sync"
+msgstr "Adaptiver Auto-Sync"
+
+msgid "Enable Adaptive Auto-Sync"
+msgstr "Adaptiven Auto-Sync aktivieren"
+
+msgid "Pause after"
+msgstr "Pause nach"
+
+msgid "Retry after"
+msgstr "Neuer Versuch nach"
+
+msgid "2 weeks"
+msgstr "2 Wochen"
+
+msgid "3 weeks"
+msgstr "3 Wochen"
+
+msgid "4 weeks"
+msgstr "4 Wochen"
+
+msgid "5 weeks"
+msgstr "5 Wochen"
+
+msgid "6 weeks"
+msgstr "6 Wochen"
+
+msgid "7 weeks"
+msgstr "7 Wochen"
+
+msgid "8 weeks"
+msgstr "8 Wochen"
+
+msgid "Days"
+msgstr "Tage"
+
+msgid "Weeks"
+msgstr "Wochen"
+
+msgid "Months"
+msgstr "Monate"
+
+msgid ""
+"When an Auto-Sync job finds no new episodes for the selected period, it "
+"enters pause mode and is only re-checked at the wider interval below. As "
+"soon as a new episode is found again, it returns to the normal cycle."
+msgstr ""
+"Findet ein Auto-Sync-Job über den gewählten Zeitraum keine neuen Folgen, "
+"wechselt er in den Pause-Modus und wird nur noch im unten gewählten, "
+"größeren Abstand geprüft. Sobald wieder eine neue Folge gefunden wird, "
+"kehrt er in den normalen Zyklus zurück."
+
+msgid "Only administrators can change Auto-Sync settings."
+msgstr "Nur Administratoren können Auto-Sync-Einstellungen ändern."
+
+msgid "Network / DNS"
+msgstr "Netzwerk / DNS"
+
+msgid "DNS Mode"
+msgstr "DNS-Modus"
+
+msgid "System (Default)"
+msgstr "System (Standard)"
+
+msgid "Custom..."
+msgstr "Benutzerdefiniert…"
+
+msgid "DNS Server IP"
+msgstr "DNS-Server IP"
+
+msgid ""
+"Defines which DNS server resolves domains. Useful if your ISP blocks "
+"AniWorld or S.TO."
+msgstr ""
+"Legt fest, über welchen DNS-Server Domains aufgelöst werden. Nützlich "
+"wenn dein ISP AniWorld oder S.TO sperrt."
+
+msgid "Test DNS"
+msgstr "DNS testen"
+
+msgid "DNS Diagnostics"
+msgstr "DNS-Diagnose"
+
+msgid "Test"
+msgstr "Testen"
+
+msgid "DNS Status"
+msgstr "DNS-Status"
+
+msgid "— Not tested yet"
+msgstr "— Noch nicht getestet"
+
+msgid "Reachability"
+msgstr "Erreichbarkeit"
+
+msgid "Web Server"
+msgstr "Web-Server"
+
+msgid "Base URL (Reverse Proxy)"
+msgstr "Basis-URL (Reverse Proxy)"
+
+msgid ""
+"Public URL when MediaForge runs behind a reverse proxy (e.g. Nginx, "
+"Traefik). Required for OIDC callbacks and absolute links. Leave empty if "
+"no proxy is used."
+msgstr ""
+"Öffentliche URL wenn MediaForge hinter einem Reverse Proxy läuft (z.B. "
+"Nginx, Traefik). Wird für OIDC-Callbacks und absolute Links benötigt. "
+"Leer lassen wenn kein Proxy verwendet wird."
+
+msgid "Changes take effect after the next restart."
+msgstr "Änderungen werden nach dem nächsten Neustart wirksam."
+
+msgid "User Management"
+msgstr "Benutzerverwaltung"
+
+msgid "Add User"
+msgstr "Benutzer hinzufügen"
+
+msgid "Username"
+msgstr "Benutzername"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "User"
+msgstr "Benutzer"
+
+msgid "Administrator"
+msgstr "Administrator"
+
+msgid "Role"
+msgstr "Rolle"
+
+msgid "Created"
+msgstr "Erstellt"
+
+msgid "Single Sign-On (SSO / OIDC)"
+msgstr "Single Sign-On (SSO / OIDC)"
+
+msgid ""
+"Connect MediaForge with an external identity provider (Keycloak, Authentik,"
+" Google, etc.)."
+msgstr ""
+"Verbinde MediaForge mit einem externen Identity-Provider (Keycloak, "
+"Authentik, Google, etc.)."
+
+msgid "Changes require a server restart."
+msgstr "Änderungen erfordern einen Neustart des Servers."
+
+msgid "Enable SSO login"
+msgstr "SSO-Login aktivieren"
+
+msgid "SSO only (disable local logins)"
+msgstr "Nur SSO (lokale Logins deaktivieren)"
+
+msgid "Admin username (SSO)"
+msgstr "Admin-Benutzername (SSO)"
+
+msgid "Admin subject (sub claim)"
+msgstr "Admin-Subject (sub claim)"
+
+msgid ""
+"The sub claim is more secure than the username. Found in server logs "
+"after the first SSO login."
+msgstr ""
+"Der sub claim ist sicherer als der Benutzername. Zu finden in den Server-"
+"Logs nach dem ersten SSO-Login."
+
+msgid "Save SSO settings"
+msgstr "SSO-Einstellungen speichern"
+
+msgid "✓ Saved — restart required"
+msgstr "✓ Gespeichert — Neustart erforderlich"
+
+msgid ""
+"External REST API for Home Assistant & Co. Auth via X-Api-Key header or "
+"?apikey=."
+msgstr ""
+"Externe REST-API für Home Assistant & Co. Auth per X-Api-Key Header oder "
+"?apikey=."
+
+msgid "Loading..."
+msgstr "Wird geladen…"
+
+msgid "Show"
+msgstr "Anzeigen"
+
+msgid "Copy"
+msgstr "Kopieren"
+
+msgid "Regenerate"
+msgstr "Neu generieren"
+
+msgid "Base URL"
+msgstr "Basis-URL"
+
+msgid "Endpoints"
+msgstr "Endpunkte"
+
+msgid "Status & queue overview"
+msgstr "Status & Queue-Übersicht"
+
+msgid "Download queue"
+msgstr "Download-Queue"
+
+msgid "Single queue item"
+msgstr "Einzelnes Queue-Item"
+
+msgid "Library — all titles"
+msgstr "Mediathek — alle Titel"
+
+msgid "Series only"
+msgstr "Nur Serien"
+
+msgid "Movies only"
+msgstr "Nur Filme"
+
+msgid "Download statistics"
+msgstr "Download-Statistiken"
+
+msgid "Example:"
+msgstr "Beispiel:"
+
+msgid "Installed"
+msgstr "Installiert"
+
+msgid "Available"
+msgstr "Verfügbar"
+
+msgid "Check now"
+msgstr "Jetzt prüfen"
+
+msgid "unknown"
+msgstr "unbekannt"
+
+msgid "Open release"
+msgstr "Release öffnen"
+
+msgid "Install update"
+msgstr "Update installieren"
+
+msgid "Development channel"
+msgstr "Entwicklungskanal"
+
+msgid ""
+"You are using a stable release. The development channel contains the "
+"latest commits directly from the models branch — it may be unstable or "
+"contain unfinished features."
+msgstr ""
+"Du verwendest ein stabiles Release. Der Entwicklungskanal enthält die "
+"neuesten Commits direkt aus dem models-Branch — er kann instabil sein "
+"oder unfertige Features enthalten."
+
+# ── login.html ────────────────────────────────────────────────────────────
+msgid "Sign in"
+msgstr "Anmelden"
+
+msgid "or"
+msgstr "oder"
+
+msgid "Sign in with"
+msgstr "Anmelden mit"
+
+# ── index.html ────────────────────────────────────────────────────────────
+msgid "Download anime & series directly"
+msgstr "Anime & Serien direkt herunterladen"
+
+msgid "Search anime & series…"
+msgstr "Anime & Serien suchen…"
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Direct Link"
+msgstr "Direkt Link"
+
+msgid "Searching..."
+msgstr "Suche läuft..."
+
+msgid "New Anime"
+msgstr "Neue Animes"
+
+msgid "Popular Anime"
+msgstr "Beliebte Animes"
+
+msgid "New Series"
+msgstr "Neue Serien"
+
+msgid "Popular Series"
+msgstr "Beliebte Serien"
+
+msgid "New Movies"
+msgstr "Neue Filme"
+
+# ── advanced_search.html ──────────────────────────────────────────────────
+msgid "Discover new series and movies with TMDB filters"
+msgstr "Entdecke neue Serien und Filme mit den TMDB-Filtern"
+
+msgid "Movies"
+msgstr "Filme"
+
+msgid "All Genres"
+msgstr "Alle Genres"
+
+msgid "Show advanced filters"
+msgstr "Erweiterte Filter anzeigen"
+
+msgid "Sort by"
+msgstr "Sortierung"
+
+msgid "Popularity (Descending)"
+msgstr "Beliebtheit (Absteigend)"
+
+msgid "Popularity (Ascending)"
+msgstr "Beliebtheit (Aufsteigend)"
+
+msgid "Rating (Descending)"
+msgstr "Bewertung (Absteigend)"
+
+msgid "Release (Newest first)"
+msgstr "Release (Neuste zuerst)"
+
+msgid "Release (Oldest first)"
+msgstr "Release (Älteste zuerst)"
+
+msgid "Search keyword (e.g. anime)..."
+msgstr "Keyword suchen (z.B. anime)..."
+
+msgid "Release year"
+msgstr "Erscheinungsjahr"
+
+msgid "From (e.g. 2000)"
+msgstr "Von (z.B. 2000)"
+
+msgid "To (e.g. 2024)"
+msgstr "Bis (z.B. 2024)"
+
+msgid "TMDB Rating"
+msgstr "TMDB Bewertung"
+
+msgid "Watch Region"
+msgstr "Streaming-Region"
+
+msgid "Any region"
+msgstr "Beliebige Region"
+
+msgid "Required for provider filters"
+msgstr "Erforderlich für Anbieter-Filter"
+
+msgid "Include Providers"
+msgstr "Anbieter einschließen"
+
+msgid "Exclude Providers"
+msgstr "Anbieter ausschließen"
+
+msgid "Search provider (e.g. Netflix)..."
+msgstr "Anbieter suchen (z.B. Netflix)..."
+
+msgid "Results"
+msgstr "Ergebnisse"
+
+msgid "Back"
+msgstr "Zurück"
+
+msgid "Page"
+msgstr "Seite"
+
+msgid "Next"
+msgstr "Weiter"
+
+msgid "Please select your filters and click Search."
+msgstr "Bitte wähle deine Filter und klicke auf Suchen."
+
+msgid "Searching streams on AniWorld, S.TO & FilmPalast..."
+msgstr "Suche Streams auf AniWorld, S.TO & FilmPalast..."
+
+# ── autosync.html ─────────────────────────────────────────────────────────
+msgid "Automatically search for new episodes and download them on a schedule."
+msgstr ""
+"Automatisch nach neuen Episoden suchen und diese nach einem Zeitplan "
+"herunterladen."
+
+msgid "Sync all"
+msgstr "Alle synchronisieren"
+
+msgid "Export all jobs as JSON"
+msgstr "Alle Jobs als JSON exportieren"
+
+msgid "Import jobs from JSON"
+msgstr "Jobs aus JSON importieren"
+
+msgid "0 selected"
+msgstr "0 ausgewählt"
+
+msgid "Enable"
+msgstr "Aktivieren"
+
+msgid "Disable"
+msgstr "Deaktivieren"
+
+msgid "Default"
+msgstr "Standard"
+
+msgid "Set path"
+msgstr "Pfad setzen"
+
+msgid "No sync jobs yet. Add a series from the search page."
+msgstr "Noch keine Sync-Jobs. Füge eine Serie über die Suchseite hinzu."
+
+msgid "Edit sync job"
+msgstr "Sync-Job bearbeiten"
+
+msgid "Provider"
+msgstr "Anbieter"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Enabled"
+msgstr "Aktiviert"
+
+msgid "Path unavailable"
+msgstr "Pfad nicht erreichbar"
+
+msgid "Skip:"
+msgstr "Überspringen:"
+
+msgid ""
+"This sync run will be skipped. It will be retried on the next scheduled "
+"check."
+msgstr ""
+"Dieser Sync-Durchlauf wird ausgelassen. Beim nächsten geplanten Check "
+"wird es erneut versucht."
+
+msgid "Wait (Hold):"
+msgstr "Warten (Hold):"
+
+msgid ""
+"The sync pauses until the custom path is reachable again — then starts "
+"automatically."
+msgstr ""
+"Der Sync pausiert solange bis der Custom Path wieder erreichbar ist — "
+"danach startet er automatisch."
+
+# ── favourites.html ───────────────────────────────────────────────────────
+msgid "Your saved series & anime"
+msgstr "Deine gespeicherten Serien & Anime"
+
+msgid "Loading favorites…"
+msgstr "Lade Favoriten…"
+
+# ── library.html ─────────────────────────────────────────────────────────
+msgid "Search series, movie or file…"
+msgstr "Serie, Film oder Datei suchen…"
+
+msgid "Show all"
+msgstr "Alles anzeigen"
+
+msgid "Sort by name"
+msgstr "Nach Name sortieren"
+
+msgid "Sort by size"
+msgstr "Nach Größe sortieren"
+
+msgid "Size"
+msgstr "Größe"
+
+msgid "Sort by episode count"
+msgstr "Nach Episodenanzahl sortieren"
+
+msgid "Ep."
+msgstr "Ep."
+
+msgid "Refresh"
+msgstr "Aktualisieren"
+
+msgid "Scanning…"
+msgstr "Wird gescannt…"
+
+msgid "Watcher…"
+msgstr "Watcher…"
+
+msgid "Move in progress"
+msgstr "Verschiebevorgang läuft"
+
+msgid "moving"
+msgstr "wird verschoben"
+
+# ── seerr.html ────────────────────────────────────────────────────────────
+msgid "Seerr Requests"
+msgstr "Seerr Anfragen"
+
+msgid "Pending & accepted series requests"
+msgstr "Ausstehende & angenommene Serien-Anfragen"
+
+msgid "Enter title…"
+msgstr "Titel eingeben…"
+
+msgid "Decline"
+msgstr "Ablehnen"
+
+msgid "Episodes"
+msgstr "Episoden"
+
+msgid "Select all"
+msgstr "Alle auswählen"
+
+msgid "Loading episodes…"
+msgstr "Lade Episoden…"
+
+msgid "Checking Availability"
+msgstr "Verfügbarkeit prüfen"
+
+msgid "Checking if the selected content is available on Veev"
+msgstr "Es wird überprüft ob der ausgewählte Inhalt auf Veev verfügbar ist"
+
+# ── setup_locked.html ─────────────────────────────────────────────────────
+msgid "Setup locked"
+msgstr "Einrichtung gesperrt"
+
+msgid "The setup link is invalid or expired."
+msgstr "Der Setup-Link ist ungültig oder abgelaufen."
+
+msgid "Restart the application to get a new token."
+msgstr "Starte die Anwendung neu um einen neuen Token zu erhalten."
+
+# ── stats.html ────────────────────────────────────────────────────────────
+msgid "Overview of your download activity"
+msgstr "Übersicht deiner Download-Aktivität"
+
+msgid "Loading statistics…"
+msgstr "Lade Statistiken…"
+
+msgid "Download speed details"
+msgstr "Download-Geschwindigkeit Details"
+
+msgid "Download performance details will be shown here."
+msgstr "Hier werden Details zur Download-Performance angezeigt."
+
+# ── shared_modals.html ────────────────────────────────────────────────────
+msgid "Paste a s.to or aniworld.to series URL"
+msgstr "s.to oder aniworld.to Serien-URL einfügen"
+
+msgid "Bookmark"
+msgstr "Merken"
+
+msgid "Recommendations"
+msgstr "Empfehlungen"
+
+msgid "Loading episodes..."
+msgstr "Lade Episoden..."
+
+msgid "Keep up to date (Auto-Sync)"
+msgstr "Aktuell halten (Auto-Sync)"
+
+msgid "Upscale with Anime4K"
+msgstr "Mit Anime4K upscalen"
+
+msgid "Download selected"
+msgstr "Ausgewählte herunterladen"
+
+msgid "Download all"
+msgstr "Alle herunterladen"
+
+msgid "Download all languages"
+msgstr "Alle Sprachen herunterladen"
+
+msgid "Connect external services"
+msgstr "Externe Dienste verbinden"
+
+msgid "Seerr Integration"
+msgstr "Seerr Integration"
+
+msgid ""
+"Connect MediaForge with your Jellyseerr or Overseerr instance. "
+"Pending requests will appear under \"Seerr Requests\"."
+msgstr ""
+"Verbinde MediaForge mit deiner Jellyseerr- oder Overseerr-"
+"Instanz. Ausstehende Anfragen erscheinen dann unter \"Seerr Anfragen\"."
+
+msgid "Settings → General"
+msgstr "Einstellungen → Allgemein"
+
+msgid ""
+"After every completed download, a library refresh is automatically "
+"triggered on the selected server."
+msgstr ""
+"Nach jedem abgeschlossenen Download wird automatisch ein Library-Refresh "
+"auf dem gewählten Server ausgelöst."
+
+msgid "Service"
+msgstr "Dienst"
+
+msgid "Which media server should MediaForge use?"
+msgstr "Welchen Mediaserver soll MediaForge ansprechen?"
+
+msgid "— Disabled —"
+msgstr "— Deaktiviert —"
+
+msgid "Enter API key"
+msgstr "API-Key eingeben"
+
+msgid "Enable if your Jellyfin is accessible via HTTPS"
+msgstr "Aktivieren wenn dein Jellyfin über HTTPS erreichbar ist"
+
+msgid ""
+"Jellyfin Dashboard → Advanced → API Keys → Create → copy the key and "
+"paste it here."
+msgstr ""
+"Jellyfin-Dashboard → Erweitert → API-Keys → Erstellen → Key kopieren und "
+"hier einfügen."
+
+msgid "Test connection"
+msgstr "Verbindung testen"
+
+msgid "Test media scan"
+msgstr "Mediascan testen"
+
+msgid "Enable if your Plex is accessible via HTTPS"
+msgstr "Aktivieren wenn dein Plex über HTTPS erreichbar ist"
+
+msgid "Retrieve automatically via Plex login"
+msgstr "Über den Plex-Login automatisch abrufen"
+
+msgid "No token stored"
+msgstr "Kein Token gespeichert"
+
+msgid "Sign in with Plex"
+msgstr "Mit Plex anmelden"
+
+msgid "Which one should be refreshed after a download?"
+msgstr "Welche soll nach dem Download aktualisiert werden?"
+
+msgid "Scan all"
+msgstr "Alle scannen"
+
+msgid "Load libraries"
+msgstr "Bibliotheken laden"
+
+msgid "Load"
+msgstr "Laden"
+
+msgid ""
+"Detects whether a series is already in your Plex or Jellyfin library and "
+"shows the ✓ Present badge on the home page. Connection data is "
+"automatically taken from the Mediaplayer integration."
+msgstr ""
+"Erkennt ob eine Serie bereits in deiner Plex- oder Jellyfin-Mediathek "
+"vorhanden ist und zeigt das ✓ Vorhanden-Badge auf der Startseite "
+"entsprechend an. Verbindungsdaten werden automatisch aus der Mediaplayer-"
+"Integration übernommen."
+
+msgid "Presence detection via library instead of folder scan"
+msgstr "Vorhanden-Erkennung über Mediathek statt Ordner-Scan"
+
+msgid "Source"
+msgstr "Quelle"
+
+msgid "Which library should be used for detection?"
+msgstr "Welche Mediathek soll für die Erkennung verwendet werden?"
+
+msgid "Folders (Default)"
+msgstr "Ordner (Standard)"
+
+msgid "Enable if Jellyfin is accessible via HTTPS"
+msgstr "Aktivieren wenn Jellyfin über HTTPS erreichbar ist"
+
+msgid "Enable if Plex is accessible via HTTPS"
+msgstr "Aktivieren wenn Plex über HTTPS erreichbar ist"
+
+msgid "Shared with Mediaplayer — sign in once for both"
+msgstr "Geteilt mit Mediaplayer — einmal anmelden reicht für beide"
+
+msgid "Which one should be used for detection?"
+msgstr "Welche soll für die Erkennung verwendet werden?"
+
+msgid "CineInfo not configured."
+msgstr "CineInfo nicht konfiguriert."
+
+msgid ""
+"A TMDB API key is required for accurate matching (German ↔ English). "
+"Please configure it under"
+msgstr ""
+"Für genaues Matching (deutsch ↔ englisch) wird ein TMDB-API-Key benötigt."
+" Bitte unter"
+
+msgid "Until then, MediaScan is disabled."
+msgstr "Bis dahin ist MediaScan deaktiviert."
+
+msgid "Last update"
+msgstr "Letztes Update"
+
+msgid "Cached entries"
+msgstr "Einträge im Cache"
+
+msgid "Scan running…"
+msgstr "Scan läuft…"
+
+msgid "Refresh library now"
+msgstr "Mediathek jetzt aktualisieren"
+
+msgid ""
+"Shows streaming providers, genres and age rating on the home page and in "
+"the detail modal. Requires a free API key from"
+msgstr ""
+"Zeigt Streaming-Anbieter, Genres und FSK direkt auf der Startseite und im"
+" Detail-Modal. Benötigt einen kostenlosen API-Key von"
+
+msgid "Without a key, CineInfo is automatically inactive."
+msgstr "Ohne Key ist CineInfo automatisch inaktiv."
+
+msgid "Your TMDB API key"
+msgstr "Dein TMDB API-Key"
+
+msgid "Country (Providers & Age Rating)"
+msgstr "Land (Anbieter & FSK)"
+
+msgid "Germany"
+msgstr "Deutschland"
+
+msgid "Austria"
+msgstr "Österreich"
+
+msgid "Switzerland"
+msgstr "Schweiz"
+
+msgid "United Kingdom"
+msgstr "Großbritannien"
+
+msgid "Advanced TMDB Search"
+msgstr "Erweiterte TMDB Suche"
+
+msgid ""
+"Shows a menu item in the sidebar for advanced search including genres and"
+" keywords."
+msgstr ""
+"Zeigt einen Menüpunkt in der Sidebar für die erweiterte Suche inkl. "
+"Genres und Keywords an."
+
+msgid "Display Options"
+msgstr "Anzeige-Optionen"
+
+msgid "Streaming Providers"
+msgstr "Streaming-Anbieter"
+
+msgid "1 provider on the card · all in the modal below the title"
+msgstr "1 Anbieter auf der Karte · alle im Modal unter dem Titel"
+
+msgid "Age Rating (FSK)"
+msgstr "Altersfreigabe (FSK)"
+
+msgid "FSK badge on the card and centered below the cover in the modal"
+msgstr "FSK-Badge auf der Karte und zentriert unter dem Cover im Modal"
+
+msgid "TMDB Genres"
+msgstr "TMDB Genres"
+
+msgid ""
+"Replaces the original site genres in the modal with TMDB genres (e.g. "
+"Action, Fantasy)"
+msgstr ""
+"Ersetzt die Genres der Original-Seite im Modal durch TMDB-Genres (z. B. "
+"Action, Fantasy)"
+
+msgid "Rating"
+msgstr "Bewertung"
+
+msgid ""
+"Shows the TMDB user rating as a badge next to the series title in the "
+"modal"
+msgstr ""
+"Zeigt die TMDB-Nutzerwertung als Badge direkt neben dem Serientitel im "
+"Modal"
+
+msgid "Similar Series (Recommendations)"
+msgstr "Ähnliche Serien (Empfehlungen)"
+
+msgid "Shows a list of similar series based on TMDB below the episodes"
+msgstr ""
+"Zeigt unter den Episoden eine Liste mit ähnlichen Serien basierend auf "
+"TMDB an"
+
+msgid "Show trailer"
+msgstr "Trailer anzeigen"
+
+msgid "Shows a YouTube trailer in the series detail modal (if available)"
+msgstr "Zeigt einen YouTube-Trailer im Detail-Modal der Serie an (falls verfügbar)"
+
+msgid "Hover Effects"
+msgstr "Hover-Effekte"
+
+msgid ""
+"These options control which info is shown when hovering over a series "
+"card on the home page."
+msgstr ""
+"Diese Optionen steuern, welche Infos beim Überfahren einer Serienkarte "
+"auf der Startseite eingeblendet werden."
+
+msgid "Show rating"
+msgstr "Bewertung anzeigen"
+
+msgid "Shows the TMDB rating when hovering on the home page"
+msgstr "Zeigt beim Hovern auf der Startseite die TMDB-Bewertung der Serie an"
+
+msgid "Show genres"
+msgstr "Genres anzeigen"
+
+msgid "Shows the TMDB genres when hovering on the home page"
+msgstr "Zeigt beim Hovern auf der Startseite die TMDB-Genres der Serie an"
+
+msgid "Show age rating"
+msgstr "FSK anzeigen"
+
+msgid "Shows the age rating when hovering on the home page"
+msgstr "Zeigt beim Hovern auf der Startseite die FSK der Serie an"
+
+msgid "Clear cache &amp; reload"
+msgstr "Cache leeren &amp; neu laden"
+
+msgid ""
+"Deletes all stored TMDB data and restarts the preloading process. Useful "
+"when info is outdated or after an API key change."
+msgstr ""
+"Löscht alle gespeicherten TMDB-Daten und startet den Vorladevorgang neu. "
+"Nützlich wenn Infos veraltet sind oder nach einem API-Key-Wechsel."
+
+msgid "Clear cache"
+msgstr "Cache leeren"
+
+msgid ""
+"Metadata is preloaded in the background and cached in the database for 24"
+" h."
+msgstr ""
+"Metadaten werden im Hintergrund vorgeladen und 24 h in der Datenbank "
+"gecacht."
+
+msgid "FFmpeg encoding settings"
+msgstr "FFmpeg Encoding-Einstellungen"
+
+msgid "Expert"
+msgstr "Experte"
+
+msgid "Hardware Acceleration"
+msgstr "Hardware-Beschleunigung"
+
+msgid "Quality &amp; Speed"
+msgstr "Qualität &amp; Geschwindigkeit"
+
+msgid "Encoder"
+msgstr "Encoder"
+
+msgid "VAAPI Device"
+msgstr "VAAPI Device"
+
+msgid "Path to render device, e.g."
+msgstr "Pfad zum Render-Device, z.B."
+
+msgid "Leave empty for auto-detection."
+msgstr "Leer lassen für automatische Erkennung."
+
+msgid "Preset"
+msgstr "Preset"
+
+msgid "Speed vs. compression. Slower = smaller files at the same quality."
+msgstr ""
+"Geschwindigkeit vs. Kompression. Langsamer = kleinere Dateien bei "
+"gleicher Qualität."
+
+msgid "CRF (Quality)"
+msgstr "CRF (Qualität)"
+
+msgid "Audio Codec"
+msgstr "Audio-Codec"
+
+msgid "Copy recommended — no quality loss, faster."
+msgstr "Copy empfohlen — kein Qualitätsverlust, schneller."
+
+msgid "Save &amp; activate"
+msgstr "Speichern &amp; aktivieren"
+
+msgid "Detect encoders"
+msgstr "Encoder erkennen"
+
+msgid "Always available"
+msgstr "Immer verfügbar"
+
+msgid "Video is always copied"
+msgstr "Video wird immer kopiert"
+
+msgid ""
+"no re-encoding, no quality loss, fastest possible. Audio can optionally "
+"be re-encoded, e.g. for better compatibility."
+msgstr ""
+"kein Re-Encoding, kein Qualitätsverlust, schnellst möglich. Audio kann "
+"optional neu codiert werden, z.B. für bessere Kompatibilität."
+
+msgid "Copy recommended — no quality loss, fastest."
+msgstr "Copy empfohlen — kein Qualitätsverlust, am schnellsten."
+
+msgid "Choose the encoder for H.264"
+msgstr "Wähle den Encoder für H.264"
+
+msgid ""
+"Checks which encoders actually work on this system. Green = available, "
+"grey = unavailable."
+msgstr ""
+"Prüft welche Encoder auf diesem System wirklich funktionieren. Grün = "
+"verfügbar, Grau = nicht verfügbar."
+
+msgid "0 = lossless, 51 = worst quality. Default: 23. Recommended: 18–28."
+msgstr ""
+"0 = verlustfrei, 51 = schlechteste Qualität. Standard: 23. Empfohlen: "
+"18–28."
+
+msgid "Choose the encoder for H.265 / HEVC"
+msgstr "Wähle den Encoder für H.265 / HEVC"
+
+msgid ""
+"Checks which encoders are available on this system. Green = found, grey ="
+" not present."
+msgstr ""
+"Prüft welche Encoder auf diesem System verfügbar sind. Grün = gefunden, "
+"Grau = nicht vorhanden."
+
+msgid "0 = lossless, 51 = worst quality. Default: 28. Recommended: 24–30."
+msgstr ""
+"0 = verlustfrei, 51 = schlechteste Qualität. Standard: 28. Empfohlen: "
+"24–30."
+
+msgid "Expert Mode"
+msgstr "Experten-Modus"
+
+msgid "Enter FFmpeg flags directly in standard style. Examples:"
+msgstr "Direkte FFmpeg-Flags im Standard-Stil eingeben. Beispiele:"
+
+msgid "If nothing is entered,"
+msgstr "Wird nichts eingegeben, gilt"
+
+msgid "is used as fallback."
+msgstr "als Fallback."
+
+msgid "Video flags"
+msgstr "Video-Flags"
+
+msgid "Audio flags"
+msgstr "Audio-Flags"
+
+msgid "Upscaling Mode"
+msgstr "Upscaling-Modus"
+
+msgid ""
+"Anime4K GLSL shaders are applied to every video via mpv encode mode or "
+"ffmpeg libplacebo. Upscaling is CPU/GPU-intensive — plan accordingly."
+msgstr ""
+"Anime4K GLSL-Shader werden per mpv Encode-Modus oder ffmpeg libplacebo "
+"auf jedes Video angewandt. Das Upscaling ist CPU/GPU-intensiv – plane "
+"entsprechend Zeit ein."
+
+msgid "Mode"
+msgstr "Modus"
+
+msgid "When should upscaling happen?"
+msgstr "Wann soll das Upscaling stattfinden?"
+
+msgid "During download"
+msgstr "Während Download"
+
+msgid "After download"
+msgstr "Nach Download"
+
+msgid ""
+"The upscaling checkbox in the download modal is only shown when a mode "
+"other than \"Disabled\" is selected."
+msgstr ""
+"Die Upscaling-Checkbox im Download-Modal wird nur angezeigt, wenn ein "
+"anderer Modus als „Deaktiviert\" gewählt ist."
+
+msgid "Replace original"
+msgstr "Original ersetzen"
+
+msgid "Overwrite original or create new file with"
+msgstr "Original überschreiben oder neue Datei mit"
+
+msgid "suffix."
+msgstr "Suffix erstellen."
+
+msgid "Replace"
+msgstr "Ersetzen"
+
+msgid "Suffix (upscale)"
+msgstr "Suffix (upscale)"
+
+msgid "Preset (Mode)"
+msgstr "Preset (Mode)"
+
+msgid ""
+"A = fastest / D = best quality. Each mode uses a different shader "
+"combination."
+msgstr ""
+"A = schnellst / D = beste Qualität. Jeder Mode nutzt eine andere Shader-"
+"Kombination."
+
+msgid "Fast, good quality"
+msgstr "Schnell, gute Qualität"
+
+msgid "Mode A – Fast"
+msgstr "Mode A – Schnell"
+
+msgid "Balanced"
+msgstr "Ausgewogen"
+
+msgid "Mode B – Balanced"
+msgstr "Mode B – Ausgewogen"
+
+msgid "High quality"
+msgstr "Hohe Qualität"
+
+msgid "Mode C – Quality"
+msgstr "Mode C – Qualität"
+
+msgid "Best quality, very slow"
+msgstr "Beste Qualität, sehr langsam"
+
+msgid "Mode D – Ultra"
+msgstr "Mode D – Ultra"
+
+msgid "Shaders are included in the package — no download needed."
+msgstr "Shader sind im Paket enthalten – kein Download nötig."
+
+msgid "Check status"
+msgstr "Status prüfen"
+
+msgid "Output"
+msgstr "Ausgabe"
+
+msgid "Target resolution"
+msgstr "Zielauflösung"
+
+msgid "What resolution should the video be upscaled to?"
+msgstr "Auf welche Auflösung soll hochskaliert werden?"
+
+msgid "Original size"
+msgstr "Originalgröße"
+
+msgid "Engine"
+msgstr "Engine"
+
+msgid ""
+"Auto detects what is available automatically. libplacebo requires ffmpeg "
+"with libplacebo support."
+msgstr ""
+"Auto erkennt automatisch was verfügbar ist. libplacebo benötigt ffmpeg "
+"mit libplacebo-Support."
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "H.264 recommended. Copy keeps the original codec (not always possible)."
+msgstr "H.264 empfohlen. Copy behält den Original-Codec (nicht immer möglich)."
+
+msgid "Lower value = better quality, larger file. Recommended: 16–22."
+msgstr "Niedrigerer Wert = bessere Qualität, größere Datei. Empfohlen: 16–22."
+
+msgid "Encoder preset"
+msgstr "Encoder-Preset"
+
+msgid "Speed vs. compression of the output encoder."
+msgstr "Geschwindigkeit vs. Kompression des Ausgabe-Encoders."
+
+msgid "Active encoding mode:"
+msgstr "Aktiver Encoding-Modus:"
+
+msgid "Upscaling:"
+msgstr "Upscaling:"
+
+msgid "Configure services"
+msgstr "Dienste konfigurieren"
+
+msgid "Storage"
+msgstr "Speicher"
+
+msgid "Notify on"
+msgstr "Benachrichtigen bei"
+
+msgid "Notify on (global — applies to all)"
+msgstr "Benachrichtigen bei (global — gilt für alle)"
+
+msgid "My settings"
+msgstr "Meine Einstellungen"
+
+msgid "Successful download"
+msgstr "Erfolgreicher Download"
+
+msgid "Partially successful"
+msgstr "Teilweise erfolgreich"
+
+msgid "Download with errors"
+msgstr "Download mit Fehlern"
+
+msgid "Cancelled download"
+msgstr "Abgebrochener Download"
+
+msgid "Auto-sync: new episodes"
+msgstr "Auto-Sync: Neue Folgen"
+
+msgid "Auto-sync: errors"
+msgstr "Auto-Sync: Fehler"
+
+msgid "Auto-sync: hold &amp; resume"
+msgstr "Auto-Sync: Hold &amp; Wiederaufnahme"
+
+msgid "Low disk space"
+msgstr "Speicherplatz niedrig"
+
+msgid "Service status"
+msgstr "Dienst-Status"
+
+msgid "↳ Only error notifications when all retries have failed"
+msgstr "↳ Nur Fehler-Benachrichtigungen wenn alle Wiederholungen gescheitert sind"
+
+msgid ""
+"When enabled, a notification is sent for failed auto-syncs only after all"
+" retries are exhausted."
+msgstr ""
+"Wenn aktiviert, wird bei fehlgeschlagenen Auto-Syncs erst nach dem "
+"Ausschöpfen aller Wiederholungen eine Benachrichtigung gesendet."
+
+msgid "When a sync is paused due to an unreachable custom path — or resumes."
+msgstr ""
+"Wenn ein Sync wegen unerreichbarem Custom Path pausiert wird — oder "
+"wieder startet."
+
+msgid "When free disk space drops below the configured threshold."
+msgstr "Wenn der freie Speicherplatz unter den konfigurierten Schwellenwert fällt."
+
+msgid "When an auto-sync job crashes or fails."
+msgstr "Wenn ein Auto-Sync Job abstürzt oder fehlschlägt."
+
+msgid "Message when at least one episode succeeded but errors also occurred."
+msgstr ""
+"Nachricht wenn mindestens eine Episode erfolgreich war, aber auch Fehler "
+"aufgetreten sind."
+
+msgid "Message when individual episodes failed."
+msgstr "Nachricht wenn einzelne Episoden fehlgeschlagen sind."
+
+msgid "Message when a running download was cancelled."
+msgstr "Nachricht wenn ein laufender Download abgebrochen wurde."
+
+msgid "Send test"
+msgstr "Test senden"
+
+msgid "Show/hide"
+msgstr "Anzeigen/Verbergen"
+
+msgid "Admin — Service"
+msgstr "Admin — Dienst"
+
+msgid "Enable Web Push globally"
+msgstr "Web Push global aktivieren"
+
+msgid "Disable to block browser push notifications for all users."
+msgstr ""
+"Deaktivieren um Browser-Push-Benachrichtigungen für alle Nutzer zu "
+"sperren."
+
+msgid ""
+"Receive browser notifications directly in the browser — even when "
+"MediaForge is running in a background tab. The browser must be open. Works "
+"on desktop and mobile devices supporting Chrome/Firefox."
+msgstr ""
+"Erhalte Browser-Benachrichtigungen direkt im Browser — auch wenn MediaForge"
+" im Hintergrundtab läuft. Der Browser muss geöffnet sein. Funktioniert "
+"auf Desktop und Mobilgeräten, die Chrome/Firefox unterstützen."
+
+msgid "Web Push only works via HTTPS or localhost."
+msgstr "Web Push funktioniert nur über HTTPS oder localhost."
+
+msgid "Enable Web Push"
+msgstr "Web Push aktivieren"
+
+msgid "When all episodes of a queue entry completed without errors."
+msgstr "Wenn alle Episoden eines Queue-Eintrags ohne Fehler abgeschlossen wurden."
+
+msgid "When at least one episode succeeded but errors also occurred."
+msgstr ""
+"Wenn mindestens eine Episode erfolgreich war, aber auch Fehler "
+"aufgetreten sind."
+
+msgid "When individual episodes of a queue entry failed."
+msgstr "Wenn einzelne Episoden eines Queue-Eintrags fehlgeschlagen sind."
+
+msgid "When a running download is manually cancelled."
+msgstr "Wenn ein laufender Download manuell abgebrochen wird."
+
+msgid "When auto-sync has found new episodes of a subscribed series."
+msgstr "Wenn der Auto-Sync neue Episoden einer abonnierten Serie gefunden hat."
+
+msgid "Admin — Bot configuration"
+msgstr "Admin — Bot-Konfiguration"
+
+msgid "Create a bot via"
+msgstr "Erstelle einen Bot via"
+
+msgid "The bot then sends messages to users who have saved their chat ID."
+msgstr ""
+"Der Bot sendet dann Nachrichten an Nutzer die ihre Chat-ID hinterlegt "
+"haben."
+
+msgid "Bot token"
+msgstr "Bot Token"
+
+msgid "Obtained from @BotFather after"
+msgstr "Erhalten von @BotFather nach"
+
+msgid "Format:"
+msgstr "Format:"
+
+msgid "Enable Telegram globally"
+msgstr "Telegram global aktivieren"
+
+msgid "Disable to block Telegram messages for all users."
+msgstr "Deaktivieren um Telegram-Nachrichten für alle Nutzer zu sperren."
+
+msgid "Send the bot a message first (e.g."
+msgstr "Schreibe dem Bot zuerst eine Nachricht (z.B."
+
+msgid "), then click Detect. Or enter your chat ID manually — find it via"
+msgstr ""
+"), dann klicke auf Erkennen. Alternativ gib deine Chat-ID manuell ein — "
+"zu finden über"
+
+msgid "Bot not configured"
+msgstr "Bot nicht konfiguriert"
+
+msgid "Enable Telegram"
+msgstr "Telegram aktivieren"
+
+msgid "Turn Telegram notifications for your account on or off."
+msgstr "Telegram-Benachrichtigungen für dein Konto ein- oder ausschalten."
+
+msgid "e.g. 123456789"
+msgstr "z.B. 123456789"
+
+msgid "Auto-detect chat ID"
+msgstr "Chat-ID automatisch erkennen"
+
+msgid "Detect"
+msgstr "Erkennen"
+
+msgid "Message when all episodes of a job completed without errors."
+msgstr "Nachricht wenn alle Episoden eines Jobs ohne Fehler fertig sind."
+
+msgid "Message when a running download was manually cancelled."
+msgstr "Nachricht wenn ein laufender Download manuell abgebrochen wurde."
+
+msgid "Message when auto-sync finds new episodes of a subscribed series."
+msgstr "Nachricht wenn der Auto-Sync neue Episoden einer abonnierten Serie findet."
+
+msgid "Admin — App configuration"
+msgstr "Admin — App-Konfiguration"
+
+msgid "Create an app at"
+msgstr "Erstelle eine App auf"
+
+msgid "Each user then enters their own user key."
+msgstr "Jeder Nutzer gibt dann seinen eigenen User-Key ein."
+
+msgid "App token"
+msgstr "App-Token"
+
+msgid "Found on the app page after creation under"
+msgstr "Zu finden auf der App-Seite nach dem Erstellen unter"
+
+msgid "Enable Pushover globally"
+msgstr "Pushover global aktivieren"
+
+msgid "Disable to block Pushover messages for all users."
+msgstr "Deaktivieren um Pushover-Nachrichten für alle Nutzer zu sperren."
+
+msgid "Download the"
+msgstr "Lade die"
+
+msgid "Pushover app"
+msgstr "Pushover-App"
+
+msgid "to your device. After login, find your user key on the home page."
+msgstr ""
+"auf dein Gerät. Nach dem Login findest du deinen User-Key auf der "
+"Startseite."
+
+msgid "App not configured"
+msgstr "App nicht konfiguriert"
+
+msgid "Enable Pushover"
+msgstr "Pushover aktivieren"
+
+msgid "Turn Pushover notifications for your account on or off."
+msgstr "Pushover-Benachrichtigungen für dein Konto ein- oder ausschalten."
+
+msgid "User key"
+msgstr "User-Key"
+
+msgid "Your personal Pushover key — not the app API key."
+msgstr "Dein persönlicher Pushover-Schlüssel — nicht die App-API-Key."
+
+msgid "Message when all episodes completed without errors."
+msgstr "Nachricht wenn alle Episoden ohne Fehler fertig sind."
+
+msgid "Message when auto-sync finds new episodes."
+msgstr "Nachricht wenn der Auto-Sync neue Episoden findet."
+
+msgid "Admin — NTFY configuration"
+msgstr "Admin — NTFY-Konfiguration"
+
+msgid "NTFY sends messages to a topic. Enter the server URL and topic here."
+msgstr ""
+"NTFY sendet Nachrichten an ein Topic. Trage hier die Server-URL und das "
+"Topic ein."
+
+msgid "NTFY server"
+msgstr "NTFY-Server"
+
+msgid "Base URL of the ntfy server. Required."
+msgstr "Basis-URL des ntfy-Servers. Pflichtfeld."
+
+msgid "Enter server URL"
+msgstr "Server-URL eingeben"
+
+msgid "NTFY topic"
+msgstr "NTFY-Topic"
+
+msgid "Topic name. Required. Messages are sent to &lt;server&gt;/&lt;topic&gt;."
+msgstr ""
+"Name des Topics. Pflichtfeld. Nachrichten werden an "
+"&lt;server&gt;/&lt;topic&gt; gesendet."
+
+msgid "Enter topic"
+msgstr "Topic eingeben"
+
+msgid ""
+"Optional: enter a bearer token if your ntfy server requires "
+"authentication."
+msgstr ""
+"Optional: Trage hier ein Bearer-Token ein, falls dein ntfy-Server Auth "
+"verlangt."
+
+msgid "Basic Auth (optional)"
+msgstr "Basic Auth (optional)"
+
+msgid "Alternatively enter username/password for basic auth."
+msgstr "Alternativ kannst du Nutzername/Passwort für Basic-Auth angeben."
+
+msgid "Enable NTFY globally"
+msgstr "NTFY global aktivieren"
+
+msgid "Disable to block NTFY messages for all users."
+msgstr "Deaktiviere um NTFY-Nachrichten für alle Nutzer zu sperren."
+
+msgid "Enable NTFY for your account and receive messages to the configured topic."
+msgstr ""
+"Aktiviere NTFY für dein Konto und erhalte Meldungen an das konfigurierte "
+"Topic."
+
+msgid "NTFY not configured"
+msgstr "NTFY nicht konfiguriert"
+
+msgid "Enable NTFY"
+msgstr "NTFY aktivieren"
+
+msgid "Turn NTFY notifications for your account on or off."
+msgstr "NTFY-Benachrichtigungen für dein Konto ein- oder ausschalten."
+
+msgid "Message when an auto-sync job crashes or fails."
+msgstr "Nachricht wenn ein Auto-Sync Job abstürzt oder fehlschlägt."
+
+msgid "Admin — Webhook configuration"
+msgstr "Admin — Webhook-Konfiguration"
+
+msgid ""
+"Discord sends to a shared channel. Channel → Settings → Integrations → "
+"Webhooks → Create new webhook → copy URL."
+msgstr ""
+"Discord sendet an einen gemeinsamen Kanal. Kanal → Einstellungen → "
+"Integrationen → Webhooks → Neuen Webhook erstellen → URL kopieren."
+
+msgid "Webhook URL"
+msgstr "Webhook-URL"
+
+msgid "Must start with"
+msgstr "Muss mit"
+
+msgid "Enable Discord globally"
+msgstr "Discord global aktivieren"
+
+msgid "Disable to block Discord messages entirely."
+msgstr "Deaktivieren um Discord-Nachrichten komplett zu sperren."
+
+msgid "Green embed message when all episodes completed without errors."
+msgstr "Grüne Embed-Nachricht wenn alle Episoden ohne Fehler fertig sind."
+
+msgid ""
+"Orange embed message when at least one episode succeeded but errors "
+"occurred."
+msgstr ""
+"Orange Embed-Nachricht wenn mindestens eine Episode erfolgreich war, aber"
+" auch Fehler aufgetreten sind."
+
+msgid "Yellow embed message when individual episodes failed."
+msgstr "Gelbe Embed-Nachricht wenn einzelne Episoden fehlgeschlagen sind."
+
+msgid "Grey embed message when a download was cancelled."
+msgstr "Graue Embed-Nachricht wenn ein Download abgebrochen wurde."
+
+msgid "Blue embed message when auto-sync finds new episodes."
+msgstr "Blaue Embed-Nachricht wenn der Auto-Sync neue Episoden findet."
+
+msgid "Red embed message when an auto-sync job crashes."
+msgstr "Rote Embed-Nachricht wenn ein Auto-Sync Job abstürzt."
+
+msgid "Embed message when a sync is paused or resumed."
+msgstr "Embed-Nachricht wenn ein Sync pausiert oder wieder fortgesetzt wird."
+
+msgid "Yellow embed message when free storage drops below the threshold."
+msgstr ""
+"Gelbe Embed-Nachricht wenn der freie Speicher unter den Schwellenwert "
+"fällt."
+
+msgid ""
+"Configured by an administrator. Once an admin sets up the webhook, "
+"MediaForge sends messages to the configured channel."
+msgstr ""
+"Wird von einem Administrator konfiguriert. Sobald ein Admin den Webhook "
+"eingerichtet hat, sendet MediaForge Nachrichten an den konfigurierten "
+"Kanal."
+
+msgid "Not configured"
+msgstr "Nicht konfiguriert"
+
+msgid "Admin — Twilio configuration"
+msgstr "Admin — Twilio-Konfiguration"
+
+msgid "WhatsApp delivery runs via"
+msgstr "WhatsApp-Versand läuft über"
+
+msgid ""
+"You need a Twilio account with WhatsApp Sandbox enabled. Users must "
+"activate the sandbox once with"
+msgstr ""
+"Du benötigst ein Twilio-Konto mit aktivierter WhatsApp Sandbox. Nutzer "
+"müssen die Sandbox einmalig mit"
+
+msgid "Found on the Twilio console home page under"
+msgstr "Auf der Twilio Console-Startseite unter"
+
+msgid "Auth token"
+msgstr "Auth Token"
+
+msgid "Next to the account SID in the Twilio console."
+msgstr "Neben dem Account SID in der Twilio Console."
+
+msgid "Sender number"
+msgstr "Absendernummer"
+
+msgid "The Twilio WhatsApp sandbox number, e.g."
+msgstr "Die Twilio WhatsApp-Sandbox-Nummer, z.B."
+
+msgid "Enable WhatsApp globally"
+msgstr "WhatsApp global aktivieren"
+
+msgid "Disable to block WhatsApp messages for all users."
+msgstr "Deaktivieren um WhatsApp-Nachrichten für alle Nutzer zu sperren."
+
+msgid "Enter your mobile number in international format (e.g."
+msgstr "Gib deine Handynummer im internationalen Format ein (z.B."
+
+msgid "You must first activate the sandbox once by sending"
+msgstr "Du musst die Sandbox zuvor einmalig mit"
+
+msgid "to the Twilio number."
+msgstr "an die Twilio-Nummer schreiben."
+
+msgid "Twilio not configured"
+msgstr "Twilio nicht konfiguriert"
+
+msgid "Enable WhatsApp"
+msgstr "WhatsApp aktivieren"
+
+msgid "Turn WhatsApp notifications for your account on or off."
+msgstr "WhatsApp-Benachrichtigungen für dein Konto ein- oder ausschalten."
+
+msgid "My number"
+msgstr "Meine Nummer"
+
+msgid "Disk space warning"
+msgstr "Speicherplatz-Warnung"
+
+msgid ""
+"MediaForge checks free disk space before every download. If it drops below "
+"the threshold, a notification is sent (max. once per hour). The download "
+"continues anyway."
+msgstr ""
+"MediaForge prüft vor jedem Download den freien Speicherplatz. Fällt er "
+"unter den Schwellenwert, wird eine Benachrichtigung gesendet (max. einmal"
+" pro Stunde). Der Download läuft trotzdem weiter."
+
+msgid "Minimum disk space"
+msgstr "Mindest-Speicherplatz"
+
+msgid "Notification when less than this value (in GB) is free. 0 = disabled."
+msgstr ""
+"Benachrichtigung wenn weniger als dieser Wert (in GB) frei ist. 0 = "
+"deaktiviert."
+
+msgid "Saved ✓"
+msgstr "Gespeichert ✓"
+
+msgid "Error:"
+msgstr "Fehler:"
+
+msgid "Searching for last message…"
+msgstr "Suche nach letzter Nachricht…"
+
+msgid "Chat ID detected:"
+msgstr "Chat-ID erkannt:"
+
+msgid "please save!"
+msgstr "bitte speichern!"
+
+msgid "No message found. Send the bot a message first."
+msgstr "Keine Nachricht gefunden. Schreib dem Bot zuerst eine Nachricht."
+
+msgid "Network error while detecting."
+msgstr "Netzwerkfehler beim Erkennen."
+
+msgid "Sending test…"
+msgstr "Test wird gesendet…"
+
+msgid "Test message sent ✓"
+msgstr "Test-Nachricht gesendet ✓"
+
+msgid "Unknown error"
+msgstr "Unbekannter Fehler"
+
+msgid "Network error:"
+msgstr "Netzwerkfehler:"
+
+msgid "Configured ✓"
+msgstr "Konfiguriert ✓"
+
+msgid "Not configured — please contact admin"
+msgstr "Nicht konfiguriert — bitte Admin kontaktieren"
+
+msgid "Disable Web Push"
+msgstr "Web Push deaktivieren"
+
+# base.html – color preset names
+msgid "Purple"
+msgstr "Lila"
+
+msgid "Blue"
+msgstr "Blau"
+
+msgid "Cyan"
+msgstr "Cyan"
+
+msgid "Green"
+msgstr "Grün"
+
+msgid "Orange"
+msgstr "Orange"
+
+msgid "Pink"
+msgstr "Pink"
+
+msgid "Red"
+msgstr "Rot"
+
+msgid "Yellow"
+msgstr "Gelb"
+
+# encoding.html – JS strings
+msgid "Detecting…"
+msgstr "Erkenne…"
+
+msgid "Encoder detection complete"
+msgstr "Encoder-Erkennung abgeschlossen"
+
+msgid "Network error during detection"
+msgstr "Netzwerkfehler bei Erkennung"
+
+msgid "available"
+msgstr "verfügbar"
+
+msgid "not available"
+msgstr "nicht verfügbar"
+
+msgid "✓ Settings saved"
+msgstr "✓ Einstellungen gespeichert"
+
+msgid "Network error while saving"
+msgstr "Netzwerkfehler beim Speichern"
+
+msgid "Copy (no re-encoding)"
+msgstr "Copy (kein Re-Encoding)"
+
+msgid "✓ Upscaling settings saved"
+msgstr "✓ Upscaling-Einstellungen gespeichert"
+
+msgid "Network error"
+msgstr "Netzwerkfehler"
+
+msgid "mpv.exe is being downloaded…"
+msgstr "mpv.exe wird heruntergeladen…"
+
+msgid "mpv download failed:"
+msgstr "mpv Download fehlgeschlagen:"
+
+msgid "Checking…"
+msgstr "Prüfe…"
+
+msgid "✓ available"
+msgstr "✓ verfügbar"
+
+msgid "✗ not found (being downloaded…)"
+msgstr "✗ nicht gefunden (wird heruntergeladen…)"
+
+msgid "✗ not found"
+msgstr "✗ nicht gefunden"
+
+msgid "✓ Shaders found (bundled)"
+msgstr "✓ Shader gefunden (gebündelt)"
+
+msgid "✗ Shaders missing"
+msgstr "✗ Shader fehlen"
+
+# ─────────────────────────────────────────────────────────────
+# JavaScript – Laufzeit-Strings (dynamische UI / Toasts / Labels)
+# ── app.js ──
+msgid "Error loading"
+msgstr "Fehler beim Laden"
+
+msgid "✓ Available"
+msgstr "✓ Vorhanden"
+
+msgid "No results found."
+msgstr "Keine Ergebnisse gefunden."
+
+msgid "Search failed: "
+msgstr "Suche fehlgeschlagen: "
+
+msgid "No episodes available."
+msgstr "Keine Episoden verfügbar."
+
+msgid "No episodes selected."
+msgstr "Keine Episoden ausgewählt."
+
+msgid "Added to download queue"
+msgstr "Zur Download-Warteschlange hinzugefügt"
+
+msgid "Download request failed: "
+msgstr "Download-Anfrage fehlgeschlagen: "
+
+msgid "Series could not be loaded: "
+msgstr "Serie konnte nicht geladen werden: "
+
+msgid "Auto-Sync enabled for \""
+msgstr "Auto-Sync aktiviert für \""
+
+msgid "Auto-Sync updated for \""
+msgstr "Auto-Sync aktualisiert für \""
+
+msgid "Auto-Sync disabled for \""
+msgstr "Auto-Sync deaktiviert für \""
+
+msgid "Sync job could not be created"
+msgstr "Sync-Job konnte nicht erstellt werden"
+
+msgid "Sync job could not be updated"
+msgstr "Sync-Job konnte nicht aktualisiert werden"
+
+msgid "Sync job could not be removed"
+msgstr "Sync-Job konnte nicht entfernt werden"
+
+msgid "Provider data not yet loaded."
+msgstr "Anbieter-Daten noch nicht geladen."
+
+msgid "This film is currently not available on Veev."
+msgstr "Dieser Film ist auf Veev momentan nicht verfügbar."
+
+msgid "Error during availability check: "
+msgstr "Fehler bei der Verfügbarkeitsprüfung: "
+
+msgid "All Languages"
+msgstr "Alle Sprachen"
+
+msgid "Unknown"
+msgstr "Unbekannt"
+
+#, python-format
+msgid "%(n)s language(s) added to queue"
+msgstr "%(n)s Sprache(n) zur Warteschlange hinzugefügt"
+
+msgid "Downloads could not be added to queue: "
+msgstr "Downloads konnten nicht zur Warteschlange hinzugefügt werden: "
+
+msgid "Removed from favourites"
+msgstr "Aus Favoriten entfernt"
+
+msgid "Added to favourites ♥"
+msgstr "Zu Favoriten hinzugefügt ♥"
+
+msgid "Error: "
+msgstr "Fehler: "
+
+msgid "Invalid URL. Please enter a s.to or aniworld.to series URL."
+msgstr "Ungültige URL. Bitte eine s.to oder aniworld.to Serien-URL eingeben."
+
+#, python-format
+msgid "%(n)s results"
+msgstr "%(n)s Ergebnisse"
+
+#, python-format
+msgid "%(n)s genres selected"
+msgstr "%(n)s Genres ausgewählt"
+
+msgid "Database is still loading..."
+msgstr "Datenbank wird noch geladen..."
+
+msgid "No results"
+msgstr "Keine Ergebnisse"
+
+msgid "No image"
+msgstr "Kein Bild"
+
+#, python-format
+msgid "%(n)s seasons"
+msgstr "%(n)s Staffeln"
+
+msgid "1 season"
+msgstr "1 Staffel"
+
+msgid "No description available."
+msgstr "Keine Beschreibung verfügbar."
+
+#, python-format
+msgid "No exact matches for \"%(title)s\" found on AniWorld, S.to or FilmPalast."
+msgstr ""
+"Keine exakten Treffer für \"%(title)s\" auf AniWorld, S.to oder "
+"FilmPalast gefunden."
+
+#, python-format
+msgid "Searching for \"%(title)s\"..."
+msgstr "Suche nach \"%(title)s\"..."
+
+#, python-format
+msgid "Results for \"%(title)s\""
+msgstr "Ergebnisse für \"%(title)s\""
+
+msgid "API key error."
+msgstr "API Key Fehler."
+
+msgid "Network error."
+msgstr "Netzwerkfehler."
+
+msgid "Error during search."
+msgstr "Fehler bei der Suche."
+
+msgid "Filters reset. Please select your filters and click Search."
+msgstr "Filter zurückgesetzt. Bitte wähle deine Filter und klicke auf Suchen."
+
+msgid "Network error during search."
+msgstr "Netzwerkfehler bei der Suche."
+
+msgid "No results on this page."
+msgstr "Keine Ergebnisse auf dieser Seite."
+
+#, python-format
+msgid "Page %(current)s / %(total)s"
+msgstr "Seite %(current)s / %(total)s"
+
+# ── settings.js ──
+msgid "Settings could not be loaded: "
+msgstr "Einstellungen konnten nicht geladen werden: "
+
+msgid "Language separation enabled"
+msgstr "Sprachentrennung aktiviert"
+
+msgid "Language separation disabled"
+msgstr "Sprachentrennung deaktiviert"
+
+msgid "Setting could not be saved: "
+msgstr "Einstellung konnte nicht gespeichert werden: "
+
+msgid "English subtitle downloads disabled"
+msgstr "Englische Untertitel-Downloads deaktiviert"
+
+msgid "English subtitle downloads enabled"
+msgstr "Englische Untertitel-Downloads aktiviert"
+
+msgid "Movie subfolder enabled"
+msgstr "Film-Unterordner aktiviert"
+
+msgid "Movie subfolder disabled"
+msgstr "Film-Unterordner deaktiviert"
+
+msgid "Download path saved"
+msgstr "Download-Pfad gespeichert"
+
+msgid "Default language saved"
+msgstr "Standardsprache gespeichert"
+
+msgid "Default provider saved"
+msgstr "Standardanbieter gespeichert"
+
+msgid "Name template saved"
+msgstr "Namens-Template gespeichert"
+
+msgid "Auto-Sync schedule saved"
+msgstr "Auto-Sync-Zeitplan gespeichert"
+
+msgid "Schedule could not be saved"
+msgstr "Zeitplan konnte nicht gespeichert werden"
+
+msgid "Auto-Sync defaults saved"
+msgstr "Auto-Sync-Standards gespeichert"
+
+msgid "Defaults could not be saved"
+msgstr "Standards konnten nicht gespeichert werden"
+
+msgid "Path offline behaviour saved"
+msgstr "Pfad-offline-Verhalten gespeichert"
+
+msgid "Error retries saved"
+msgstr "Fehler-Wiederholungen gespeichert"
+
+msgid "Retry delay saved"
+msgstr "Wiederholungs-Zeit gespeichert"
+
+msgid "Base URL saved — restart required"
+msgstr "Basis-URL gespeichert — Neustart erforderlich"
+
+msgid "Debug mode enabled"
+msgstr "Debug-Modus aktiviert"
+
+msgid "Debug mode disabled"
+msgstr "Debug-Modus deaktiviert"
+
+msgid "System DNS active (no custom DNS configured)"
+msgstr "System-DNS aktiv (kein eigener DNS konfiguriert)"
+
+msgid "active — server: "
+msgstr "aktiv — Server: "
+
+#, python-format
+msgid "Saved mode: %(mode)s — but no server active. Save settings again?"
+msgstr ""
+"Gespeicherter Modus: %(mode)s — aber kein Server aktiv. Einstellungen "
+"erneut speichern?"
+
+msgid "— No data"
+msgstr "— Keine Daten"
+
+msgid "✓ Reachable & verified"
+msgstr "✓ Erreichbar & verifiziert"
+
+msgid "⚠ Reachable…but content unknown"
+msgstr "⚠ Erreichbar...aber Inhalt unbekannt"
+
+msgid "⚠ DNS resolved…but HTTP failed"
+msgstr "⚠ DNS aufgelöst...aber HTTP fehlgeschlagen"
+
+msgid "✗ Not reachable"
+msgstr "✗ Nicht erreichbar"
+
+msgid "Show error"
+msgstr "Fehler anzeigen"
+
+msgid "Hide error"
+msgstr "Fehler ausblenden"
+
+msgid "⏳ Testing…"
+msgstr "⏳ Teste…"
+
+msgid "⏳ Loading…"
+msgstr "⏳ Lädt…"
+
+msgid "↺ Retest"
+msgstr "↺ Erneut testen"
+
+msgid "Please enter a DNS server"
+msgstr "Bitte einen DNS-Server eingeben"
+
+msgid "DNS reset — system DNS active"
+msgstr "DNS zurückgesetzt — System-DNS aktiv"
+
+#, python-format
+msgid "DNS saved — %(server)s active"
+msgstr "DNS gespeichert — %(server)s aktiv"
+
+msgid "Error saving"
+msgstr "Fehler beim Speichern"
+
+msgid "No custom paths"
+msgstr "Keine benutzerdefinierten Pfade"
+
+msgid "Name and path are required"
+msgstr "Name und Pfad sind erforderlich"
+
+msgid "Custom path added"
+msgstr "Benutzerdefinierter Pfad hinzugefügt"
+
+msgid "Custom path deleted"
+msgstr "Benutzerdefinierter Pfad gelöscht"
+
+msgid "Delete this custom path?"
+msgstr "Diesen benutzerdefinierten Pfad löschen?"
+
+msgid "protected"
+msgstr "geschützt"
+
+msgid "SSO"
+msgstr "SSO"
+
+msgid "Local"
+msgstr "Lokal"
+
+msgid "Username and password are required"
+msgstr "Benutzername und Passwort sind erforderlich"
+
+msgid "User created"
+msgstr "Benutzer erstellt"
+
+msgid "User deleted"
+msgstr "Benutzer gelöscht"
+
+msgid "Delete this user?"
+msgstr "Diesen Benutzer löschen?"
+
+msgid "Role updated"
+msgstr "Rolle aktualisiert"
+
+msgid "Users could not be loaded: "
+msgstr "Benutzer konnten nicht geladen werden: "
+
+msgid "API key copied"
+msgstr "API-Key kopiert"
+
+msgid "Copy failed: "
+msgstr "Kopieren fehlgeschlagen: "
+
+msgid "Regenerate API key? The old key will be immediately invalidated."
+msgstr "API-Key neu generieren? Der alte Key wird sofort ungültig."
+
+msgid "New API key generated"
+msgstr "Neuer API-Key generiert"
+
+msgid "Error generating"
+msgstr "Fehler beim Generieren"
+
+msgid "✓ Already up to date."
+msgstr "✓ Bereits aktuell."
+
+msgid "Newer commits available"
+msgstr "Neuere Commits verfügbar"
+
+#, python-format
+msgid "Version %(version)s available"
+msgstr "Version %(version)s verfügbar"
+
+msgid "Command copied"
+msgstr "Befehl kopiert"
+
+msgid "SSO settings saved — restart required"
+msgstr "SSO-Einstellungen gespeichert — Neustart erforderlich"
+
+msgid "SSO settings could not be saved: "
+msgstr "SSO-Einstellungen konnten nicht gespeichert werden: "
+
+msgid "Delete ~/.mediaforge/.env now? This action cannot be undone."
+msgstr ""
+"~/.mediaforge/.env jetzt löschen? Diese Aktion kann nicht rückgängig "
+"gemacht werden."
+
+msgid ".env successfully deleted"
+msgstr ".env erfolgreich gelöscht"
+
+msgid "Error deleting"
+msgstr "Fehler beim Löschen"
+
+msgid "Glow effect enabled"
+msgstr "Glow-Effekt aktiviert"
+
+msgid "Glow effect disabled"
+msgstr "Glow-Effekt deaktiviert"
+
+msgid "Header color enabled"
+msgstr "Header-Farbe aktiviert"
+
+msgid "Header color disabled"
+msgstr "Header-Farbe deaktiviert"
+
+msgid "Skeleton Loader enabled"
+msgstr "Skeleton Loader aktiviert"
+
+msgid "Skeleton Loader disabled"
+msgstr "Skeleton Loader deaktiviert"
+
+msgid "Color highlight enabled"
+msgstr "Farbliche Markierung aktiviert"
+
+msgid "Color highlight disabled"
+msgstr "Farbliche Markierung deaktiviert"
+
+msgid "Download highlight enabled"
+msgstr "Download-Markierung aktiviert"
+
+msgid "Download highlight disabled"
+msgstr "Download-Markierung deaktiviert"
+
+msgid "Click effect enabled"
+msgstr "Klick-Effekt aktiviert"
+
+msgid "Click effect disabled"
+msgstr "Klick-Effekt deaktiviert"
+
+msgid "Icon Movement enabled"
+msgstr "Icon Movement aktiviert"
+
+msgid "Icon Movement disabled"
+msgstr "Icon Movement deaktiviert"
+
+# ── queue.js ──
+msgid "Downloads resumed."
+msgstr "Downloads werden fortgesetzt."
+
+msgid "Downloads paused."
+msgstr "Downloads pausiert."
+
+msgid "Old entries deleted"
+msgstr "Alte Einträge gelöscht"
+
+msgid "Paused"
+msgstr "Pausiert"
+
+msgid "Completed"
+msgstr "Abgeschlossen"
+
+msgid "Cancelling..."
+msgstr "Wird abgebrochen..."
+
+msgid "Cancelled"
+msgstr "Abgebrochen"
+
+msgid "No download running."
+msgstr "Kein Download läuft gerade."
+
+msgid "No downloads queued."
+msgstr "Keine wartenden Downloads."
+
+msgid "No completed downloads."
+msgstr "Keine abgeschlossenen Downloads."
+
+msgid "No partially completed downloads."
+msgstr "Keine teilweise abgeschlossenen Downloads."
+
+msgid "No failed or cancelled downloads."
+msgstr "Keine fehlgeschlagenen oder abgebrochenen Downloads."
+
+msgid "Queue is empty"
+msgstr "Warteschlange ist leer"
+
+msgid "FFmpeg"
+msgstr "FFmpeg"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Film — finishing..."
+msgstr "Film – beendet..."
+
+msgid "Film (stopped)"
+msgstr "Film (gestoppt)"
+
+msgid "Film"
+msgstr "Film"
+
+msgid "Ep. — finishing current episode..."
+msgstr "Ep. – beendet aktuelle Episode..."
+
+msgid "Resume downloads"
+msgstr "Downloads fortsetzen"
+
+msgid "Resume"
+msgstr "Fortsetzen"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Cancelling after current episode..."
+msgstr "Nach aktueller Episode wird abgebrochen..."
+
+msgid "Restart failed (server error)."
+msgstr "Neustart fehlgeschlagen (Server-Fehler)."
+
+msgid "Restart failed: "
+msgstr "Neustart fehlgeschlagen: "
+
+msgid "Episode(s) re-queued."
+msgstr "Episode(n) wurden erneut in die Warteschlange gestellt."
+
+msgid "Restarted."
+msgstr "Neu gestartet."
+
+msgid "Captcha solved! Download resuming..."
+msgstr "Captcha gelöst! Download wird fortgesetzt..."
+
+msgid "Click anywhere in the screenshot to interact with the captcha."
+msgstr "Klicke irgendwo im Screenshot um mit dem Captcha zu interagieren."
+
+msgid "Waiting for captcha browser..."
+msgstr "Warte auf Captcha-Browser..."
+
+msgid "Auto-Sync"
+msgstr "Auto‑Sync"
+
+msgid "Move up"
+msgstr "Nach oben"
+
+msgid "Move down"
+msgstr "Nach unten"
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "Cancel after current episode"
+msgstr "Nach aktueller Episode abbrechen"
+
+msgid "Solve"
+msgstr "Lösen"
+
+msgid "new"
+msgstr "neu"
+
+msgid "Restart"
+msgstr "Neu starten"
+
+msgid "restart failed episodes"
+msgstr "fehlerhafte Episoden neu starten"
+
+msgid "Restart all episodes"
+msgstr "Alle Episoden neu starten"
+
+msgid "Errors"
+msgstr "Fehler"
+
+# ── autosync.js ──
+msgid "Sync started"
+msgstr "Sync gestartet"
+
+msgid "Sync could not be started"
+msgstr "Sync konnte nicht gestartet werden"
+
+msgid "Synchronising…"
+msgstr "Synchronisiere…"
+
+#, python-format
+msgid "%(n)s job(s) started"
+msgstr "%(n)s Job(s) gestartet"
+
+msgid "already active"
+msgstr "bereits aktiv"
+
+msgid "No jobs to start (all already active or disabled)"
+msgstr "Keine Jobs zum Starten (alle bereits aktiv oder deaktiviert)"
+
+msgid "Error starting"
+msgstr "Fehler beim Starten"
+
+msgid "Error starting all syncs"
+msgstr "Fehler beim Starten aller Syncs"
+
+msgid "Remove this sync job?"
+msgstr "Diesen Sync-Job entfernen?"
+
+msgid "Sync job removed"
+msgstr "Sync-Job entfernt"
+
+msgid "Remove failed"
+msgstr "Entfernen fehlgeschlagen"
+
+msgid "Job not found"
+msgstr "Job nicht gefunden"
+
+msgid "Job could not be loaded"
+msgstr "Job konnte nicht geladen werden"
+
+msgid "Job updated"
+msgstr "Job aktualisiert"
+
+msgid "Update failed"
+msgstr "Aktualisierung fehlgeschlagen"
+
+msgid "Export failed"
+msgstr "Export fehlgeschlagen"
+
+msgid "Export successful"
+msgstr "Export erfolgreich"
+
+msgid "Import failed"
+msgstr "Import fehlgeschlagen"
+
+msgid "imported"
+msgstr "importiert"
+
+msgid "skipped"
+msgstr "übersprungen"
+
+msgid "path set"
+msgstr "Pfad gesetzt"
+
+msgid "cleared"
+msgstr "gelöscht"
+
+msgid "updated"
+msgstr "aktualisiert"
+
+msgid "Batch action failed"
+msgstr "Batch-Aktion fehlgeschlagen"
+
+msgid "Sync jobs could not be loaded."
+msgstr "Sync-Jobs konnten nicht geladen werden."
+
+msgid "No sync jobs yet. Add a series via the search page."
+msgstr "Noch keine Sync-Jobs. Füge eine Serie über die Suchseite hinzu."
+
+msgid "Last result"
+msgstr "Letztes Ergebnis"
+
+msgid "Last checked"
+msgstr "Zuletzt geprüft"
+
+msgid "Next check"
+msgstr "Nächste Prüfung"
+
+msgid "Last new"
+msgstr "Zuletzt neu"
+
+msgid "Up to date"
+msgstr "Aktuell"
+
+msgid "Soon"
+msgstr "Bald"
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Sync"
+msgstr "Sync"
+
+msgid "Running…"
+msgstr "Läuft…"
+
+msgid "Hold"
+msgstr "Hold"
+
+msgid " selected"
+msgstr " ausgewählt"
+
+msgid "Really delete sync job(s)?"
+msgstr "Sync-Job(s) wirklich löschen?"
+
+# ── library.js ──
+msgid "Updated: "
+msgstr "Aktualisiert: "
+
+msgid "Watcher inactive"
+msgstr "Watcher inaktiv"
+
+msgid "Watcher active"
+msgstr "Watcher aktiv"
+
+msgid "Watcher starting…"
+msgstr "Watcher startet…"
+
+msgid "Series"
+msgstr "Serien"
+
+msgid "total"
+msgstr "gesamt"
+
+msgid "A–Z (click for Z–A)"
+msgstr "A–Z (klicken für Z–A)"
+
+msgid "Z–A (click for A–Z)"
+msgstr "Z–A (klicken für A–Z)"
+
+msgid "Ascending"
+msgstr "Aufsteigend"
+
+msgid "Descending"
+msgstr "Absteigend"
+
+msgid "watched"
+msgstr "gesehen"
+
+msgid "Season "
+msgstr "Staffel "
+
+msgid "Play film"
+msgstr "Film abspielen"
+
+msgid "Play"
+msgstr "Abspielen"
+
+msgid "More options"
+msgstr "Mehr Optionen"
+
+msgid "Rename"
+msgstr "Umbenennen"
+
+msgid "Upscale"
+msgstr "Upscalen"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Delete title"
+msgstr "Titel löschen"
+
+msgid "Delete film"
+msgstr "Film löschen"
+
+msgid "Delete season"
+msgstr "Staffel löschen"
+
+msgid "Delete episode"
+msgstr "Episode löschen"
+
+msgid "Upscale episode"
+msgstr "Folge upscalen"
+
+msgid "Confirm"
+msgstr "Bestätigen"
+
+msgid "Renamed"
+msgstr "Umbenannt"
+
+msgid "Rename failed"
+msgstr "Umbenennen fehlgeschlagen"
+
+#, python-format
+msgid "Delete %(title)s completely? This action cannot be undone."
+msgstr ""
+"%(title)s vollständig löschen? Dieser Vorgang kann nicht rückgängig "
+"gemacht werden."
+
+#, python-format
+msgid "Delete all episodes of season %(n)s in %(title)s?"
+msgstr "Alle Episoden von Staffel %(n)s in %(title)s löschen?"
+
+#, python-format
+msgid "Delete episode E%(n)s in %(title)s?"
+msgstr "Episode E%(n)s in %(title)s löschen?"
+
+msgid "Successfully deleted"
+msgstr "Erfolgreich gelöscht"
+
+msgid "Season deleted"
+msgstr "Staffel gelöscht"
+
+msgid "Episode deleted"
+msgstr "Episode gelöscht"
+
+msgid "Preparing…"
+msgstr "Wird vorbereitet…"
+
+msgid "Connection lost"
+msgstr "Verbindung unterbrochen"
+
+msgid "Network error: "
+msgstr "Netzwerkfehler: "
+
+msgid "Server error "
+msgstr "Server-Fehler "
+
+#, python-format
+msgid "\"%(folder)s\" has been moved"
+msgstr "\"%(folder)s\" wurde verschoben"
+
+msgid "Action failed"
+msgstr "Aktion fehlgeschlagen"
+
+msgid "Library could not be loaded."
+msgstr "Bibliothek konnte nicht geladen werden."
+
+msgid "No downloaded content found. Downloads will be shown here automatically."
+msgstr ""
+"Keine heruntergeladenen Inhalte gefunden. Downloads werden hier "
+"automatisch angezeigt."
+
+#, python-format
+msgid "No results for \"%(query)s\"."
+msgstr "Keine Ergebnisse für „%(query)s\"."
+
+msgid "No file paths found."
+msgstr "Keine Dateipfade gefunden."
+
+#, python-format
+msgid "✓ %(n)s file(s) added to upscaling queue"
+msgstr "✓ %(n)s Datei(en) zur Upscaling-Queue hinzugefügt"
+
+msgid "✓ Episode added to upscaling queue"
+msgstr "✓ Folge zur Upscaling-Queue hinzugefügt"
+
+msgid "No file path found."
+msgstr "Kein Dateipfad gefunden."
+
+msgid "Player is loading…"
+msgstr "Player wird geladen…"
+
+msgid "Copied!"
+msgstr "Kopiert!"
+
+msgid "Copy failed"
+msgstr "Kopieren fehlgeschlagen"
+
+msgid "Filename:"
+msgstr "Dateiname:"
+
+msgid "Path:"
+msgstr "Pfad:"
+
+msgid "Copy path"
+msgstr "Pfad kopieren"
+
+msgid "Size:"
+msgstr "Größe:"
+
+msgid "Container:"
+msgstr "Container:"
+
+msgid "Video Stream"
+msgstr "Video Stream"
+
+msgid "Profile:"
+msgstr "Profil:"
+
+msgid "Level:"
+msgstr "Level:"
+
+msgid "Resolution:"
+msgstr "Auflösung:"
+
+msgid "Framerate:"
+msgstr "Framerate:"
+
+msgid "Bit depth:"
+msgstr "Farbtiefe:"
+
+msgid "Range:"
+msgstr "Bereich:"
+
+msgid "Pixel format:"
+msgstr "Pixelformat:"
+
+msgid "Bitrate:"
+msgstr "Bitrate:"
+
+msgid "AVC:"
+msgstr "AVC:"
+
+msgid "Ref Frames:"
+msgstr "Ref Frames:"
+
+msgid "NAL:"
+msgstr "NAL:"
+
+msgid "No video stream found"
+msgstr "Kein Video-Stream gefunden"
+
+msgid "Audio Stream"
+msgstr "Audio Stream"
+
+msgid "Channels:"
+msgstr "Kanäle:"
+
+msgid "Layout:"
+msgstr "Layout:"
+
+msgid "Sample Rate:"
+msgstr "Sample Rate:"
+
+msgid "Default:"
+msgstr "Default:"
+
+msgid "Forced:"
+msgstr "Forced:"
+
+msgid "No audio stream found"
+msgstr "Kein Audio-Stream gefunden"
+
+msgid "Watched"
+msgstr "Gesehen"
+
+#, python-format
+msgid "Continue watching (%(pct)s%%)"
+msgstr "Weiterschauen (%(pct)s%%)"
+
+# ── integrations.js ──
+msgid "Integrations settings could not be loaded: "
+msgstr "Einstellungen konnten nicht geladen werden: "
+
+msgid "Seerr settings saved"
+msgstr "Seerr-Einstellungen gespeichert"
+
+msgid "Error saving settings"
+msgstr "Fehler beim Speichern"
+
+msgid "CineInfo saved"
+msgstr "CineInfo gespeichert"
+
+msgid "CineInfo settings could not be loaded: "
+msgstr "CineInfo-Einstellungen konnten nicht geladen werden: "
+
+msgid "Cache cleared — TMDB data will be reloaded in the background"
+msgstr "Cache geleert — TMDB-Daten werden im Hintergrund neu geladen"
+
+msgid "Error clearing cache"
+msgstr "Fehler beim Leeren des Caches"
+
+msgid "Clearing…"
+msgstr "Wird geleert…"
+
+msgid "Media player settings saved"
+msgstr "Mediaplayer-Einstellungen gespeichert"
+
+msgid "✓ Plex login successful!"
+msgstr "✓ Plex-Anmeldung erfolgreich!"
+
+msgid "Connecting to Plex…"
+msgstr "Verbinde mit Plex…"
+
+msgid "Waiting for Plex login…"
+msgstr "Warte auf Plex-Login…"
+
+msgid "Popup was blocked — please disable popup blocker"
+msgstr "Popup wurde blockiert – bitte Popup-Blocker deaktivieren"
+
+msgid "Timeout — please try again"
+msgstr "Timeout – bitte erneut versuchen"
+
+msgid "Pin creation failed"
+msgstr "Pin-Erstellung fehlgeschlagen"
+
+msgid "Libraries: "
+msgstr "Bibliotheken: "
+
+msgid "Libraries could not be loaded"
+msgstr "Bibliotheken konnten nicht geladen werden"
+
+msgid "Triggering…"
+msgstr "Wird ausgelöst…"
+
+msgid "Test mediascan"
+msgstr "Mediascan testen"
+
+msgid "✓ Mediascan completed"
+msgstr "✓ Mediascan abgeschlossen"
+
+msgid "⚠ Scan timeout — it may still be running in the background"
+msgstr "⚠ Scan-Timeout – möglicherweise läuft er noch im Hintergrund"
+
+msgid "⚠ No active scan detected — check if Plex/Jellyfin is scanning"
+msgstr "⚠ Kein aktiver Scan erkannt – prüfe ob Plex/Jellyfin scant"
+
+msgid "✓ Connected to: "
+msgstr "✓ Verbunden mit: "
+
+msgid "Connection failed"
+msgstr "Verbindung fehlgeschlagen"
+
+msgid "MediaScan saved"
+msgstr "MediaScan gespeichert"
+
+msgid "No token saved"
+msgstr "Kein Token gespeichert"
+
+msgid "✓ Token saved ("
+msgstr "✓ Token gespeichert ("
+
+msgid "Ready"
+msgstr "Bereit"
+
+msgid "No scan yet"
+msgstr "Noch kein Scan"
+
+msgid "Just now"
+msgstr "Gerade eben"
+
+#, python-format
+msgid "%(n)s min. ago"
+msgstr "vor %(n)s Min."
+
+#, python-format
+msgid "%(n)s h. ago"
+msgstr "vor %(n)s Std."
+
+#, python-format
+msgid "%(n)s day(s) ago"
+msgstr "vor %(n)s Tag(en)"
+
+#, python-format
+msgid "%(n)s entries"
+msgstr "%(n)s Einträge"
+
+msgid "Scan started…"
+msgstr "Scan gestartet…"
+
+#, python-format
+msgid "✓ Library updated — %(n)s entries"
+msgstr "✓ Mediathek aktualisiert — %(n)s Einträge"
+
+msgid "✗ Scan failed: "
+msgstr "✗ Scan fehlgeschlagen: "
+
+msgid "Starting…"
+msgstr "Wird gestartet…"
+
+msgid "↻ Update library now"
+msgstr "↻ Mediathek jetzt aktualisieren"
+
+msgid "↻ Load"
+msgstr "↻ Laden"
+
+msgid "Popup blocked — please disable popup blocker"
+msgstr "Popup blockiert — bitte Popup-Blocker deaktivieren"
+
+# ── upscale_queue.js ──
+msgid "No upscaling running."
+msgstr "Kein Upscaling läuft gerade."
+
+msgid "No upscaling jobs queued."
+msgstr "Keine wartenden Upscaling-Jobs."
+
+msgid "No completed upscaling jobs."
+msgstr "Keine abgeschlossenen Upscaling-Jobs."
+
+msgid "No failed or cancelled upscaling jobs."
+msgstr "Keine fehlgeschlagenen oder abgebrochenen Upscaling-Jobs."
+
+msgid "Upscaling queue is empty"
+msgstr "Upscaling-Warteschlange ist leer"
+
+msgid "Files"
+msgstr "Dateien"
+
+msgid "✨ File"
+msgstr "✨ Datei"
+
+msgid "✨ Upscaling"
+msgstr "✨ Upscaling"
+
+# ── favourites.js ──
+msgid "Error loading favourites."
+msgstr "Fehler beim Laden der Favoriten."
+
+msgid "No favourites saved. Add series via the search page."
+msgstr "Keine Favoriten gespeichert. Füge Serien über die Suche hinzu."
+
+msgid "Open"
+msgstr "Öffnen"
+
+# ── seerr.js ──
+msgid "Loading requests…"
+msgstr "Lade Anfragen…"
+
+msgid "Seerr is not yet configured..."
+msgstr "Seerr ist noch nicht konfiguriert..."
+
+msgid "No pending or accepted series requests."
+msgstr "Keine ausstehenden oder angenommenen Serien-Anfragen."
+
+#, python-format
+msgid "%(n)s requests"
+msgstr "%(n)s Anfragen"
+
+msgid "Search film"
+msgstr "Film suchen"
+
+msgid "Search series"
+msgstr "Serie suchen"
+
+msgid "Search running…"
+msgstr "Suche läuft…"
+
+msgid "No results."
+msgstr "Keine Ergebnisse."
+
+msgid "Pending"
+msgstr "Ausstehend"
+
+msgid "Accepted"
+msgstr "Angenommen"
+
+msgid "Not loaded"
+msgstr "Nicht geladen"
+
+msgid "In Sync"
+msgstr "In Sync"
+
+msgid "Season"
+msgstr "Staffel"
+
+msgid "Seasons"
+msgstr "Staffeln"
+
+msgid "Requested"
+msgstr "Angefragt"
+
+msgid "Accept & Download"
+msgstr "Annehmen & Herunterladen"
+
+msgid "Accept all & download"
+msgstr "Alle annehmen & herunterladen"
+
+msgid "Really decline request? This action cannot be undone."
+msgstr ""
+"Anfrage wirklich ablehnen? Diese Aktion kann nicht rückgängig gemacht "
+"werden."
+
+msgid "Error declining: "
+msgstr "Fehler beim Ablehnen: "
+
+msgid "Error loading (seerr)"
+msgstr "Fehler beim Laden"
+
+msgid "Loading…"
+msgstr "Lädt…"
+
+msgid "Connected"
+msgstr "Verbunden"
+
+msgid "⚠ Seerr approval failed: "
+msgstr "⚠ Seerr-Genehmigung fehlgeschlagen: "
+
+# ── player.js ──
+msgid "No encoder: "
+msgstr "Kein Encoder: "
+
+msgid "ffmpeg missing"
+msgstr "ffmpeg fehlt"
+
+msgid "Starting transcoding…"
+msgstr "Transcoding wird gestartet…"
+
+msgid "Transcoding failed"
+msgstr "Transcoding fehlgeschlagen"
+
+msgid "Generating first segments…"
+msgstr "Erste Segmente werden generiert…"
+
+msgid "Encoder error: "
+msgstr "Encoder-Fehler: "
+
+msgid "Timeout: Stream did not start within 90s"
+msgstr "Timeout: Stream startet nicht nach 90s"
+
+msgid "Stream error: "
+msgstr "Stream-Fehler: "
+
+msgid "Video could not be loaded."
+msgstr "Video konnte nicht geladen werden."
+
+msgid "Browser does not support HLS. Please use Chrome/Firefox/Safari."
+msgstr "Browser unterstützt kein HLS. Bitte Chrome/Firefox/Safari."
+
+msgid "Buffering…"
+msgstr "Puffert…"
+
+#, python-format
+msgid "Jumping to %(time)s…"
+msgstr "Springe zu %(time)s…"
+
+msgid "Restart failed"
+msgstr "Neustart fehlgeschlagen"
+
+#, python-format
+msgid "Generating segments from %(time)s…"
+msgstr "Segmente ab %(time)s werden generiert…"
+
+msgid "Network error during restart: "
+msgstr "Netzwerkfehler beim Neustart: "
+
+msgid "Hardware encoder"
+msgstr "Hardware-Encoder"
+
+msgid "Software encoder (CPU)"
+msgstr "Software-Encoder (CPU)"
+
+# ── stats.js ──
+msgid "Error loading statistics."
+msgstr "Fehler beim Laden der Statistiken."
+
+msgid "Completed Downloads"
+msgstr "Abgeschlossene Downloads"
+
+msgid "Successfully downloaded queue entries"
+msgstr "Erfolgreich heruntergeladene Queue-Einträge"
+
+msgid "Downloaded Episodes"
+msgstr "Heruntergeladene Episoden"
+
+msgid "Individual episodes across all downloads"
+msgstr "Einzelne Episoden über alle Downloads"
+
+msgid "Downloaded Films"
+msgstr "Heruntergeladene Filme"
+
+#, python-format
+msgid "%(n)s FilmPalast downloads"
+msgstr "%(n)s FilmPalast-Downloads"
+
+msgid "Downloads with errors or without stream"
+msgstr "Downloads mit Fehlern oder ohne Stream"
+
+msgid "Last 24 hours"
+msgstr "Letzte 24 Stunden"
+
+msgid "Downloads completed in the last 24h"
+msgstr "Downloads abgeschlossen in den letzten 24h"
+
+msgid "Avg. download duration"
+msgstr "Ø Download-Dauer"
+
+msgid "Average time per queue entry"
+msgstr "Durchschnittliche Zeit pro Queue-Eintrag"
+
+msgid "Avg. speed"
+msgstr "Ø Geschwindigkeit"
+
+#, python-format
+msgid "Total: %(n)s MB loaded"
+msgstr "Gesamt: %(n)s MB geladen"
+
+msgid "No data"
+msgstr "Keine Daten"
+
+msgid "Click for details"
+msgstr "Klicken für Details"
+
+#, python-format
+msgid "%(n)s active"
+msgstr "%(n)s aktiv"
+
+#, python-format
+msgid "%(n)s jobs total configured"
+msgstr "%(n)s Jobs gesamt konfiguriert"
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "Speed"
+msgstr "Geschwindigkeit"
+
+msgid "Queue Status"
+msgstr "Queue-Status"
+
+msgid "Anime (AniWorld)"
+msgstr "Anime (AniWorld)"
+
+msgid "Series (S.TO)"
+msgstr "Serien (S.TO)"
+
+msgid "Films (FilmPalast)"
+msgstr "Filme (FilmPalast)"
+
+#, python-format
+msgid "%(n)s episodes downloaded"
+msgstr "%(n)s Episoden heruntergeladen"
+
+msgid "By Language"
+msgstr "Nach Sprache"
+
+# ── pwa.js ──
+msgid "Push keys are being generated, please wait a moment …"
+msgstr "Push-Keys werden generiert, bitte kurz warten …"
+
+msgid "Push configuration failed. Check server logs."
+msgstr "Push-Konfiguration fehlgeschlagen. Prüfe Server-Logs."
+
+msgid "Push notifications disabled"
+msgstr "Push-Benachrichtigungen deaktiviert"
+
+msgid "Permission denied"
+msgstr "Berechtigung verweigert"
+
+msgid "Push notifications enabled 🔔"
+msgstr "Push-Benachrichtigungen aktiviert 🔔"
+
+msgid "Push subscription failed: "
+msgstr "Push-Abo fehlgeschlagen: "
+
+msgid "Hidden"
+msgstr "Versteckt"
+
+msgid "Hidden requests"
+msgstr "Versteckte Anfragen"
+
+msgid "No hidden requests."
+msgstr "Keine versteckten Anfragen."
+
+msgid "Hide"
+msgstr "Verstecken"
+
+# ── calendar.html / Calendar View ──────────────────────────────────────────
+msgid "Calendar"
+msgstr "Kalender"
+
+msgid "Calendar View"
+msgstr "Kalenderansicht"
+
+msgid ""
+"Shows a sidebar menu item with upcoming episode air dates for your "
+"AutoSync jobs based on TMDB data."
+msgstr ""
+"Zeigt einen Menüpunkt in der Seitenleiste mit den kommenden "
+"Ausstrahlungsterminen der Episoden deiner AutoSync-Jobs basierend auf "
+"TMDB-Daten."
+
+msgid "Upcoming episode air dates for your AutoSync jobs"
+msgstr "Kommende Ausstrahlungstermine der Episoden deiner AutoSync-Jobs"
+
+msgid "Today"
+msgstr "Heute"
+
+msgid "Month"
+msgstr "Monat"
+
+msgid "Week"
+msgstr "Woche"
+
+msgid "Grid view"
+msgstr "Kachelansicht"
+
+msgid "List view"
+msgstr "Listenansicht"
+
+msgid "Loading calendar..."
+msgstr "Kalender wird geladen…"
+
+msgid "A TMDB API key is required. Configure it under"
+msgstr "Ein TMDB-API-Schlüssel ist erforderlich. Konfiguriere ihn unter"
+
+msgid "No upcoming episode dates found for your AutoSync jobs."
+msgstr "Keine kommenden Episodentermine für deine AutoSync-Jobs gefunden."
+
+# ── Calendar: Seerr sub-option ──────────────────────────────────────────────
+msgid "↳ Show Seerr requests in calendar"
+msgstr "↳ Seerr-Anfragen im Kalender anzeigen"
+
+msgid ""
+"Adds open Seerr requests to the calendar based on their TMDB air/release "
+"dates."
+msgstr ""
+"Fügt offene Seerr-Anfragen anhand ihrer TMDB-"
+"Ausstrahlungs-/Erscheinungstermine zum Kalender hinzu."
+
+msgid "Enable the calendar above and set up Seerr first to use this option."
+msgstr ""
+"Aktiviere oben den Kalender und richte Seerr ein, um diese Option zu "
+"nutzen."
+
+msgid ""
+"Please be aware that the calendar displays the airtime based on the "
+"country of origin. The time zone cannot currently be converted."
+msgstr ""
+"Bitte beachte, dass der Kalender die Ausstrahlungszeit basierend auf dem "
+"Ursprungsland anzeigt. Die Zeitzone kann derzeit nicht umgerechnet "
+"werden."
+
+# ── history.html / Download History ─────────────────────────────────────────
+msgid "Download History"
+msgstr "Download-Verlauf"
+
+msgid "Every downloaded episode with start and end time"
+msgstr "Jede heruntergeladene Episode mit Start"
+
+# ── autosync.html (Gruppen / Ansicht / Suche) ──
+msgid "View"
+msgstr "Ansicht"
+
+msgid "Auto-grouping"
+msgstr "Auto-Gruppierung"
+
+msgid "Search by name…"
+msgstr "Nach Namen suchen…"
+
+msgid "Off"
+msgstr "Aus"
+
+msgid "Rename group"
+msgstr "Gruppe umbenennen"
+
+msgid "Group name"
+msgstr "Gruppenname"
+
+msgid "Set group"
+msgstr "Gruppe setzen"
+
+msgid "Remove from group"
+msgstr "Aus Gruppe entfernen"
+
+msgid "Group"
+msgstr "Gruppe"
+
+msgid "No group"
+msgstr "Keine Gruppe"
+
+msgid "New name"
+msgstr "Neuer Name"
+
+# ── autosync.html (Bulk-Menü) ──
+msgid "Clear selection"
+msgstr "Auswahl aufheben"
+
+msgid "Set"
+msgstr "Setzen"
+
+# --- Self-update feature (added) ---
+msgid "Install update now"
+msgstr "Update jetzt installieren"
+
+msgid "Update channel"
+msgstr "Update-Kanal"
+
+msgid "Stable"
+msgstr "Stabil"
+
+msgid "Automatic updates"
+msgstr "Automatische Updates"
+
+msgid "Install available updates automatically"
+msgstr "Verfügbare Updates automatisch installieren"
+
+msgid "Weekdays"
+msgstr "Wochentage"
+
+msgid "Time"
+msgstr "Uhrzeit"
+
+msgid "Times"
+msgstr "Uhrzeiten"
+
+msgid ""
+"Switch between the stable release and the development channel (latest "
+"commits from the models branch — may be unstable). Switching installs the"
+" selected version right away."
+msgstr ""
+"Wechsle zwischen der stabilen Version und dem Entwicklungs-Kanal (neueste"
+" Commits aus dem models-Branch — kann instabil sein). Beim Wechsel wird "
+"die gewählte Version sofort installiert."
+
+msgid ""
+"When enabled, an available update is installed automatically at the "
+"selected time on the chosen weekdays. The app restarts itself and running"
+" downloads resume afterwards."
+msgstr ""
+"Wenn aktiviert, wird ein verfügbares Update automatisch zur gewählten "
+"Uhrzeit an den gewählten Wochentagen installiert. Die App startet sich "
+"selbst neu, laufende Downloads werden danach fortgesetzt."
+
+msgid "Console"
+msgstr "Konsole"
+
+msgid "Auto-scroll"
+msgstr "Automatisch scrollen"
+
+msgid ""
+"The application was started with --debug. Debug mode is locked on and "
+"cannot be changed here."
+msgstr ""
+"Die Anwendung wurde mit --debug gestartet. Der Debug-Modus ist fest "
+"aktiviert und kann hier nicht geändert werden."
+
+msgid "Continue watching?"
+msgstr "Weiterschauen?"
+
+msgid "Start over"
+msgstr "Von vorne"
+
+msgid "Syncplay"
+msgstr "Syncplay"
+
+msgid ""
+"Synchronised playback with others via a Syncplay server (compatible with "
+"the Syncplay desktop app)."
+msgstr ""
+"Synchrone Wiedergabe mit anderen über einen Syncplay-Server (kompatibel "
+"mit der Syncplay-Desktop-App)."
+
+msgid "Server address"
+msgstr "Serveradresse"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Server password (optional)"
+msgstr "Server-Passwort (optional)"
+
+msgid "Use TLS"
+msgstr "TLS verwenden"
+
+msgid "Watch together (Syncplay)"
+msgstr "Gemeinsam ansehen (Syncplay)"
+
+# ── Crunchyroll (CineInfo) ─────────────────────────────────────────────────
+msgid ""
+"Logs in to Crunchyroll to add provider pills for current simulcasts "
+"(which TMDB often lacks) and to sync the Crunchyroll calendar. Your "
+"password is stored encrypted. Without login, only public metadata is "
+"available in anonymous mode."
+msgstr ""
+"Meldet sich bei Crunchyroll an, um Provider-Pills für aktuelle Simulcasts"
+" (die TMDB oft fehlen) hinzuzufügen und den Crunchyroll-Kalender zu "
+"synchronisieren. Dein Passwort wird verschlüsselt gespeichert. Ohne Login"
+" sind im anonymen Modus nur öffentliche Metadaten verfügbar."
+
+msgid "Enable Crunchyroll integration"
+msgstr "Crunchyroll-Integration aktivieren"
+
+msgid "Master switch for all Crunchyroll features below."
+msgstr "Hauptschalter für alle Crunchyroll-Funktionen unten."
+
+msgid "Email"
+msgstr "E-Mail"
+
+msgid "Crunchyroll account email"
+msgstr "E-Mail des Crunchyroll-Kontos"
+
+msgid "Stored encrypted"
+msgstr "Wird verschlüsselt gespeichert"
+
+msgid "Language (Locale)"
+msgstr "Sprache (Locale)"
+
+msgid "Anonymous mode (no account)"
+msgstr "Anonymer Modus (ohne Konto)"
+
+msgid ""
+"Use public metadata only — no login required. Watchlist sync needs an "
+"account and is unavailable here."
+msgstr ""
+"Nur öffentliche Metadaten verwenden – kein Login nötig. Die Watchlist-"
+"Synchronisierung benötigt ein Konto und ist hier nicht verfügbar."
+
+msgid "Crunchyroll provider pill"
+msgstr "Crunchyroll-Provider-Pill"
+
+msgid ""
+"Adds a Crunchyroll pill in the detail modal when a title is on "
+"Crunchyroll — even for new simulcasts TMDB does not list yet."
+msgstr ""
+"Fügt im Detail-Fenster eine Crunchyroll-Pill hinzu, wenn ein Titel bei "
+"Crunchyroll verfügbar ist – auch für neue Simulcasts, die TMDB noch nicht"
+" listet."
+
+msgid "↳ Sync Crunchyroll simulcast calendar"
+msgstr "↳ Crunchyroll-Simulcast-Kalender synchronisieren"
+
+msgid "↳ Sync with my custom lists (Crunchylists)"
+msgstr "↳ Mit meinen eigenen Listen (Crunchylists) synchronisieren"
+
+msgid ""
+"Adds the series from your Crunchyroll custom lists (Crunchylists) to the "
+"calendar. Episode dates come from TMDB (CineInfo API key required). Requires "
+"an account."
+msgstr ""
+"Fügt die Serien aus deinen Crunchyroll-Listen (Crunchylists) zum Kalender "
+"hinzu. Episodendaten stammen von TMDB (CineInfo-API-Key erforderlich). "
+"Erfordert ein Konto."
+
+msgid ""
+"Adds dated episode releases from the weekly Crunchyroll simulcast "
+"schedule to the calendar (best effort)."
+msgstr "Fügt datierte Episodenveröffentlichungen aus dem wöchentlichen Crunch"
+
+msgid "Active rooms"
+msgstr "Aktive Räume"
+
+msgid "Apply"
+msgstr "Übernehmen"
+
+msgid "Change"
+msgstr "Ändern"
+
+msgid "Chat"
+msgstr "Chat"
+
+msgid "Choose what to watch"
+msgstr "Wähle, was ihr schaut"
+
+msgid "Close room for everyone"
+msgstr "Raum für alle schließen"
+
+msgid "Enter room"
+msgstr "Raum betreten"
+
+msgid "Host control"
+msgstr "Host-Steuerung"
+
+msgid "Host settings"
+msgstr "Host-Einstellungen"
+
+msgid "If the room is protected"
+msgstr "Falls der Raum geschützt ist"
+
+msgid "Invite"
+msgstr "Einladen"
+
+msgid "Invite to room"
+msgstr "In den Raum einladen"
+
+msgid "Leave"
+msgstr "Verlassen"
+
+msgid "Max participants (0 = unlimited)"
+msgstr "Max. Teilnehmer (0 = unbegrenzt)"
+
+msgid "Message…"
+msgstr "Nachricht…"
+
+msgid "No media found in your library."
+msgstr "Keine Medien in deiner Mediathek gefunden."
+
+msgid "Nothing selected yet."
+msgstr "Noch nichts ausgewählt."
+
+msgid "Only I control playback"
+msgstr "Nur ich steuere die Wiedergabe"
+
+msgid "Only the host controls playback"
+msgstr "Nur der Host steuert die Wiedergabe"
+
+msgid "Required"
+msgstr "Erforderlich"
+
+msgid "Room name"
+msgstr "Raumname"
+
+msgid "Room password"
+msgstr "Raum-Passwort"
+
+msgid "Room password (empty = none)"
+msgstr "Raum-Passwort (leer = keins)"
+
+msgid "Scan the code or share the link. Guests can join without an account."
+msgstr "Scanne den Code oder teile den Link. Gäste können ohne Konto beitreten."
+
+msgid "Search library…"
+msgstr "Mediathek durchsuchen…"
+
+msgid "Send"
+msgstr "Senden"
+
+msgid "Share the room link with friends — they can join without an account."
+msgstr "Teile den Raum-Link mit Freunden — sie können ohne Konto beitreten."
+
+msgid "Start or join a room"
+msgstr "Raum starten oder beitreten"
+
+msgid "Waiting for the host to pick something…"
+msgstr "Warte, bis der Host etwas auswählt…"
+
+msgid "Watch"
+msgstr "Ansehen"
+
+msgid "Watch together, perfectly in sync — phone, tablet and PC."
+msgstr "Schaut gemeinsam, perfekt synchron — Handy, Tablet und PC."
+
+msgid "Watched in this room"
+msgstr "In diesem Raum gesehen"
+
+msgid "Watching"
+msgstr "Zuschauer"
+
+msgid "Your display name"
+msgstr "Dein Anzeigename"
+
+msgid "e.g. movie-night"
+msgstr "z. B. filmabend"
+
+msgid "Enable SyncPlay"
+msgstr "SyncPlay aktivieren"
+
+msgid "Open SyncPlay"
+msgstr "SyncPlay öffnen"
+
+msgid "Open SyncPlay →"
+msgstr "SyncPlay öffnen →"
+
+msgid "Watch Together"
+msgstr "Gemeinsam schauen"
+
+msgid "Also appears in the sidebar on the left once enabled."
+msgstr "Erscheint nach dem Aktivieren auch links in der Seitenleiste."
+
+msgid ""
+"Adds a SyncPlay entry to the sidebar and lets you start watch-together "
+"rooms."
+msgstr ""
+"Fügt links in der Seitenleiste einen SyncPlay-Eintrag hinzu und lässt "
+"dich Watch-Together-Räume starten."
+
+msgid ""
+"Watch films and series together, perfectly in sync across phone, tablet "
+"and PC. Everyone connects to this instance — no third-party server. "
+"Invited guests can join via a link without an account."
+msgstr ""
+"Schaut Filme und Serien gemeinsam, perfekt synchron auf Handy, Tablet und"
+" PC. Alle verbinden sich mit dieser Instanz — kein Drittanbieter-Server. "
+"Eingeladene Gäste können per Link ohne Konto beitreten."
+
+
+msgid "↳ Sync with my CR Watchlist"
+msgstr "↳ Mit meiner CR Watchlist synchronisieren"
+
+msgid "Adds your Crunchyroll watchlist series to the calendar — works even when the general Crunchyroll display is off, as long as a Crunchyroll account is configured. Episode dates come from TMDB (CineInfo API key required)."
+msgstr "Fügt deine Crunchyroll-Watchlist-Serien zum Kalender hinzu — funktioniert auch, wenn die allgemeine Crunchyroll-Anzeige aus ist, solange ein Crunchyroll-Konto konfiguriert ist. Episodendaten kommen von TMDB (CineInfo-API-Key erforderlich)."
+
+msgid "Adds the series from your Crunchyroll custom lists (Crunchylists) to the calendar — works even when the general Crunchyroll display is off, as long as a Crunchyroll account is configured. Episode dates come from TMDB (CineInfo API key required)."
+msgstr "Fügt die Serien aus deinen Crunchyroll-Listen (Crunchylists) zum Kalender hinzu — funktioniert auch, wenn die allgemeine Crunchyroll-Anzeige aus ist, solange ein Crunchyroll-Konto konfiguriert ist. Episodendaten kommen von TMDB (CineInfo-API-Key erforderlich)."
+
+# ── legacy import (MediaForge rename) ──
+
+msgid "Coming from AniWorld Downloader? Your data from ~/.aniworld is imported automatically on first start — nothing gets lost."
+msgstr "Kommst du von AniWorld Downloader? Deine Daten aus ~/.aniworld werden beim ersten Start automatisch übernommen — es geht nichts verloren."
+
+msgid "Import from previous installation"
+msgstr "Aus vorheriger Installation importieren"
+
+msgid "A previous AniWorld Downloader installation was detected. Your data is imported automatically on first start; use the button below to copy any remaining files. An existing database is never overwritten."
+msgstr "Eine vorherige AniWorld-Downloader-Installation wurde erkannt. Deine Daten werden beim ersten Start automatisch übernommen; über den Button unten kannst du verbliebene Dateien nachkopieren. Eine bestehende Datenbank wird nie überschrieben."
+
+msgid "Import legacy data"
+msgstr "Alte Daten importieren"
+
+msgid "Already imported."
+msgstr "Bereits importiert."
+
+msgid "Importing…"
+msgstr "Importiere…"
+
+msgid "item(s) imported."
+msgstr "Element(e) importiert."
+
+msgid "Restart to load an imported database."
+msgstr "Neu starten, um eine importierte Datenbank zu laden."
+
+msgid "Nothing to import."
+msgstr "Nichts zu importieren."
+
+msgid "Import failed."
+msgstr "Import fehlgeschlagen."

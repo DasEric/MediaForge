@@ -1,0 +1,54 @@
+services:
+  mediaforge:
+    container_name: mediaforge
+    build: .
+    image: ghcr.io/pd-codes/mediaforge:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist downloads on the host so they survive container recreation.
+      - ./Downloads:/app/Downloads
+      # Persist application config and database across restarts.
+      # Note: a .env file is no longer created or required. All settings
+      #       are stored in the database and configurable via the WebUI.
+      #       Existing .env files are automatically imported on first start.
+      - mediaforge-data:/home/mediaforge/.mediaforge
+
+    # NOTE: Create ./Downloads before running: mkdir -p Downloads
+    # Docker creates missing bind-mount directories as root, causing permission errors.
+
+    # All settings are configurable via the WebUI (Settings page).
+    # Environment variables below are optional — useful for initial setup or automation.
+    # Values set via WebUI are stored in the database and take precedence over env vars.
+
+    # environment:
+    # --- Initial admin account (auto-created on first run, skips the setup page) ---
+    #   MEDIAFORGE_WEB_ADMIN_USER: "admin"
+    #   MEDIAFORGE_WEB_ADMIN_PASS: "changeme"
+
+    # --- OIDC / SSO (optional — can also be configured in WebUI → Settings → Authentifizierung) ---
+    #   MEDIAFORGE_WEB_SSO: "1"                         # Enable OIDC SSO login button
+    #   MEDIAFORGE_WEB_FORCE_SSO: "1"                   # SSO-only mode (disable local login)
+    #   MEDIAFORGE_OIDC_ISSUER_URL: "https://keycloak.example.com/realms/myrealm"
+    #   MEDIAFORGE_OIDC_CLIENT_ID: "mediaforge"
+    #   MEDIAFORGE_OIDC_CLIENT_SECRET: "secret"
+    #   MEDIAFORGE_OIDC_DISPLAY_NAME: "SSO"
+    #   MEDIAFORGE_OIDC_ADMIN_SUBJECT: ""               # OIDC sub claim auto-promoted to admin
+
+    # --- Reverse proxy (optional) ---
+    #   MEDIAFORGE_WEB_BASE_URL: "https://mediaforge.example.com"
+
+    # Security hardening
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      # Writable scratch space for Xvfb, Chromium/patchright temp files, and runtime sockets
+      - /run:size=128m
+
+    restart: unless-stopped
+
+volumes:
+  mediaforge-data:

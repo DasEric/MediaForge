@@ -1,0 +1,72 @@
+name: "🐞 Bug Report"
+description: "Report a bug in the MediaForge."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the Bug"
+      description: "What happened? Please be as detailed as possible."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: "Which version of MediaForge are you using?"
+      placeholder: "e.g. 1.0.0 or GitHub commit hash"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Operating System"
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Steps to Reproduce"
+      description: "How can the bug be reproduced?"
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected Behavior"
+      description: "What should have happened instead?"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: "Affected URL (optional)"
+      description: "If the bug occurs with a specific AniWorld/SerienStream URL, enter it here."
+      placeholder: "e.g. https://aniworld.to/anime/stream/..."
+
+  - type: textarea
+    id: log
+    attributes:
+      label: "Log Output (optional)"
+      description: "If available, paste relevant log output here."
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "Screenshots (optional)"
+      description: "Attach screenshots or paste links here."

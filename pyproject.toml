@@ -1,0 +1,66 @@
+[project]
+name = "mediaforge"
+version = "1.0.0"
+authors = [
+  { name = "TheMRX13 (Pascal Keller)", email = "keller.pascal1313@gmail.com" },
+  { name = "Domekologe (Domenick Waldvogel)", email = "domenick.waldvogel@domekologe.eu" },
+]
+description = "MediaForge is a WebUI-only tool for downloading anime and series from AniWorld, SerienStream and FilmPalast. Start it with 'mediaforge' to launch the web interface directly."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "niquests",
+  "ffmpeg-python",
+  "yt-dlp",
+  "python-dotenv",
+  "rich",
+  "fake-useragent",
+  "flask",
+  "flask-wtf",
+  "flask-limiter",
+  "authlib",
+  "joserfc",
+  "requests",
+  "waitress",
+  "packaging",
+  "cryptography",
+  "patchright",
+  "pywebpush",
+  "watchdog",
+  "dnspython",
+  "curl_cffi",
+  "flask-babel",
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICENSE"]
+
+[project.urls]
+homepage = "https://github.com/PD-Codes/MediaForge"
+changelog = "https://github.com/PD-Codes/MediaForge/commits/main"
+documentation = "https://github.com/PD-Codes/MediaForge/wiki"
+bugs = "https://github.com/PD-Codes/MediaForge/issues"
+issues = "https://github.com/PD-Codes/MediaForge/issues"
+tracker = "https://github.com/PD-Codes/MediaForge/issues"
+
+[tool.setuptools.package-data]
+mediaforge = [
+  "web/templates/*.html",
+  "web/static/*.css",
+  "web/static/*.js",
+  "web/static/*.json",
+  "web/static/*.svg",
+  "web/static/*.png",
+  "web/static/flags/*.svg",
+  "bin/windows/*",
+  "anime4k/shader/*.glsl",
+  "web/translations/de/LC_MESSAGES/*.mo",
+  "web/translations/de/LC_MESSAGES/*.po",
+]
+
+[project.scripts]
+mediaforge = "mediaforge.entry:mediaforge"

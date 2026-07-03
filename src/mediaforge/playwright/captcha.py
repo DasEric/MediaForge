@@ -1,0 +1,1307 @@
+import threading as _threading
+import queue as _queue_module
+import time as _time
+import random as _random
+
+# Threading-local: set queue_id from the web worker to enable interactive mode
+_local = _threading.local()
+
+# Active captcha sessions keyed by queue_id (int)
+_active_sessions = {}
+_active_sessions_lock = _threading.Lock()
+
+# Optional hooks set by app.py to avoid circular imports
+_on_captcha_start = None  # callable(queue_id: int, url: str)
+_on_captcha_end = None    # callable(queue_id: int)
+
+
+# Serialise concurrent solve attempts
+_captcha_lock = _threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Ad-overlay defence
+# ---------------------------------------------------------------------------
+
+# Known video-provider netlocs — new browser tabs on these domains are the
+# actual player; any other new tab is treated as an ad and closed immediately.
+_KNOWN_PROVIDER_NETLOCS = {
+    "voe.sx",
+    "vidoza.net", "vidoza.to",
+    "streamtape.com", "streamtape.to",
+    "doodstream.com", "dood.to", "dood.watch",
+    "filemoon.sx", "filemoon.to",
+    "vidmoly.to", "vidmoly.net", "vidmoly.biz",
+    "luluvdo.com",
+    "vidara.to",
+    "veev.to",
+}
+
+# JavaScript that removes transparent full-viewport overlay <a> elements.
+# s.to sometimes injects an invisible <a target="_blank"> that covers the
+# entire page so that any click opens an ad tab.
+_REMOVE_AD_OVERLAYS_JS = """
+() => {
+  try {
+    document.querySelectorAll('a').forEach(el => {
+      const r  = el.getBoundingClientRect();
+      const cs = window.getComputedStyle(el);
+      const bigEnough  = r.width  > window.innerWidth  * 0.4
+                      && r.height > window.innerHeight * 0.4;
+      const invisible  = parseFloat(cs.opacity) < 0.05
+                      || cs.visibility === 'hidden'
+                      || cs.pointerEvents === 'none';
+      const positioned = cs.position === 'fixed' || cs.position === 'absolute';
+      if (bigEnough && positioned && (invisible || el.getAttribute('target') === '_blank')) {
+        el.remove();
+      }
+    });
+  } catch(e) {}
+}
+"""
+
+
+def _remove_ad_overlays(page) -> None:
+    """Remove invisible full-page ad-overlay <a> elements before clicking."""
+    try:
+        page.evaluate(_REMOVE_AD_OVERLAYS_JS)
+    except Exception:
+        pass
+
+
+def _is_known_provider_url(url: str) -> bool:
+    """Return True when *url* belongs to a known video-provider domain."""
+    try:
+        from urllib.parse import urlparse as _up
+        netloc = _up(url).netloc.lower().lstrip("www.")
+        return any(netloc == p or netloc.endswith("." + p) for p in _KNOWN_PROVIDER_NETLOCS)
+    except Exception:
+        return False
+
+
+def _is_captcha_infra_url(url: str) -> bool:
+    """True for Cloudflare / Turnstile / captcha iframe URLs.
+
+    These must never be mistaken for the provider result: after the modal is
+    submitted the Turnstile iframe (challenges.cloudflare.com/...) is still on
+    the page, and the foreign-iframe detection would otherwise grab it and hand
+    it to the VOE extractor (→ 403, "Keine VOE-Videoquelle gefunden").
+    """
+    u = (url or "").lower()
+    return ("challenges.cloudflare.com" in u
+            or "cdn-cgi/challenge-platform" in u
+            or "/turnstile/" in u
+            or "hcaptcha.com" in u
+            or "recaptcha" in u)
+
+
+# JavaScript injected at document start: a MutationObserver that continuously
+# removes full-page overlay <a> elements, so an ad overlay injected *after* our
+# one-off cleanup still can't hijack a click.
+_AD_OVERLAY_OBSERVER_JS = """
+(() => {
+  const clean = () => {
+    try {
+      document.querySelectorAll('a').forEach(el => {
+        const r  = el.getBoundingClientRect();
+        const cs = window.getComputedStyle(el);
+        const bigEnough  = r.width  > window.innerWidth  * 0.4
+                        && r.height > window.innerHeight * 0.4;
+        const invisible  = parseFloat(cs.opacity) < 0.05
+                        || cs.visibility === 'hidden'
+                        || cs.pointerEvents === 'none';
+        const positioned = cs.position === 'fixed' || cs.position === 'absolute';
+        if (bigEnough && positioned && (invisible || el.getAttribute('target') === '_blank')) {
+          el.remove();
+        }
+      });
+    } catch (e) {}
+  };
+  const start = () => {
+    clean();
+    try {
+      const obs = new MutationObserver(() => clean());
+      obs.observe(document.documentElement || document, {childList: true, subtree: true});
+    } catch (e) {}
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+})();
+"""
+
+# Third-party hosts that must stay reachable during captcha solving: Cloudflare
+# (Turnstile), common safe CDNs and hCaptcha/reCAPTCHA fallback infrastructure.
+_AD_SAFE_HOST_SUFFIXES = (
+    "cloudflare.com",
+    "cloudflareinsights.com",
+    "jsdelivr.net",
+    "unpkg.com",
+    "googleapis.com",
+    "gstatic.com",
+    "google.com",
+    "hcaptcha.com",
+    "recaptcha.net",
+    "s.to",
+    "serienstream.to",
+    "aniworld.to",
+    "filmpalast.to",
+)
+
+
+def _ad_host_allowed(host: str, home_netloc: str) -> bool:
+    """True when *host* may load during captcha solving (i.e. is not an ad)."""
+    if not host:
+        return True
+    home = home_netloc.lower()
+    if home.startswith("www."):
+        home = home[4:]
+    if host == home or host.endswith("." + home):
+        return True
+    if _is_known_provider_url("https://" + host):
+        return True
+    return any(host == s or host.endswith("." + s) for s in _AD_SAFE_HOST_SUFFIXES)
+
+
+def _install_network_adblock(context, home_netloc: str, weiter_event=None) -> None:
+    """Register a network route handler that aborts requests to third-party (ad)
+    hosts — popunders, ad iframes and their scripts never load.  s.to, Cloudflare
+    Turnstile and known providers stay reachable.  Once the Turnstile form has
+    been submitted, third-party navigations/frames are allowed again so the
+    provider result (which may sit on an unpredictable alias domain) can still be
+    captured.
+    """
+    from urllib.parse import urlparse as _up
+
+    def _route(route):
+        try:
+            req = route.request
+            host = _up(req.url).netloc.lower()
+            if host.startswith("www."):
+                host = host[4:]
+            if _ad_host_allowed(host, home_netloc):
+                route.continue_()
+                return
+            rtype = req.resource_type
+            # After submit the provider result may navigate to an unknown alias
+            # domain — allow its top-level navigation / iframe so we can read it.
+            if (weiter_event is not None and weiter_event.is_set()
+                    and rtype in ("document", "sub_frame")):
+                route.continue_()
+                return
+            if rtype in ("document", "sub_frame", "script", "xhr",
+                         "fetch", "media", "websocket"):
+                route.abort()
+                return
+            route.continue_()
+        except Exception:
+            try:
+                route.continue_()
+            except Exception:
+                pass
+
+    try:
+        context.route("**/*", _route)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint hardening
+# ---------------------------------------------------------------------------
+
+# WebGL renderer spoof.  Under Xvfb (Docker) Chromium reports a SwiftShader
+# renderer ("ANGLE (Google, SwiftShader ...)") — one of the strongest bot
+# signals Turnstile evaluates.  This replaces only the UNMASKED vendor/renderer
+# strings with a plausible *Linux* Intel/Mesa GPU, keeping the function looking
+# native.  Enabled by default in Docker only (see _webgl_spoof_enabled); on a
+# real desktop GPU it stays off so we don't fake a worse fingerprint.
+_WEBGL_SPOOF_JS = """
+(() => {
+  const VENDOR   = 'Google Inc. (Intel)';
+  const RENDERER = 'ANGLE (Intel, Mesa Intel(R) UHD Graphics (CML GT2), OpenGL 4.6 (Core Profile) Mesa 23.2.1)';
+  const patch = (proto) => {
+    if (!proto || !proto.getParameter || proto.getParameter.__aniworld) return;
+    const orig = proto.getParameter;
+    const wrapped = function (p) {
+      if (p === 37445) return VENDOR;    // UNMASKED_VENDOR_WEBGL
+      if (p === 37446) return RENDERER;  // UNMASKED_RENDERER_WEBGL
+      return orig.apply(this, arguments);
+    };
+    try {
+      wrapped.toString = orig.toString.bind(orig);
+      Object.defineProperty(wrapped, 'name', {value: 'getParameter', configurable: true});
+    } catch (e) {}
+    wrapped.__aniworld = true;
+    proto.getParameter = wrapped;
+  };
+  try { patch(self.WebGLRenderingContext && WebGLRenderingContext.prototype); } catch (e) {}
+  try { patch(self.WebGL2RenderingContext && WebGL2RenderingContext.prototype); } catch (e) {}
+})();
+"""
+
+
+def _in_docker() -> bool:
+    import os
+    return os.path.exists("/.dockerenv") or os.environ.get("MEDIAFORGE_DOCKER") == "1"
+
+
+def _webgl_spoof_enabled() -> bool:
+    """WebGL renderer spoof — OFF by default.
+
+    Spoofing only the renderer *string* while the actual rendering stays
+    SwiftShader produces an inconsistent fingerprint: getShaderPrecisionFormat,
+    the MAX_* parameters, the supported extensions and the canvas/WebGL render
+    hash all still report SwiftShader.  Cloudflare is trained on exactly that
+    inconsistency, so a string that says "Intel" on top of SwiftShader is a
+    *stronger* bot signal than an honest SwiftShader string.  Enable only to
+    A/B test with MEDIAFORGE_SPOOF_WEBGL=1; the real fix is a GPU or Mesa llvmpipe.
+    """
+    import os
+    return os.environ.get("MEDIAFORGE_SPOOF_WEBGL", "0") == "1"
+
+
+def _persistent_profile_enabled() -> bool:
+    """Persistent Chromium profile.
+
+    Default: ON only inside Docker (a clean, volume-mounted profile keeps
+    cf_clearance warm).  On a real desktop a stale/flagged profile causes
+    *persistent* "verification failed" loops, so a fresh context is used each
+    time.  Force with MEDIAFORGE_PERSISTENT_PROFILE=1, disable with
+    MEDIAFORGE_NO_PERSISTENT_PROFILE=1.
+    """
+    import os
+    if os.environ.get("MEDIAFORGE_NO_PERSISTENT_PROFILE", "0") == "1":
+        return False
+    if os.environ.get("MEDIAFORGE_PERSISTENT_PROFILE") == "1":
+        return True
+    return _in_docker()
+
+
+_PROFILE_DIR_CACHE = None
+_PROFILE_LOCK = _threading.Lock()
+
+
+def _resolve_profile_dir() -> str:
+    """Directory for the persistent Chromium profile.  Defaults to
+    ~/.mediaforge/browser-profile (a mounted volume in the Docker setup, so the
+    fingerprint and cf_clearance survive container restarts)."""
+    global _PROFILE_DIR_CACHE
+    if _PROFILE_DIR_CACHE:
+        return _PROFILE_DIR_CACHE
+    import os
+    import tempfile
+    candidate = os.environ.get("MEDIAFORGE_BROWSER_PROFILE")
+    if not candidate:
+        candidate = os.path.join(os.path.expanduser("~"), ".mediaforge", "browser-profile")
+    try:
+        os.makedirs(candidate, exist_ok=True)
+        _PROFILE_DIR_CACHE = candidate
+    except Exception:
+        _PROFILE_DIR_CACHE = tempfile.mkdtemp(prefix="mediaforge-bp-")
+    return _PROFILE_DIR_CACHE
+
+
+def _stealth_context_kwargs() -> dict:
+    kw = dict(ignore_https_errors=True)
+    if _in_docker():
+        # Under Xvfb a headed window renders at full size regardless of its
+        # (off-screen) position, so no_viewport gives a correct render area and
+        # click coordinates that match what Playwright measures.  The container
+        # is otherwise UTC / C-locale, so give it a realistic identity here.
+        kw["no_viewport"] = True
+        kw["locale"] = "de-DE"
+        kw["timezone_id"] = "Europe/Berlin"
+    else:
+        # Real desktop: do NOT force locale/timezone — the machine already has
+        # consistent, real ones, and overriding them can contradict other
+        # signals and trip Cloudflare.  Fixed viewport matching the window so an
+        # off-screen WebUI window still renders (no_viewport would be degenerate
+        # off-screen on Windows).
+        kw["viewport"] = {"width": 1920, "height": 1080}
+    return kw
+
+
+def _stealth_launch_args(offscreen: bool) -> list:
+    # --disable-dev-shm-usage: the default 64 MB /dev/shm in Docker is too small,
+    #   so the Chromium renderer crashes on larger pages — which shows up as a
+    #   captcha that won't render, a blank popup or random scrolling.  Harmless
+    #   outside Docker.
+    args = [
+        "--window-size=1920,1080",
+        "--lang=de-DE,de",
+        "--disable-dev-shm-usage",
+    ]
+    # Route the captcha browser's DNS through the same resolver as the rest of
+    # the app.  Chromium is a separate process and does NOT inherit Python's
+    # patched socket.getaddrinfo, so without this it would resolve s.to /
+    # cloudflare via the OS/ISP DNS instead of the project-configured DoH.
+    try:
+        from ..config import chromium_dns_args
+        args.extend(chromium_dns_args())
+    except Exception:
+        pass
+    if _in_docker():
+        # Chromium refuses to build its sandbox when running as root in a
+        # capability-stripped container; --no-sandbox is the standard Docker
+        # workaround and is NOT observable from the page (no JS fingerprint).
+        args.append("--no-sandbox")
+    if offscreen:
+        args.insert(0, "--window-position=-32000,-32000")
+    return args
+
+
+def _network_adblock_enabled() -> bool:
+    """Network ad-blocking is on by default; kill-switch via MEDIAFORGE_NO_ADBLOCK=1
+    (use it to rule the ad-blocker out when the captcha won't load)."""
+    import os
+    return os.environ.get("MEDIAFORGE_NO_ADBLOCK", "0") != "1"
+
+
+def _install_stealth(context, ad_home=None, weiter_event=None) -> None:
+    """Install ad + fingerprint defences on a patchright context: continuous
+    overlay removal, optional WebGL spoof, and (when *ad_home* is given) the
+    network ad-blocker."""
+    try:
+        context.add_init_script(_AD_OVERLAY_OBSERVER_JS)
+    except Exception:
+        pass
+    if _webgl_spoof_enabled():
+        try:
+            context.add_init_script(_WEBGL_SPOOF_JS)
+        except Exception:
+            pass
+    if ad_home and _network_adblock_enabled():
+        _install_network_adblock(context, ad_home, weiter_event)
+
+
+def _sync_session_user_agent(page) -> None:
+    """Align GLOBAL_SESSION's User-Agent with the real browser UA.
+
+    cf_clearance is bound to the UA that solved the challenge; if later HTTP
+    requests use a different UA the cookie is rejected.  In Docker the browser is
+    a Linux Chromium while the session UA defaults to a random Windows string —
+    a guaranteed mismatch — so copy the browser UA onto the session.
+    """
+    try:
+        ua = page.evaluate("() => navigator.userAgent")
+    except Exception:
+        return
+    if ua and isinstance(ua, str):
+        try:
+            from ..config import GLOBAL_SESSION
+            GLOBAL_SESSION.headers["User-Agent"] = ua
+        except Exception:
+            pass
+
+
+class _BrowserHandle:
+    """Wraps a patchright context (persistent or ephemeral) + its browser and
+    the profile lock, so callers close everything with one call."""
+
+    def __init__(self, context, browser, got_lock):
+        self.context = context
+        self._browser = browser
+        self._got_lock = got_lock
+
+    def close(self):
+        try:
+            self.context.close()
+        except Exception:
+            pass
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+        if self._got_lock:
+            try:
+                _PROFILE_LOCK.release()
+            except Exception:
+                pass
+
+
+def _launch_browser_context(p, offscreen=False, ad_home=None, weiter_event=None) -> "_BrowserHandle":
+    """Launch a hardened patchright context.
+
+    Prefers a persistent profile (stable fingerprint + warm cf_clearance, which
+    raises the Turnstile trust score).  Only one solve may use the profile at a
+    time; concurrent solves — or any failure to open it — fall back to an
+    ephemeral context, so the worst case equals the previous behaviour.
+    """
+    args = _stealth_launch_args(offscreen)
+    ctx_kwargs = _stealth_context_kwargs()
+    browser = None
+    context = None
+    got_lock = False
+    if _persistent_profile_enabled() and _PROFILE_LOCK.acquire(blocking=False):
+        got_lock = True
+        try:
+            context = p.chromium.launch_persistent_context(
+                _resolve_profile_dir(), headless=False, args=args, **ctx_kwargs
+            )
+        except Exception:
+            context = None
+            try:
+                _PROFILE_LOCK.release()
+            except Exception:
+                pass
+            got_lock = False
+    if context is None:
+        browser = p.chromium.launch(headless=False, args=args)
+        context = browser.new_context(**ctx_kwargs)
+    _install_stealth(context, ad_home=ad_home, weiter_event=weiter_event)
+    return _BrowserHandle(context, browser, got_lock)
+
+
+def _click_turnstile(page, logger=None) -> bool:
+    """Locate the Cloudflare Turnstile iframe and click its checkbox.
+
+    Uses human-like mouse movement (random offsets + step-based move) so that
+    Turnstile does not flag the click as automated.
+
+    Removes invisible full-page ad-overlay elements first so that the mouse
+    events reach the Turnstile iframe and don't accidentally open an ad tab.
+
+    Returns True if a click was performed.
+    """
+    def _looks_like_turnstile(u):
+        u = (u or "").lower()
+        return ("challenges.cloudflare.com" in u
+                or "cdn-cgi/challenge-platform" in u
+                or "turnstile" in u
+                or "hcaptcha.com" in u)
+
+    # Locate the Turnstile iframe ELEMENT.  It is frequently nested inside
+    # another iframe (the s.to modal / player-iframe), so a top-level
+    # page.locator("iframe[...]") can't see it.  Walking page.frames finds the
+    # challenge frame at any depth; frame.frame_element() returns the hosting
+    # <iframe> whose bounding box is already mapped into top-level page coords.
+    iframe_el = None
+    try:
+        for fr in page.frames:
+            if _looks_like_turnstile(fr.url):
+                try:
+                    el = fr.frame_element()
+                except Exception:
+                    el = None
+                if el:
+                    iframe_el = el
+                    break
+    except Exception:
+        pass
+
+    # Fallback: top-frame locator (covers the non-nested case).
+    if iframe_el is None:
+        for selector in (
+            "iframe[src*='challenges.cloudflare.com']",
+            "iframe[src*='turnstile']",
+            "iframe[src*='cdn-cgi/challenge-platform']",
+        ):
+            try:
+                loc = page.locator(selector).first
+                loc.wait_for(state="visible", timeout=1500)
+                iframe_el = loc.element_handle()
+                if iframe_el:
+                    break
+            except Exception:
+                continue
+
+    if iframe_el is None:
+        if logger:
+            try:
+                urls = [f.url for f in page.frames]
+            except Exception:
+                urls = []
+            logger.warning("No Turnstile iframe found to click; frames=%s" % urls)
+        return False
+
+    try:
+        try:
+            iframe_el.scroll_into_view_if_needed(timeout=1500)
+        except Exception:
+            pass
+
+        # Let the widget settle, but accept any usable box.
+        box = None
+        for _ in range(8):
+            b = iframe_el.bounding_box()
+            if b and b["width"] > 0 and b["height"] > 0:
+                box = b
+                if b["width"] > 40:   # fully laid out — good to click
+                    break
+            page.wait_for_timeout(150)
+        if not box:
+            if logger:
+                logger.warning("Turnstile iframe found but has no bounding box yet")
+            return False
+
+        _remove_ad_overlays(page)
+
+        # Checkbox sits on the left of the widget, vertically centred.
+        if box["width"] > 40:
+            inset = min(30.0, box["width"] * 0.12)
+        else:
+            inset = box["width"] / 2
+        x = box["x"] + inset + _random.uniform(-2, 2)
+        y = box["y"] + box["height"] / 2 + _random.uniform(-2, 2)
+
+        page.mouse.move(x, y, steps=_random.randint(8, 20))
+        page.wait_for_timeout(_random.randint(80, 220))
+        page.mouse.down()
+        page.wait_for_timeout(_random.randint(40, 100))
+        page.mouse.up()
+
+        if logger:
+            logger.warning(
+                "Turnstile checkbox clicked at (%d,%d) [box %dx%d]"
+                % (int(x), int(y), int(box["width"]), int(box["height"]))
+            )
+        return True
+    except Exception as e:
+        if logger:
+            logger.warning("Turnstile click failed: %s" % e)
+        return False
+
+
+def _is_turnstile_token_ready(page) -> bool:
+    """Check whether the Turnstile hidden input already carries a token.
+
+    Searches the main document *and* every sub-frame, because s.to renders the
+    Turnstile widget inside a modal that may live in a nested frame.
+    """
+    js = (
+        "() => { const el = document.querySelector"
+        "('input[name=\"cf-turnstile-response\"]');"
+        " return !!(el && el.value && el.value.length > 20); }"
+    )
+    try:
+        if page.evaluate(js):
+            return True
+        for fr in page.frames:
+            try:
+                if fr.evaluate(js):
+                    return True
+            except Exception:
+                continue
+        return False
+    except Exception:
+        return False
+
+
+def _is_captcha_page_dom(page) -> bool:
+    """Lightweight DOM query to detect an active CF challenge — avoids full page.content() serialization."""
+    try:
+        return page.evaluate(
+            """() => {
+              const t = (document.title || '').toLowerCase();
+              if (t.includes('just a moment') || t.includes('attention required')) return true;
+              return !!document.querySelector(
+                '#challenge-running, #cf-challenge-running, .cf-turnstile,'
+                + ' [class*="challenge-"], [id*="challenge-"]'
+              );
+            }"""
+        )
+    except Exception:
+        return True  # assume still on captcha page if evaluation fails
+
+
+def is_captcha_page(html: str, status_code: int = 200) -> bool:
+    """Detect Cloudflare challenge / CAPTCHA pages."""
+    if status_code in (403, 503):
+        return True
+
+    lower = html.lower()
+    indicators = [
+        "just a moment",
+        "cf-turnstile",
+        "checking your browser",
+        "enable javascript and cookies",
+        "ddos protection by cloudflare",
+        "<title>attention required",
+        "cdn-cgi/challenge-platform",
+        "challenges.cloudflare.com",
+        "challenge-running",
+        "cf_chl_",
+        "jschl-answer",
+        "<title>just a moment",
+        "hcaptcha.com",
+        "newassets.hcaptcha",
+        "g-recaptcha",
+        # legacy aniworld check kept for safety
+        "<title>stream wird vorbereitet...</title>",
+        # s.to inline Turnstile modal
+        "player-prepare-turnstile",
+    ]
+    return any(ind in lower for ind in indicators)
+
+
+def solve_captcha(url: str):
+    """
+    Solve a CAPTCHA for *url*.
+
+    - WebUI mode  (queue_id set in threading-local): streams screenshots to the
+      Web UI so the user can click inside the browser; injects cookies afterwards.
+    - CLI mode: opens a visible browser window and waits for the user to solve.
+
+    After a successful solve all browser cookies are injected into GLOBAL_SESSION
+    so subsequent requests work without re-solving.
+
+    Returns the final URL (str) on success — for redirect-based captchas this is
+    the provider URL captured from an iframe.  Returns None on timeout / error.
+    Callers that don't need the URL can ignore the return value.
+    """
+    queue_id = getattr(_local, "queue_id", None)
+    if queue_id is not None:
+        return _solve_captcha_interactive(url, queue_id)
+    return _solve_captcha_cli(url)
+
+
+def _solve_captcha_cli(url: str) -> bool:
+    """CLI mode captcha solver — opens a visible browser, injects cookies on success."""
+    try:
+        from patchright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError(
+            "patchright ist nicht installiert. "
+            "Bitte installieren mit: pip install patchright && patchright install chromium"
+        )
+
+    from ..config import GLOBAL_SESSION
+    from ..logger import get_logger
+    logger = get_logger(__name__)
+
+    with _captcha_lock:
+        logger.warning(f"CAPTCHA detected for {url} — opening browser for manual solving")
+
+        try:
+            from ..autodeps import _ensure_xvfb
+            _ensure_xvfb()
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=False)
+                context = browser.new_context(ignore_https_errors=True)
+                page = context.new_page()
+                page.goto(url, wait_until="domcontentloaded")
+
+                timeout = 300  # 5 minutes
+                start = _time.time()
+                solved = False
+                turnstile_clicked = False
+
+                while _time.time() - start < timeout:
+                    # Standard Cloudflare full-page challenge
+                    if any(c["name"] == "cf_clearance" for c in context.cookies()):
+                        solved = True
+                        break
+
+                    # s.to modal: form target="player-iframe" — after Weiter the VOE URL
+                    # loads into that iframe. The modal HTML stays on the page, so
+                    # is_captcha_page() would never become False. Instead poll the frame.
+                    for frame in page.frames:
+                        if frame.name == "player-iframe":
+                            fu = frame.url
+                            if fu and fu not in ("about:blank", "", url):
+                                final_url = fu
+                                solved = True
+                                break
+                    if solved:
+                        break
+
+                    # Check for classic full-page solve using lightweight DOM query
+                    if not _is_captcha_page_dom(page):
+                        solved = True
+                        break
+
+                    # Click Turnstile checkbox if not yet clicked
+                    if not turnstile_clicked and not _is_turnstile_token_ready(page):
+                        if _click_turnstile(page, logger):
+                            turnstile_clicked = True
+                            page.wait_for_timeout(_random.randint(2000, 4000))
+                            continue
+                    elif turnstile_clicked and not _is_turnstile_token_ready(page):
+                        # Turnstile may have reset — allow re-click
+                        turnstile_clicked = False
+
+                    # Auto-click Weiter once Turnstile token is present
+                    if _is_turnstile_token_ready(page):
+                        try:
+                            weiter = page.locator('button[type="submit"]')
+                            weiter.wait_for(state="visible", timeout=1500)
+                            weiter.click()
+                            page.wait_for_timeout(2000)
+                        except Exception:
+                            pass
+
+                    _time.sleep(1.5)
+
+                if solved:
+                    for cookie in context.cookies():
+                        GLOBAL_SESSION.cookies.set(
+                            cookie["name"],
+                            cookie["value"],
+                            domain=cookie.get("domain", "").lstrip("."),
+                        )
+                    logger.info("CAPTCHA solved — cookies injected into session")
+                else:
+                    logger.warning("CAPTCHA timeout after 5 minutes")
+
+                browser.close()
+
+            return final_url if solved else None
+
+        except Exception as e:
+            logger.error(f"Error while solving CAPTCHA: {e}", exc_info=True)
+            return None
+
+
+class CaptchaSession:
+    """Holds state for an in-progress interactive captcha solve (web UI mode)."""
+
+    def __init__(self):
+        self._screenshot = b""
+        self._screenshot_lock = _threading.Lock()
+        self._click_queue = _queue_module.Queue()
+        self.done = False
+        self.result_url = None
+
+    def get_screenshot(self) -> bytes:
+        with self._screenshot_lock:
+            return self._screenshot
+
+    def _store_screenshot(self, data: bytes):
+        with self._screenshot_lock:
+            self._screenshot = data
+
+    def enqueue_click(self, x: int, y: int):
+        self._click_queue.put_nowait((x, y))
+
+
+def _solve_captcha_interactive(url: str, queue_id: int) -> bool:
+    """WebUI mode: stream screenshots, accept clicks, inject cookies on success."""
+    try:
+        from patchright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError(
+            "patchright ist nicht installiert. "
+            "Bitte installieren mit: pip install patchright && patchright install chromium"
+        )
+
+    from ..config import GLOBAL_SESSION
+    from ..logger import get_logger
+    logger = get_logger(__name__)
+
+    session = CaptchaSession()
+    with _active_sessions_lock:
+        _active_sessions[queue_id] = session
+
+    if _on_captcha_start is not None:
+        try:
+            _on_captcha_start(queue_id, url)
+        except Exception:
+            pass
+
+    try:
+        from ..autodeps import _ensure_xvfb
+        _ensure_xvfb()
+        with sync_playwright() as p:
+            # headless=False required for Cloudflare/Turnstile to work.
+            # Window pushed off-screen to avoid visible popup on server desktops.
+            # Hardened context: persistent profile, realistic locale/timezone/
+            # viewport, overlay + WebGL defences.  No network ad-block here — this
+            # generic solver must let foreign provider iframes load.
+            _handle = _launch_browser_context(p, offscreen=True)
+            context = _handle.context
+            page = context.new_page()
+            page.goto(url)
+            _sync_session_user_agent(page)
+
+            solved = False
+            turnstile_clicked = False
+            for _ in range(300):  # up to ~5 minutes
+                # Stream screenshot to Web UI
+                try:
+                    shot = page.screenshot(type="jpeg", quality=65)
+                    session._store_screenshot(shot)
+                except Exception:
+                    pass
+
+                # Forward pending click events from Web UI
+                while not session._click_queue.empty():
+                    try:
+                        cx, cy = session._click_queue.get_nowait()
+                        page.mouse.click(cx, cy)
+                        page.wait_for_timeout(400)
+                    except Exception:
+                        pass
+
+                # Check for cf_clearance cookie (classic Cloudflare challenge)
+                if any(c["name"] == "cf_clearance" for c in context.cookies()):
+                    solved = True
+                    break
+
+                # s.to modal: poll player-iframe for the VOE URL
+                for frame in page.frames:
+                    if frame.name == "player-iframe":
+                        fu = frame.url
+                        if fu and fu not in ("about:blank", "", url):
+                            result_url = fu
+                            solved = True
+                            break
+                if solved:
+                    break
+
+                # Classic full-page solve (no modal) — lightweight DOM query
+                if not _is_captcha_page_dom(page):
+                    solved = True
+                    break
+
+                # Click Turnstile checkbox if not yet clicked
+                if not turnstile_clicked and not _is_turnstile_token_ready(page):
+                    if _click_turnstile(page):
+                        turnstile_clicked = True
+                        page.wait_for_timeout(_random.randint(2000, 4000))
+                        continue
+                elif turnstile_clicked and not _is_turnstile_token_ready(page):
+                    turnstile_clicked = False
+
+                # Auto-click Weiter button once Turnstile token is present
+                if _is_turnstile_token_ready(page):
+                    try:
+                        weiter_button = page.locator('button[type="submit"]')
+                        weiter_button.wait_for(state="visible", timeout=2000)
+                        weiter_button.click()
+                        page.wait_for_timeout(2000)
+                    except Exception:
+                        pass
+
+                page.wait_for_timeout(1000)
+
+            # Final screenshot
+            try:
+                shot = page.screenshot(type="jpeg", quality=65)
+                session._store_screenshot(shot)
+            except Exception:
+                pass
+
+            if solved:
+                for cookie in context.cookies():
+                    GLOBAL_SESSION.cookies.set(
+                        cookie["name"],
+                        cookie["value"],
+                        domain=cookie.get("domain", "").lstrip("."),
+                    )
+                logger.info("CAPTCHA solved — cookies injected into session")
+            else:
+                logger.warning("CAPTCHA timeout after 5 minutes")
+
+            final_url = page.url
+            page.wait_for_timeout(400)
+            _handle.close()
+
+        # Use the player-iframe URL if captured, otherwise fall back to page URL
+        result_url = locals().get("result_url") or _extract_iframe_url(page, url)
+        if result_url == url:
+            result_url = final_url
+
+        session.result_url = result_url or final_url
+        session.done = True
+
+        return result_url if solved else None
+
+    finally:
+        if _on_captcha_end is not None:
+            try:
+                _on_captcha_end(queue_id)
+            except Exception:
+                pass
+        with _active_sessions_lock:
+            _active_sessions.pop(queue_id, None)
+
+
+def _extract_iframe_url(page, current_url: str) -> str:
+    """
+    After a modal is dismissed the provider player loads as an iframe on the same
+    page (URL never changes).  Scan all frames for the first external URL.
+    Returns the iframe URL if found, otherwise *current_url*.
+    """
+    try:
+        from urllib.parse import urlparse
+        current_netloc = urlparse(current_url).netloc.lstrip("www.")
+        for frame in page.frames:
+            u = frame.url
+            if not u or u in ("about:blank", current_url):
+                continue
+            nl = urlparse(u).netloc.lstrip("www.")
+            if nl and nl != current_netloc:
+                return u
+    except Exception:
+        pass
+    return current_url
+
+
+def playwright_get_page_url(url: str) -> str:
+    solve_captcha(url)
+    from ..config import GLOBAL_SESSION
+    return GLOBAL_SESSION.get(url).url
+
+
+def _inject_session_cookies(context, url: str) -> None:
+    """Copy GLOBAL_SESSION cookies into a patchright browser context."""
+    try:
+        from ..config import GLOBAL_SESSION
+        from urllib.parse import urlparse
+        base = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+        cookies = [
+            {"name": c.name, "value": c.value, "url": base}
+            for c in GLOBAL_SESSION.cookies
+        ]
+        if cookies:
+            context.add_cookies(cookies)
+    except Exception:
+        pass
+
+
+def solve_sto_modal(episode_url: str, provider_name: str, language_label: str,
+                    redirect_url: str = None):
+    """
+    Navigate to the provider redirect URL (or fall back to the episode page),
+    solve any Turnstile modal that appears, and return the player-iframe URL
+    (e.g. voe.sx/e/...).  Works in CLI and WebUI mode.
+
+    redirect_url — the provider-specific /r?t=... link; when supplied the
+    browser navigates there directly so the Turnstile modal is triggered
+    immediately without needing to click a provider button first.
+
+    Returns the provider URL on success, None on timeout.
+    """
+    try:
+        from patchright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError(
+            "patchright ist nicht installiert. "
+            "Bitte installieren mit: pip install patchright && patchright install chromium"
+        )
+
+    from ..config import GLOBAL_SESSION
+    from ..logger import get_logger
+    logger = get_logger(__name__)
+
+    queue_id = getattr(_local, "queue_id", None)
+    session_obj = None
+    if queue_id is not None:
+        session_obj = CaptchaSession()
+        with _active_sessions_lock:
+            _active_sessions[queue_id] = session_obj
+        if _on_captcha_start is not None:
+            try:
+                _on_captcha_start(queue_id, episode_url)
+            except Exception:
+                pass
+
+    try:
+        from ..autodeps import _ensure_xvfb
+        _ensure_xvfb()
+
+        # The Turnstile captcha modal lives on the s.to *episode page* itself.
+        # It is shown by the in-page player JS when the provider's play button
+        # (the element carrying the matching data-play-url) is clicked.
+        # Navigating to the /r?t=... redirect URL directly bounces to the s.to
+        # homepage, because the token is consumed by the in-page player JS and
+        # not by a top-level GET — so we open the episode page and click.
+        start_url = episode_url
+
+        with sync_playwright() as p:
+            from urllib.parse import urlparse as _urlparse
+            # Episode-page netloc — the "home" domain.  Any other netloc is
+            # either an ad (blocked) or the provider result (allowed post-submit).
+            sto_netloc = _urlparse(episode_url).netloc
+
+            # Created before the context so the ad-blocker can read it:
+            # navigations after submit are the provider result, not ads.
+            _weiter_submitted = _threading.Event()   # set when submit is clicked
+
+            # Hardened, ad-blocked context: persistent profile, realistic
+            # locale/timezone/viewport, overlay + WebGL fingerprint defences.
+            _handle = _launch_browser_context(
+                p, offscreen=(queue_id is not None),
+                ad_home=sto_netloc, weiter_event=_weiter_submitted,
+            )
+            context = _handle.context
+
+            _inject_session_cookies(context, episode_url)
+            page = context.new_page()
+
+            # New-tab guard: s.to has invisible full-page <a target="_blank">
+            # ad overlays that open an ad tab on any click.
+            #
+            # Strategy: use *timing* rather than a domain whitelist.
+            # - A tab that opens BEFORE the Weiter/submit button is clicked is
+            #   an ad (overlay click during Turnstile mouse movement) → close it.
+            # - A tab that opens AFTER Weiter is clicked is the provider result
+            #   (s.to opened it as the player) → keep it, regardless of domain.
+            #   This correctly handles VOE alias domains like jeanprofessorcentral.com
+            #   that we can't predict in advance.
+            # - As a fallback, tabs on known provider domains are always kept even
+            #   if they somehow open before Weiter.
+            _ad_tab_lock = _threading.Lock()
+            _provider_tab_urls: list = []
+
+            def _on_new_page(new_pg):
+                try:
+                    new_pg.wait_for_load_state("commit", timeout=4000)
+                    pu = new_pg.url
+                    if not pu or pu in ("about:blank", ""):
+                        return
+                    from urllib.parse import urlparse as _up2
+                    if _up2(pu).netloc == sto_netloc:
+                        return  # still on s.to — not a provider result
+                    # Keep if: Weiter was already submitted, OR it's a known provider
+                    if _weiter_submitted.is_set() or _is_known_provider_url(pu):
+                        with _ad_tab_lock:
+                            _provider_tab_urls.append(pu)
+                    else:
+                        # Ad tab from overlay click — close immediately
+                        try:
+                            new_pg.close()
+                        except Exception:
+                            pass
+                except Exception:
+                    try:
+                        new_pg.close()
+                    except Exception:
+                        pass
+
+            context.on("page", _on_new_page)
+
+            logger.debug(f"Opening episode page for modal solving: {start_url}")
+            page.goto(start_url, wait_until="domcontentloaded")
+            _sync_session_user_agent(page)
+
+            # The captcha modal is triggered by clicking the provider's play
+            # button on the episode page.  Derive the data-play-url value from
+            # the redirect URL (it is exactly the path+query of /r?t=...) and
+            # click the matching element via JS so invisible ad overlays can't
+            # intercept the click.
+            _remove_ad_overlays(page)
+
+            play_path = None
+            if redirect_url:
+                _sp = _urlparse(redirect_url)
+                play_path = _sp.path + (("?" + _sp.query) if _sp.query else "")
+
+            clicked = False
+            if play_path:
+                try:
+                    clicked = page.evaluate(
+                        """(playPath) => {
+                            const els = document.querySelectorAll('[data-play-url]');
+                            for (const el of els) {
+                                if (el.getAttribute('data-play-url') === playPath) {
+                                    el.scrollIntoView({block: 'center'});
+                                    el.click();
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }""",
+                        play_path,
+                    )
+                except Exception as _e:
+                    logger.debug(f"Provider-button click failed: {_e}")
+
+            if clicked:
+                logger.debug(
+                    f"Clicked provider button ({play_path}) — waiting for Turnstile modal"
+                )
+                page.wait_for_timeout(1500)
+                _remove_ad_overlays(page)
+            else:
+                # Fallback (legacy behaviour): the matching play button was not
+                # found on the episode page — navigate to the redirect URL
+                # directly and hope the modal appears there.
+                logger.warning(
+                    "Provider play button not found on episode page — "
+                    "falling back to direct redirect navigation"
+                )
+                if redirect_url:
+                    page.goto(redirect_url, wait_until="domcontentloaded")
+
+            final_url = None
+            weiter_clicked = False
+            turnstile_clicked = False
+            last_turnstile_click = 0.0
+            start = _time.time()
+
+            while _time.time() - start < 90:
+                # WebUI: stream screenshots + forward user clicks
+                if session_obj is not None:
+                    try:
+                        session_obj._store_screenshot(page.screenshot(type="jpeg", quality=65))
+                    except Exception:
+                        pass
+                    while not session_obj._click_queue.empty():
+                        try:
+                            cx, cy = session_obj._click_queue.get_nowait()
+                            page.mouse.click(cx, cy)
+                            page.wait_for_timeout(300)
+                        except Exception:
+                            pass
+
+                # ── Provider-URL detection (runs every iteration) ────────────
+                # This must run before the Turnstile logic so that a successful
+                # cookie-based redirect (no Turnstile at all) is captured
+                # immediately without waiting for the 90 s timeout.
+
+                # 1. player-iframe by name (classic s.to behaviour).
+                #    IMPORTANT: the form POST to /r first loads an intermediate
+                #    s.to redirect page into the iframe before the final provider
+                #    URL arrives.  We must skip any URL still on sto_netloc so we
+                #    don't hand a serienstream.to URL to the VOE extractor.
+                for frame in page.frames:
+                    if frame.name == "player-iframe":
+                        fu = frame.url
+                        if fu and fu not in ("about:blank", ""):
+                            if (_urlparse(fu).netloc not in ("", sto_netloc)
+                                    and not _is_captcha_infra_url(fu)):
+                                final_url = fu
+                                break
+                if final_url:
+                    logger.debug(f"player-iframe URL found: {final_url}")
+                    break
+
+                # 2. Any iframe whose netloc differs from s.to — only trusted
+                #    AFTER the Turnstile modal was submitted.  Before that, the
+                #    s.to episode page is full of third-party ad iframes whose
+                #    netloc differs from s.to; without this gate the solver would
+                #    grab an ad iframe, set final_url and close the browser
+                #    immediately (captcha never solved).  Known provider domains
+                #    are always accepted as a safety net.
+                if not final_url:
+                    for frame in page.frames:
+                        fu = frame.url
+                        if not fu or fu in ("about:blank", "", start_url, episode_url):
+                            continue
+                        if _urlparse(fu).netloc in ("", sto_netloc):
+                            continue
+                        if _is_captcha_infra_url(fu):
+                            continue  # Turnstile widget, not the provider
+                        if weiter_clicked or _is_known_provider_url(fu):
+                            final_url = fu
+                            logger.warning(f"Foreign iframe URL found: {final_url}")
+                            break
+                if final_url:
+                    break
+
+                # 3. Main page navigated to a different domain (direct redirect).
+                #    Only trusted after submit / for known providers, so an ad
+                #    that hijacks the top frame can't end the solve early.
+                if not final_url:
+                    try:
+                        pu = page.url
+                        if (pu and _urlparse(pu).netloc not in ("", sto_netloc)
+                                and not _is_captcha_infra_url(pu)):
+                            if weiter_clicked or _is_known_provider_url(pu):
+                                final_url = pu
+                                logger.warning(f"Page navigated to provider: {final_url}")
+                    except Exception:
+                        pass
+                if final_url:
+                    break
+
+                # 4. New tab opened by s.to — only accept known provider domains.
+                #    Non-provider tabs (ads) are closed by the context handler
+                #    above; here we just check if any provider tab was captured.
+                with _ad_tab_lock:
+                    for _u in reversed(_provider_tab_urls):
+                        if not _is_captcha_infra_url(_u):
+                            final_url = _u
+                            break
+                if final_url:
+                    logger.debug(f"Provider tab URL found: {final_url}")
+                    break
+
+                # ── Turnstile solving ────────────────────────────────────────
+                if not weiter_clicked:
+                    token_ready = _is_turnstile_token_ready(page)
+
+                    if token_ready:
+                        # Token present — submit the modal form.
+                        try:
+                            # Remove ad overlays before clicking Weiter so the
+                            # submit button click isn't hijacked by the overlay.
+                            _remove_ad_overlays(page)
+                            weiter = page.locator('button[type="submit"]')
+                            weiter.wait_for(state="visible", timeout=2000)
+                            # Signal BEFORE the click so the new-tab handler
+                            # never races ahead of the flag being set.
+                            _weiter_submitted.set()
+                            weiter.click()
+                            logger.warning("Submit clicked (Turnstile token ready)")
+                            weiter_clicked = True
+                        except Exception as e:
+                            logger.warning(f"Submit button error: {e}")
+                    else:
+                        # No token yet.  Click the Turnstile checkbox ONCE, then
+                        # give the widget time to validate.  Re-clicking a
+                        # checkbox that is already validating/solved resets it,
+                        # so only re-click after a grace period without a token.
+                        now = _time.time()
+                        if not turnstile_clicked:
+                            if _click_turnstile(page, logger):
+                                turnstile_clicked = True
+                                last_turnstile_click = now
+                                logger.warning(
+                                    "Turnstile checkbox clicked — waiting for token"
+                                )
+                            else:
+                                logger.warning(
+                                    "Turnstile iframe not found yet — modal may "
+                                    "still be loading"
+                                )
+                            page.wait_for_timeout(_random.randint(1500, 2500))
+                        elif now - last_turnstile_click > 8:
+                            logger.warning(
+                                "Turnstile token still missing after 8s — "
+                                "re-clicking checkbox"
+                            )
+                            turnstile_clicked = False
+
+                _time.sleep(0.8)
+
+            if final_url:
+                for cookie in context.cookies():
+                    GLOBAL_SESSION.cookies.set(
+                        cookie["name"],
+                        cookie["value"],
+                        domain=cookie.get("domain", "").lstrip("."),
+                    )
+
+            if session_obj is not None:
+                try:
+                    session_obj._store_screenshot(page.screenshot(type="jpeg", quality=65))
+                except Exception:
+                    pass
+
+            _handle.close()
+
+        if session_obj is not None:
+            session_obj.result_url = final_url
+            session_obj.done = True
+
+        return final_url
+
+    except Exception as e:
+        from ..logger import get_logger
+        get_logger(__name__).error(f"Fehler in solve_sto_modal: {e}", exc_info=True)
+        return None
+
+    finally:
+        if queue_id is not None:
+            if _on_captcha_end is not None:
+                try:
+                    _on_captcha_end(queue_id)
+                except Exception:
+                    pass
+            with _active_sessions_lock:
+                _active_sessions.pop(queue_id, None)

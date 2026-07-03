@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block styles %}
+<style>
+  #directLinkBtn {
+    height: 46px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+    white-space: nowrap;
+  }
+
+  #directLinkBtn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent);
+  }
+
+  .directlink-modal {
+    position: relative;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-modal);
+    width: 100%;
+    max-width: 500px;
+    padding: 28px 24px 22px;
+    margin: 0 auto;
+    animation: modal-in 0.2s ease;
+  }
+
+  .directlink-modal>.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .directlink-modal>.close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .dl-title {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .dl-hint {
+    margin: 0 0 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .dl-input-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dl-input-row input {
+    flex: 1 1 0%;
+    min-width: 0;
+    height: 44px;
+    border-radius: var(--radius-md);
+    padding: 0 14px;
+    font-size: 0.9rem;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  .dl-input-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .dl-input-row input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .dl-input-row button {
+    flex-shrink: 0;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+    transition: background var(--transition);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .dl-input-row button:hover {
+    background: var(--accent-hover);
+  }
+
+  .dl-error {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(220, 53, 53, 0.12);
+    border: 1px solid rgba(220, 53, 53, 0.35);
+    border-radius: var(--radius-md);
+    color: #e05555;
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 560px) {
+    .dl-input-row {
+      flex-direction: column !important;
+    }
+
+    .dl-input-row button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* Mobile: search bar wraps — input full width, buttons below */
+  @media (max-width: 540px) {
+    .search-bar {
+      flex-wrap: wrap;
+    }
+
+    .search-bar input {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+
+    .search-bar #searchBtn {
+      flex: 1;
+    }
+
+    #directLinkBtn {
+      flex: 1;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="site-hero">
+    <h1 id="pageHeading">MediaForge</h1>
+    <p class="hero-sub" id="pageSubtitle">{{ _('Download anime & series directly') }}</p>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="{{ _('Search anime & series…') }}" autofocus />
+    <button id="searchBtn" onclick="doSearch()">{{ _('Search') }}</button>
+    <button id="directLinkBtn" onclick="openDirectLinkModal()">{{ _('Direct Link') }}</button>
+  </div>
+  <div class="spinner" id="searchSpinner">{{ _('Searching...') }}</div>
+  <div class="results" id="results"></div>
+  <div id="browse">
+    <div class="browse-provider-block">
+      <div class="browse-provider-header browse-provider-aniworld">AniWorld</div>
+      <div class="browse-section" id="newAnimesSection">
+        <h2 class="browse-heading">{{ _('New Anime') }}</h2>
+        <div class="browse-grid" id="newAnimesGrid"></div>
+      </div>
+      <div class="browse-section" id="popularAnimesSection">
+        <h2 class="browse-heading">{{ _('Popular Anime') }}</h2>
+        <div class="browse-grid" id="popularAnimesGrid"></div>
+      </div>
+    </div>
+    <div class="browse-provider-block">
+      <div class="browse-provider-header browse-provider-sto">S.TO</div>
+      <div class="browse-section" id="newSeriesSection">
+        <h2 class="browse-heading">{{ _('New Series') }}</h2>
+        <div class="browse-grid" id="newSeriesGrid"></div>
+      </div>
+      <div class="browse-section" id="popularSeriesSection">
+        <h2 class="browse-heading">{{ _('Popular Series') }}</h2>
+        <div class="browse-grid" id="popularSeriesGrid"></div>
+      </div>
+    </div>
+    <div class="browse-provider-block">
+      <div class="browse-provider-header browse-provider-filmpalast">FilmPalast</div>
+      <div class="browse-section" id="newMoviesSection">
+        <h2 class="browse-heading">{{ _('New Movies') }}</h2>
+        <div class="browse-grid" id="newMoviesGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% include "shared_modals.html" %}
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

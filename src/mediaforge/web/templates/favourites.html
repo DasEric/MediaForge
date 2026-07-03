@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Favorites') }} — MediaForge{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header" style="margin-bottom:28px;">
+    <h1 class="page-title">{{ _('Favorites') }}</h1>
+    <p class="page-subtitle">{{ _('Your saved series & anime') }}</p>
+  </div>
+  <div id="favouritesList" class="fav-list">
+    <div class="stats-loading">{{ _('Loading favorites…') }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='favourites.js') }}"></script>
+{% endblock %}

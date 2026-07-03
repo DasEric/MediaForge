@@ -1,0 +1,1470 @@
+{% extends "base.html" %} {% block title %}{{ _('Notifications') }} — MediaForge{% endblock %}
+{% block content %}
+<div class="settings-container">
+  <div class="page-header" style="margin-bottom:28px;">
+    <h1 class="page-title">{{ _('Notifications') }}</h1>
+    <p class="page-subtitle">{{ _('Configure services') }}</p>
+  </div>
+
+  <!-- Service Pills -->
+  <div class="service-pills">
+    <button class="service-pill active" onclick="showService('webpush',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Web Push
+    </button>
+    <button class="service-pill" onclick="showService('telegram',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 4.8L2.8 11.6c-1.1.4-1.1 1.1-.2 1.4l4.6 1.4 1.8 5.5c.2.6.5.8.9.8.4 0 .6-.2.9-.4l2.7-2.6 5.3 3.9c1 .5 1.7.3 1.9-.9l3.4-16c.3-1.4-.5-2-1.9-1.4z"/></svg>
+      Telegram
+    </button>
+    <button class="service-pill" onclick="showService('pushover',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+      Pushover
+    </button>
+    <button class="service-pill" onclick="showService('ntfy',this)">
+      <svg viewBox="0 0 24 24"><g transform="scale(.046875)" fill="currentColor"><path d="M78.1 32.7C40.9 32.7 9 62 9 99.2l.4 311.2-9.4 69 127.1-33.8H443c37.2 0 69.1-29.3 69.1-66.5V99.2c0-37.2-31.9-66.5-69-66.5zm0 46.9H443c13.1 0 22.1 9.5 22.1 19.6V379c0 10-9 19.8-22.1 19.6H120.2l-64.6 19.5.7-3.8-.4-315.1c0-10.1 9.1-19.6 22.2-19.6"/><path d="M116.4 310.9v-34.8l73.1-38.7c2.4-1.2 4.6-2.1 6.8-2.7 2.3-.8 4.5-1.4 6.3-1.8l6-.6V230q-3-.3-6-1.2-2.85-.6-6.3-1.5c-2.2-.8-4.5-1.8-6.8-3l-73.1-38.7v-35.1l113 61.5v37.4z"/><path d="M110.5 139.7v50.4l76.6 40.6.5.2-.5.2-76.6 40.6v50.1l8.2-4.5L235.1 254v-46.4zm11.8 21.7 101.2 55.1V245l-101.2 55.1v-19.4l69.6-36.8.1-.1c1.9-1 3.8-1.7 5.8-2.3h.1l.2-.1c2.1-.7 3.9-1.2 5.5-1.6l11.1-1.1v-15.2l-5.4-.5c-1.7-.2-3.5-.5-5.1-1.1h-.2l-.2-.1c-2-.4-3.9-.9-5.9-1.4-2-.7-4-1.6-5.9-2.6l-.1-.1-69.6-36.7zm152.3 137.4h120.7v32.6H274.6z"/><path d="M268.7 292.1v46h132.4v-46zm11.7 13.4h109v19.2h-109z"/></g></svg>
+      NTFY
+    </button>
+    <button class="service-pill" onclick="showService('discord',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M7.5 7.5c1-.5 2.5-.5 4.5-.5s3.5 0 4.5.5M7.5 16.5c1 .5 2.5.5 4.5.5s3.5 0 4.5-.5"/><path d="M5 5.5S3 6 2 9c0 4 1 8 4 9.5 1 .5 2.5.5 3 0l1-2M19 5.5s2 .5 3 3c0 4-1 8-4 9.5-1 .5-2.5.5-3 0l-1-2"/></svg>
+      Discord
+    </button>
+    <button class="service-pill" onclick="showService('whatsapp',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      WhatsApp
+    </button>
+  <button class="service-pill" onclick="showService('storage',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      {{ _('Storage') }}
+    </button>
+  </div>
+
+  <!-- ═══ WEB PUSH ═══ -->
+  <div class="service-panel active" id="panel-webpush">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — Service') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Web Push globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block browser push notifications for all users.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_webpush_enabled" checked onchange="saveAdminToggle('notif_webpush_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-section">
+      <h2 style="padding:20px 24px 0;margin:0;font-size:1rem;font-weight:600;">Web Push</h2>
+      <div class="settings-hint" style="padding:8px 24px 0;">
+        {{ _('Receive browser notifications directly in the browser — even when MediaForge is running in a background tab. The browser must be open. Works on desktop and mobile devices supporting Chrome/Firefox.') }}
+      </div>
+      <div class="settings-hint" style="color:var(--text-muted);font-size:0.8rem;padding:4px 24px 0;">
+        ⚠️ {{ _('Web Push only works via HTTPS or localhost.') }}
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);margin-top:12px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="pushBtn" class="btn btn-primary" onclick="togglePushSubscription()" style="min-width:160px;">{{ _('Enable Web Push') }}</button>
+          <button class="btn btn-secondary" onclick="testNotif('webpush')">Test</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section push-prefs-disabled" id="pushPrefsSection">
+      <div class="settings-section-header">{{ _('Notify on') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('When all episodes of a queue entry completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_completed" onchange="saveUserPref('webpush_on_completed',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('When at least one episode succeeded but errors also occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_partial" onchange="saveUserPref('webpush_on_partial',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('When individual episodes of a queue entry failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_errors" onchange="saveUserPref('webpush_on_errors',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('When a running download is manually cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_cancelled" onchange="saveUserPref('webpush_on_cancelled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('When auto-sync has found new episodes of a subscribed series.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_autosync" onchange="saveUserPref('webpush_on_autosync',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('When an auto-sync job crashes or fails.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_sync_error" onchange="saveUserPref('webpush_on_sync_error',this.checked?'1':'0'); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_webpush" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_webpush" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('When a sync is paused due to an unreachable custom path — or resumes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_sync_hold" onchange="saveUserPref('webpush_on_sync_hold',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('When free disk space drops below the configured threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_webpush_on_disk_space_low" onchange="saveUserPref('webpush_on_disk_space_low',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TELEGRAM ═══ -->
+  <div class="service-panel" id="panel-telegram">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — Bot configuration') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Create a bot via') }} <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a>. {{ _('The bot then sends messages to users who have saved their chat ID.') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Bot token') }}</div>
+          <div class="settings-row-desc">{{ _('Obtained from @BotFather after') }} <code>/newbot</code>. {{ _('Format:') }} <code>1234567890:ABC-DEF...</code></div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_telegram_token" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_telegram_token',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_telegram_bot_token','admin_telegram_token')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Telegram globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block Telegram messages for all users.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_telegram_enabled" checked onchange="saveAdminToggle('notif_telegram_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-section">
+      <div class="settings-section-header">{{ _('My settings') }}</div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Send the bot a message first (e.g.') }} <code>/start</code>{{ _('), then click Detect. Or enter your chat ID manually — find it via') }} <a href="https://t.me/userinfobot" target="_blank" style="color:var(--accent)">@userinfobot</a>.
+      </div>
+      <div class="settings-row" id="telegram-status-row" style="display:none;">
+        <div class="settings-row-left"><div class="settings-row-label">{{ _('Service status') }}</div></div>
+        <div class="settings-row-right"><span id="telegram-status-badge" class="notif-badge notif-badge-warn">{{ _('Bot not configured') }}</span></div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Telegram') }}</div>
+          <div class="settings-row-desc">{{ _('Turn Telegram notifications for your account on or off.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_enabled" checked onchange="saveUserPref('telegram_enabled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">Chat-ID</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="user_telegram_chat_id" class="notif-input" placeholder="{{ _('e.g. 123456789') }}">
+          <button class="btn btn-secondary btn-sm" onclick="detectTelegramChatId()" title="{{ _('Auto-detect chat ID') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            {{ _('Detect') }}
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveUserField('telegram_chat_id','user_telegram_chat_id')">{{ _('Save') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section notif-prefs-section" id="telegram-prefs-section">
+      <div class="settings-section-header">{{ _('Notify on') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when all episodes of a job completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_completed" onchange="saveUserPref('telegram_on_completed',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('Message when at least one episode succeeded but errors also occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_partial" onchange="saveUserPref('telegram_on_partial',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('Message when individual episodes failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_errors" onchange="saveUserPref('telegram_on_errors',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when a running download was manually cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_cancelled" onchange="saveUserPref('telegram_on_cancelled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('Message when auto-sync finds new episodes of a subscribed series.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_autosync" onchange="saveUserPref('telegram_on_autosync',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('When an auto-sync job crashes or fails.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_sync_error" onchange="saveUserPref('telegram_on_sync_error',this.checked?'1':'0'); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_telegram" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_telegram" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('When a sync is paused due to an unreachable custom path — or resumes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_sync_hold" onchange="saveUserPref('telegram_on_sync_hold',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('When free disk space drops below the configured threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_telegram_on_disk_space_low" onchange="saveUserPref('telegram_on_disk_space_low',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);padding-top:4px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right">
+          <button class="btn btn-secondary btn-sm" onclick="testNotif('telegram')">{{ _('Send test') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PUSHOVER ═══ -->
+  <div class="service-panel" id="panel-pushover">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — App configuration') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Create an app at') }} <a href="https://pushover.net/apps/build" target="_blank" style="color:var(--accent)">pushover.net/apps/build</a>. {{ _('Each user then enters their own user key.') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('App token') }}</div>
+          <div class="settings-row-desc">{{ _('Found on the app page after creation under') }} <em>API Token/Key</em>.</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_pushover_token" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_pushover_token',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_pushover_app_token','admin_pushover_token')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Pushover globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block Pushover messages for all users.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_pushover_enabled" checked onchange="saveAdminToggle('notif_pushover_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-section">
+      <div class="settings-section-header">{{ _('My settings') }}</div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Download the') }} <a href="https://pushover.net" target="_blank" style="color:var(--accent)">{{ _('Pushover app') }}</a> {{ _('to your device. After login, find your user key on the home page.') }}
+      </div>
+      <div class="settings-row" id="pushover-status-row" style="display:none;">
+        <div class="settings-row-left"><div class="settings-row-label">{{ _('Service status') }}</div></div>
+        <div class="settings-row-right"><span id="pushover-status-badge" class="notif-badge notif-badge-warn">{{ _('App not configured') }}</span></div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Pushover') }}</div>
+          <div class="settings-row-desc">{{ _('Turn Pushover notifications for your account on or off.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_enabled" checked onchange="saveUserPref('pushover_enabled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('User key') }}</div>
+          <div class="settings-row-desc">{{ _('Your personal Pushover key — not the app API key.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="user_pushover_key" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('user_pushover_key',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveUserField('pushover_user_key','user_pushover_key')">{{ _('Save') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section notif-prefs-section" id="pushover-prefs-section">
+      <div class="settings-section-header">{{ _('Notify on') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when all episodes completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_completed" onchange="saveUserPref('pushover_on_completed',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('Message when at least one episode succeeded but errors also occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_partial" onchange="saveUserPref('pushover_on_partial',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('Message when individual episodes failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_errors" onchange="saveUserPref('pushover_on_errors',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when a running download was cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_cancelled" onchange="saveUserPref('pushover_on_cancelled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('Message when auto-sync finds new episodes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_autosync" onchange="saveUserPref('pushover_on_autosync',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('When an auto-sync job crashes or fails.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_sync_error" onchange="saveUserPref('pushover_on_sync_error',this.checked?'1':'0'); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_pushover" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_pushover" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('When a sync is paused due to an unreachable custom path — or resumes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_sync_hold" onchange="saveUserPref('pushover_on_sync_hold',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('When free disk space drops below the configured threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_pushover_on_disk_space_low" onchange="saveUserPref('pushover_on_disk_space_low',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);padding-top:4px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right">
+          <button class="btn btn-secondary btn-sm" onclick="testNotif('pushover')">{{ _('Send test') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NTFY ═══ -->
+  <div class="service-panel" id="panel-ntfy">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — NTFY configuration') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('NTFY sends messages to a topic. Enter the server URL and topic here.') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('NTFY server') }}</div>
+          <div class="settings-row-desc">{{ _('Base URL of the ntfy server. Required.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="admin_ntfy_server" class="notif-input" placeholder="{{ _('Enter server URL') }}">
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_ntfy_server','admin_ntfy_server')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('NTFY topic') }}</div>
+          <div class="settings-row-desc">{{ _('Topic name. Required. Messages are sent to &lt;server&gt;/&lt;topic&gt;.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="admin_ntfy_topic" class="notif-input" placeholder="{{ _('Enter topic') }}">
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_ntfy_topic','admin_ntfy_topic')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">Auth Token (Bearer)</div>
+          <div class="settings-row-desc">{{ _('Optional: enter a bearer token if your ntfy server requires authentication.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_ntfy_auth_token" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_ntfy_auth_token',this)" title="{{ _('Show/hide') }}">👁</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_ntfy_auth_token','admin_ntfy_auth_token')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Basic Auth (optional)') }}</div>
+          <div class="settings-row-desc">{{ _('Alternatively enter username/password for basic auth.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="admin_ntfy_user" class="notif-input" placeholder="user">
+          <input type="password" id="admin_ntfy_password" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_ntfy_user','admin_ntfy_user'); saveAdminField('notif_ntfy_password','admin_ntfy_password')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable NTFY globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block NTFY messages for all users.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_ntfy_enabled" checked onchange="saveAdminToggle('notif_ntfy_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-section">
+      <div class="settings-section-header">{{ _('My settings') }}</div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Enable NTFY for your account and receive messages to the configured topic.') }}
+      </div>
+      <div class="settings-row" id="ntfy-status-row" style="display:none;">
+        <div class="settings-row-left"><div class="settings-row-label">{{ _('Service status') }}</div></div>
+        <div class="settings-row-right"><span id="ntfy-status-badge" class="notif-badge notif-badge-warn">{{ _('NTFY not configured') }}</span></div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable NTFY') }}</div>
+          <div class="settings-row-desc">{{ _('Turn NTFY notifications for your account on or off.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_enabled" checked onchange="saveUserPref('ntfy_enabled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section notif-prefs-section" id="ntfy-prefs-section">
+      <div class="settings-section-header">{{ _('Notify on') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when all episodes of a job completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_completed" onchange="saveUserPref('ntfy_on_completed',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('Message when at least one episode succeeded but errors also occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_partial" onchange="saveUserPref('ntfy_on_partial',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('Message when individual episodes failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_errors" onchange="saveUserPref('ntfy_on_errors',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when a running download was cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_cancelled" onchange="saveUserPref('ntfy_on_cancelled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('Message when auto-sync finds new episodes of a subscribed series.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_autosync" onchange="saveUserPref('ntfy_on_autosync',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('Message when an auto-sync job crashes or fails.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_sync_error" onchange="saveUserPref('ntfy_on_sync_error',this.checked?'1':'0'); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_ntfy" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_ntfy" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('When a sync is paused due to an unreachable custom path — or resumes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_sync_hold" onchange="saveUserPref('ntfy_on_sync_hold',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('When free disk space drops below the configured threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_ntfy_on_disk_space_low" onchange="saveUserPref('ntfy_on_disk_space_low',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);padding-top:4px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right">
+          <button class="btn btn-secondary btn-sm" onclick="testNotif('ntfy')">{{ _('Send test') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DISCORD ═══ -->
+  <div class="service-panel" id="panel-discord">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — Webhook configuration') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Discord sends to a shared channel. Channel → Settings → Integrations → Webhooks → Create new webhook → copy URL.') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Webhook URL') }}</div>
+          <div class="settings-row-desc">{{ _('Must start with') }} <code>https://discord.com/api/webhooks/</code>.</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_discord_webhook" class="notif-input" placeholder="https://discord.com/api/webhooks/…">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_discord_webhook',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_discord_webhook_url','admin_discord_webhook')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Discord globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block Discord messages entirely.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_discord_enabled" checked onchange="saveAdminToggle('notif_discord_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section" id="discord-prefs-section">
+      <div class="settings-section-header">{{ _('Notify on (global — applies to all)') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('Green embed message when all episodes completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_completed" onchange="saveAdminToggle('notif_discord_on_completed',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('Orange embed message when at least one episode succeeded but errors occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_partial" onchange="saveAdminToggle('notif_discord_on_partial',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('Yellow embed message when individual episodes failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_errors" onchange="saveAdminToggle('notif_discord_on_errors',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('Grey embed message when a download was cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_cancelled" onchange="saveAdminToggle('notif_discord_on_cancelled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('Blue embed message when auto-sync finds new episodes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_autosync" onchange="saveAdminToggle('notif_discord_on_autosync',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('Red embed message when an auto-sync job crashes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_sync_error" onchange="saveAdminToggle('notif_discord_on_sync_error',this.checked); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_discord" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_discord" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('Embed message when a sync is paused or resumed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_sync_hold" onchange="saveAdminToggle('notif_discord_on_sync_hold',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('Yellow embed message when free storage drops below the threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_discord_on_disk_space_low" onchange="saveAdminToggle('notif_discord_on_disk_space_low',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);padding-top:4px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right">
+          <button class="btn btn-secondary btn-sm" onclick="testNotif('discord')">{{ _('Send test') }}</button>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="settings-section">
+      <div class="service-wip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;stroke:var(--text-muted);opacity:.5;"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M7.5 7.5c1-.5 2.5-.5 4.5-.5s3.5 0 4.5.5M7.5 16.5c1 .5 2.5.5 4.5.5s3.5 0 4.5-.5"/><path d="M5 5.5S3 6 2 9c0 4 1 8 4 9.5 1 .5 2.5.5 3 0l1-2M19 5.5s2 .5 3 3c0 4-1 8-4 9.5-1 .5-2.5.5-3 0l-1-2"/></svg>
+        <p><strong>Discord Webhook</strong></p>
+        <p style="font-size:0.82rem;">{{ _('Configured by an administrator. Once an admin sets up the webhook, MediaForge sends messages to the configured channel.') }}</p>
+        <span id="discord-user-status" class="notif-badge notif-badge-warn" style="margin-top:4px;">{{ _('Not configured') }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ WHATSAPP ═══ -->
+  <div class="service-panel" id="panel-whatsapp">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{ _('Admin — Twilio configuration') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('WhatsApp delivery runs via') }} <a href="https://www.twilio.com/en-us/whatsapp" target="_blank" style="color:var(--accent)">Twilio</a>. {{ _('You need a Twilio account with WhatsApp Sandbox enabled. Users must activate the sandbox once with') }} <code>join &lt;code&gt;</code>.
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">Account SID</div>
+          <div class="settings-row-desc">{{ _('Found on the Twilio console home page under') }} <em>Account Info</em>.</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_whatsapp_sid" class="notif-input" placeholder="AC••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_whatsapp_sid',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_whatsapp_sid','admin_whatsapp_sid')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auth token') }}</div>
+          <div class="settings-row-desc">{{ _('Next to the account SID in the Twilio console.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="password" id="admin_whatsapp_auth" class="notif-input" placeholder="••••••••">
+          <button class="btn btn-icon" onclick="toggleVisibility('admin_whatsapp_auth',this)" title="{{ _('Show/hide') }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_whatsapp_auth_token','admin_whatsapp_auth')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Sender number') }}</div>
+          <div class="settings-row-desc">{{ _('The Twilio WhatsApp sandbox number, e.g.') }} <code>+14155238886</code>.</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="admin_whatsapp_from" class="notif-input" placeholder="+14155238886">
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_whatsapp_from','admin_whatsapp_from')">{{ _('Save') }}</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable WhatsApp globally') }}</div>
+          <div class="settings-row-desc">{{ _('Disable to block WhatsApp messages for all users.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_whatsapp_enabled" checked onchange="saveAdminToggle('notif_whatsapp_enabled',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-section">
+      <div class="settings-section-header">{{ _('My settings') }}</div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('Enter your mobile number in international format (e.g.') }} <code>+4917612345678</code>). {{ _('You must first activate the sandbox once by sending') }} <code>join &lt;code&gt;</code> {{ _('to the Twilio number.') }}
+      </div>
+      <div class="settings-row" id="whatsapp-status-row" style="display:none;">
+        <div class="settings-row-left"><div class="settings-row-label">{{ _('Service status') }}</div></div>
+        <div class="settings-row-right"><span id="whatsapp-status-badge" class="notif-badge notif-badge-warn">{{ _('Twilio not configured') }}</span></div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable WhatsApp') }}</div>
+          <div class="settings-row-desc">{{ _('Turn WhatsApp notifications for your account on or off.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_enabled" checked onchange="saveUserPref('whatsapp_enabled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('My number') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="text" id="user_whatsapp_phone" class="notif-input" placeholder="+49…">
+          <button class="btn btn-primary btn-sm" onclick="saveUserField('whatsapp_phone','user_whatsapp_phone')">{{ _('Save') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section notif-prefs-section" id="whatsapp-prefs-section">
+      <div class="settings-section-header">{{ _('Notify on') }}</div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Successful download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when all episodes completed without errors.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_completed" onchange="saveUserPref('whatsapp_on_completed',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Partially successful') }}</div>
+          <div class="settings-row-desc">{{ _('Message when at least one episode succeeded but errors also occurred.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_partial" onchange="saveUserPref('whatsapp_on_partial',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Download with errors') }}</div>
+          <div class="settings-row-desc">{{ _('Message when individual episodes failed.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_errors" onchange="saveUserPref('whatsapp_on_errors',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Cancelled download') }}</div>
+          <div class="settings-row-desc">{{ _('Message when a running download was cancelled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_cancelled" onchange="saveUserPref('whatsapp_on_cancelled',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: new episodes') }}</div>
+          <div class="settings-row-desc">{{ _('Message when auto-sync finds new episodes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_autosync" onchange="saveUserPref('whatsapp_on_autosync',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: errors') }}</div>
+          <div class="settings-row-desc">{{ _('When an auto-sync job crashes or fails.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_sync_error" onchange="saveUserPref('whatsapp_on_sync_error',this.checked?'1':'0'); updateSyncErrorSubtogglesState();"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% if is_admin %}
+      <div class="settings-row" id="admin_sync_error_only_failed_all_container_whatsapp" style="padding-left: 44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size: 0.9rem;">{{ _('↳ Only error notifications when all retries have failed') }}</div>
+          <div class="settings-row-desc">{{ _('When enabled, a notification is sent for failed auto-syncs only after all retries are exhausted.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="admin_sync_error_only_failed_all_whatsapp" onchange="saveAdminToggle('notif_sync_error_only_failed_all',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Auto-sync: hold &amp; resume') }}</div>
+          <div class="settings-row-desc">{{ _('When a sync is paused due to an unreachable custom path — or resumes.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_sync_hold" onchange="saveUserPref('whatsapp_on_sync_hold',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Low disk space') }}</div>
+          <div class="settings-row-desc">{{ _('When free disk space drops below the configured threshold.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle"><input type="checkbox"  id="pref_whatsapp_on_disk_space_low" onchange="saveUserPref('whatsapp_on_disk_space_low',this.checked?'1':'0')"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div class="settings-row" style="border-top:1px solid var(--border);padding-top:4px;">
+        <div class="settings-row-left"></div>
+        <div class="settings-row-right">
+          <button class="btn btn-secondary btn-sm" onclick="testNotif('whatsapp')">{{ _('Send test') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SPEICHER ═══ -->
+  <div class="service-panel" id="panel-storage">
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        {{ _('Disk space warning') }}
+      </div>
+      <div class="settings-hint" style="padding:12px 24px 0;font-size:0.8rem;color:var(--text-muted);">
+        {{ _('MediaForge checks free disk space before every download. If it drops below the threshold, a notification is sent (max. once per hour). The download continues anyway.') }}
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Minimum disk space') }}</div>
+          <div class="settings-row-desc">{{ _('Notification when less than this value (in GB) is free. 0 = disabled.') }}</div>
+        </div>
+        <div class="settings-row-right notif-input-group">
+          <input type="number" id="storage_min_gb" class="notif-input" placeholder="5" min="0" step="1" style="width:80px;">
+          <span style="color:var(--text-muted);font-size:0.85rem;">GB</span>
+          <button class="btn btn-primary btn-sm" onclick="saveAdminField('notif_disk_space_min_gb','storage_min_gb')">{{ _('Save') }}</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /.settings-container -->
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Notification page responsive & extras ─────────────────────────── */
+.notif-input-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.notif-input-group .notif-input { min-width: 140px; }
+
+/* .btn-icon is now in style.css */
+
+/* Force the active-push danger color regardless of design-system overrides */
+#pushBtn.push-active {
+  background: rgba(239,68,68,0.18) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239,68,68,0.35) !important;
+}
+#pushBtn.push-active:hover {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+
+/* Mobile: stack rows vertically */
+@media (max-width: 640px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+  .settings-row-right {
+    width: 100%;
+  }
+  .notif-input-group {
+    width: 100%;
+  }
+  .notif-input-group .notif-input {
+    flex: 1;
+    min-width: 0;
+  }
+  .service-pills {
+    gap: 6px;
+  }
+  .service-pill {
+    padding: 7px 13px;
+    font-size: 0.82rem;
+  }
+  .settings-section-header {
+    padding: 14px 16px;
+  }
+  .settings-row {
+    padding: 14px 16px;
+  }
+  .settings-hint {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .settings-section > h2 {
+    padding-left: 16px !important;
+  }
+}
+</style>
+
+<script>
+/* ── Toast (defined here because app.js is not loaded on this page) ── */
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = "";
+  t.classList.remove("show");
+  void t.offsetWidth;
+  t.classList.add("show");
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+/* ── Service panel switcher ── */
+function showService(id, pill) {
+  document.querySelectorAll('.service-pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.service-panel').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  document.getElementById('panel-' + id).classList.add('active');
+}
+
+/* ── API helpers ── */
+async function _post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+/* ── Show / hide password field ── */
+function toggleVisibility(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const isHidden = el.type === 'password';
+  el.type = isHidden ? 'text' : 'password';
+  // swap eye icon
+  btn.innerHTML = isHidden
+    ? '<svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="15" height="15" style="width:15px;height:15px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+
+/* ── Admin: save a single sensitive field ── */
+async function saveAdminField(key, inputId) {
+  const val = document.getElementById(inputId)?.value?.trim();
+  if (val === undefined) return;
+  const res = await _post('/api/notif/admin-settings', { [key]: val });
+  if (res.ok) {
+    showToast({{ _('Saved ✓') | tojson }});
+    await loadSettings();
+  } else {
+    showToast({{ _('Error:') | tojson }} + ' ' + (res.error || '?'));
+  }
+}
+
+/* ── Admin: save a boolean toggle ── */
+async function saveAdminToggle(key, checked) {
+  const res = await _post('/api/notif/admin-settings', { [key]: checked ? '1' : '0' });
+  if (!res.ok) {
+    showToast({{ _('Error:') | tojson }} + ' ' + (res.error || '?'));
+  } else {
+    if (key === 'notif_sync_error_only_failed_all') {
+      const list = [
+        'admin_sync_error_only_failed_all_webpush',
+        'admin_sync_error_only_failed_all_telegram',
+        'admin_sync_error_only_failed_all_pushover',
+        'admin_sync_error_only_failed_all_ntfy',
+        'admin_sync_error_only_failed_all_discord',
+        'admin_sync_error_only_failed_all_whatsapp'
+      ];
+      for (const id of list) {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+      }
+    }
+  }
+}
+
+/* ── User: save a single field ── */
+async function saveUserField(key, inputId) {
+  const val = document.getElementById(inputId)?.value?.trim();
+  if (val === undefined) return;
+  const res = await _post('/api/notif/user-settings', { [key]: val });
+  if (res.ok) {
+    showToast({{ _('Saved ✓') | tojson }});
+    await loadSettings();
+  } else {
+    showToast({{ _('Error:') | tojson }} + ' ' + (res.error || '?'));
+  }
+}
+
+/* ── User: save a pref toggle (fire-and-forget, no toast needed) ── */
+async function saveUserPref(key, val) {
+  const res = await _post('/api/notif/user-settings', { [key]: val });
+  if (!res.ok) showToast({{ _('Error:') | tojson }} + ' ' + (res.error || '?'));
+}
+
+/* ── Telegram Chat-ID auto-detect ── */
+async function detectTelegramChatId() {
+  showToast({{ _('Searching for last message…') | tojson }});
+  try {
+    const r = await fetch('/api/notif/telegram/detect-chat-id');
+    const data = await r.json();
+    if (data.chat_id) {
+      document.getElementById('user_telegram_chat_id').value = data.chat_id;
+      showToast({{ _('Chat ID detected:') | tojson }} + ' ' + data.chat_id + ' — ' + {{ _('please save!') | tojson }});
+    } else {
+      showToast(data.error || {{ _('No message found. Send the bot a message first.') | tojson }});
+    }
+  } catch(e) {
+    showToast({{ _('Network error while detecting.') | tojson }});
+  }
+}
+
+/* ── Test notification ── */
+async function testNotif(service) {
+  showToast({{ _('Sending test…') | tojson }});
+  let res;
+  try {
+    const r = await fetch('/api/notif/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service })
+    });
+    res = await r.json();
+    if (res.ok) {
+      showToast({{ _('Test message sent ✓') | tojson }});
+    } else {
+      showToast({{ _('Error:') | tojson }} + ' ' + (res.error || {{ _('Unknown error') | tojson }}));
+    }
+  } catch(e) {
+    showToast({{ _('Network error:') | tojson }} + ' ' + e.message);
+  }
+}
+
+/* ── Toggle helpers ── */
+function _applyToggle(key, prefs, defaultOn) {
+  const el = document.getElementById('pref_' + key);
+  if (!el) return;
+  const v = prefs[key];
+  el.checked = (v === undefined || v === null) ? (defaultOn !== false) : (v !== '0' && v !== 'false' && v !== false);
+}
+
+function _applyAdminToggle(elId, admin, adminKey, defaultOn) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const v = admin[adminKey];
+  el.checked = (v === undefined || v === '' || v === null) ? (defaultOn !== false) : (v !== '0' && v !== false);
+}
+
+function _maybeSetInput(id, value) {
+  const el = document.getElementById(id);
+  if (el && value !== undefined && value !== null && value !== '') el.value = value;
+}
+
+function _showStatusBadge(service, configured) {
+  const row   = document.getElementById(service + '-status-row');
+  const badge = document.getElementById(service + '-status-badge');
+  if (!row || !badge) return;
+  row.style.display = 'flex';
+  badge.textContent = configured ? {{ _('Configured ✓') | tojson }} : {{ _('Not configured — please contact admin') | tojson }};
+  badge.className   = 'notif-badge ' + (configured ? 'notif-badge-ok' : 'notif-badge-warn');
+}
+
+function _setSectionEnabled(id, enabled) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('push-prefs-disabled', !enabled);
+}
+
+function updateSyncErrorSubtogglesState() {
+  const providers = ['webpush', 'telegram', 'pushover', 'ntfy', 'discord', 'whatsapp'];
+  providers.forEach(prov => {
+    const parentId = prov === 'discord' ? 'pref_discord_on_sync_error' : 'pref_' + prov + '_on_sync_error';
+    const subContainerId = 'admin_sync_error_only_failed_all_container_' + prov;
+    const parentEl = document.getElementById(parentId);
+    const subContainerEl = document.getElementById(subContainerId);
+    if (parentEl && subContainerEl) {
+      const isChecked = parentEl.checked;
+      subContainerEl.classList.toggle('push-prefs-disabled', !isChecked);
+    }
+  });
+}
+
+/* ── Load all settings ── */
+async function loadSettings() {
+  let data;
+  try {
+    data = await fetch('/api/notif/settings').then(r => r.json());
+  } catch(e) {
+    console.warn('[Notif] loadSettings error:', e);
+    return;
+  }
+  const prefs   = data.user_prefs || {};
+  const admin   = data.admin      || {};
+  const isAdmin = data.is_admin;
+
+  /* Web Push */
+  _applyToggle('webpush_on_completed', prefs);
+  _applyToggle('webpush_on_partial',   prefs);
+  _applyToggle('webpush_on_errors',    prefs);
+  _applyToggle('webpush_on_cancelled', prefs);
+  _applyToggle('webpush_on_autosync',       prefs);
+  _applyToggle('webpush_on_sync_error',     prefs);
+  _applyToggle('webpush_on_sync_hold',      prefs);
+  _applyToggle('webpush_on_disk_space_low', prefs);
+  if (isAdmin) {
+    _applyAdminToggle('admin_webpush_enabled', admin, 'notif_webpush_enabled');
+  }
+
+  /* Telegram */
+  const tgConfigured = isAdmin
+    ? !!(admin.notif_telegram_bot_token && String(admin.notif_telegram_bot_token).length > 4)
+    : admin.notif_telegram_bot_token === true;
+  _showStatusBadge('telegram', tgConfigured);
+  if (isAdmin) {
+    _maybeSetInput('admin_telegram_token', admin.notif_telegram_bot_token);
+    _applyAdminToggle('admin_telegram_enabled', admin, 'notif_telegram_enabled');
+  }
+  _applyToggle('telegram_enabled',      prefs);
+  _maybeSetInput('user_telegram_chat_id', prefs.telegram_chat_id);
+  _applyToggle('telegram_on_completed', prefs);
+  _applyToggle('telegram_on_partial',   prefs);
+  _applyToggle('telegram_on_errors',    prefs);
+  _applyToggle('telegram_on_cancelled', prefs);
+  _applyToggle('telegram_on_autosync',       prefs);
+  _applyToggle('telegram_on_sync_error',     prefs);
+  _applyToggle('telegram_on_sync_hold',      prefs);
+  _applyToggle('telegram_on_disk_space_low', prefs);
+  _setSectionEnabled('telegram-prefs-section',
+    tgConfigured && !!prefs.telegram_chat_id && prefs.telegram_enabled !== '0');
+
+  /* Pushover */
+  const poConfigured = isAdmin
+    ? !!(admin.notif_pushover_app_token && String(admin.notif_pushover_app_token).length > 4)
+    : admin.notif_pushover_app_token === true;
+  _showStatusBadge('pushover', poConfigured);
+  if (isAdmin) {
+    _maybeSetInput('admin_pushover_token', admin.notif_pushover_app_token);
+    _applyAdminToggle('admin_pushover_enabled', admin, 'notif_pushover_enabled');
+  }
+  _applyToggle('pushover_enabled',      prefs);
+  _maybeSetInput('user_pushover_key', prefs.pushover_user_key);
+  _applyToggle('pushover_on_completed', prefs);
+  _applyToggle('pushover_on_partial',   prefs);
+  _applyToggle('pushover_on_errors',    prefs);
+  _applyToggle('pushover_on_cancelled', prefs);
+  _applyToggle('pushover_on_autosync',       prefs);
+  _applyToggle('pushover_on_sync_error',     prefs);
+  _applyToggle('pushover_on_sync_hold',      prefs);
+  _applyToggle('pushover_on_disk_space_low', prefs);
+  _setSectionEnabled('pushover-prefs-section',
+    poConfigured && !!prefs.pushover_user_key && prefs.pushover_enabled !== '0');
+
+  /* NTFY */
+  const ntfyConfigured = isAdmin
+    ? !!(admin.notif_ntfy_server && String(admin.notif_ntfy_server).length > 0
+      && admin.notif_ntfy_topic && String(admin.notif_ntfy_topic).length > 0)
+    : (admin.notif_ntfy_server === true && admin.notif_ntfy_topic === true);
+  _showStatusBadge('ntfy', ntfyConfigured);
+  if (isAdmin) {
+    _maybeSetInput('admin_ntfy_server', admin.notif_ntfy_server);
+    _maybeSetInput('admin_ntfy_topic', admin.notif_ntfy_topic);
+    _maybeSetInput('admin_ntfy_auth_token', admin.notif_ntfy_auth_token);
+    _maybeSetInput('admin_ntfy_user', admin.notif_ntfy_user);
+    _maybeSetInput('admin_ntfy_password', admin.notif_ntfy_password);
+    _applyAdminToggle('admin_ntfy_enabled', admin, 'notif_ntfy_enabled');
+  }
+  _applyToggle('ntfy_enabled',      prefs);
+  _applyToggle('ntfy_on_completed', prefs);
+  _applyToggle('ntfy_on_partial',   prefs);
+  _applyToggle('ntfy_on_errors',    prefs);
+  _applyToggle('ntfy_on_cancelled', prefs);
+  _applyToggle('ntfy_on_autosync',       prefs);
+  _applyToggle('ntfy_on_sync_error',     prefs);
+  _applyToggle('ntfy_on_sync_hold',      prefs);
+  _applyToggle('ntfy_on_disk_space_low', prefs);
+  _setSectionEnabled('ntfy-prefs-section',
+    ntfyConfigured && prefs.ntfy_enabled !== '0');
+
+  /* Discord */
+  if (isAdmin) {
+    const dcConfigured = !!(admin.notif_discord_webhook_url &&
+      String(admin.notif_discord_webhook_url).length > 10);
+    _maybeSetInput('admin_discord_webhook', admin.notif_discord_webhook_url);
+    _applyAdminToggle('admin_discord_enabled', admin, 'notif_discord_enabled');
+    _applyAdminToggle('pref_discord_on_completed', admin, 'notif_discord_on_completed');
+    _applyAdminToggle('pref_discord_on_partial',   admin, 'notif_discord_on_partial');
+    _applyAdminToggle('pref_discord_on_errors',    admin, 'notif_discord_on_errors');
+    _applyAdminToggle('pref_discord_on_cancelled', admin, 'notif_discord_on_cancelled');
+    _applyAdminToggle('pref_discord_on_autosync',        admin, 'notif_discord_on_autosync');
+    _applyAdminToggle('pref_discord_on_sync_error',      admin, 'notif_discord_on_sync_error');
+    _applyAdminToggle('pref_discord_on_sync_hold',       admin, 'notif_discord_on_sync_hold');
+    _applyAdminToggle('pref_discord_on_disk_space_low',  admin, 'notif_discord_on_disk_space_low');
+    _setSectionEnabled('discord-prefs-section', dcConfigured);
+  } else {
+    const badge = document.getElementById('discord-user-status');
+    const configured = admin.notif_discord_webhook_url === true;
+    if (badge) {
+      badge.textContent = configured ? {{ _('Configured ✓') | tojson }} : {{ _('Not configured') | tojson }};
+      badge.className   = 'notif-badge ' + (configured ? 'notif-badge-ok' : 'notif-badge-warn');
+    }
+  }
+
+  /* WhatsApp */
+  const waConfigured = isAdmin
+    ? !!(admin.notif_whatsapp_sid && String(admin.notif_whatsapp_sid).length > 4)
+    : admin.notif_whatsapp_sid === true;
+  _showStatusBadge('whatsapp', waConfigured);
+  if (isAdmin) {
+    _maybeSetInput('admin_whatsapp_sid',  admin.notif_whatsapp_sid);
+    _maybeSetInput('admin_whatsapp_auth', admin.notif_whatsapp_auth_token);
+    _maybeSetInput('admin_whatsapp_from', admin.notif_whatsapp_from);
+    _applyAdminToggle('admin_whatsapp_enabled', admin, 'notif_whatsapp_enabled');
+  }
+  _applyToggle('whatsapp_enabled',      prefs);
+  _maybeSetInput('user_whatsapp_phone', prefs.whatsapp_phone);
+  _applyToggle('whatsapp_on_completed', prefs);
+  _applyToggle('whatsapp_on_partial',   prefs);
+  _applyToggle('whatsapp_on_errors',    prefs);
+  _applyToggle('whatsapp_on_cancelled', prefs);
+  _applyToggle('whatsapp_on_autosync',       prefs);
+  _applyToggle('whatsapp_on_sync_error',     prefs);
+  _applyToggle('whatsapp_on_sync_hold',      prefs);
+  _applyToggle('whatsapp_on_disk_space_low', prefs);
+  _setSectionEnabled('whatsapp-prefs-section',
+    waConfigured && !!prefs.whatsapp_phone && prefs.whatsapp_enabled !== '0');
+  /* Storage panel */
+  const rawGb = admin['notif_disk_space_min_gb'];
+  const gbEl  = document.getElementById('storage_min_gb');
+  if (gbEl && rawGb !== undefined && rawGb !== null && rawGb !== '') {
+    gbEl.value = rawGb;
+  } else if (gbEl && !gbEl.value) {
+    gbEl.value = '5';
+  }
+  if (isAdmin) {
+    const list = [
+      'admin_sync_error_only_failed_all_webpush',
+      'admin_sync_error_only_failed_all_telegram',
+      'admin_sync_error_only_failed_all_pushover',
+      'admin_sync_error_only_failed_all_ntfy',
+      'admin_sync_error_only_failed_all_discord',
+      'admin_sync_error_only_failed_all_whatsapp'
+    ];
+    for (const id of list) {
+      _applyAdminToggle(id, admin, 'notif_sync_error_only_failed_all', false);
+    }
+  }
+  updateSyncErrorSubtogglesState();
+}
+
+document.addEventListener('DOMContentLoaded', loadSettings);
+
+/* ── Keep pwa.js in sync: update push button state ── */
+window._updatePushButtonState = async function() {
+  const btn  = document.getElementById('pushBtn');
+  const sect = document.getElementById('pushPrefsSection');
+  if (!btn || !('serviceWorker' in navigator)) return;
+  let sw = null;
+  try { sw = await navigator.serviceWorker.ready; } catch(_) {}
+  const sub = sw ? await sw.pushManager.getSubscription().catch(()=>null) : null;
+  if (sub) {
+    btn.textContent = {{ _('Disable Web Push') | tojson }};
+    btn.classList.add('push-active');
+    if (sect) sect.classList.remove('push-prefs-disabled');
+  } else {
+    btn.textContent = {{ _('Enable Web Push') | tojson }};
+    btn.classList.remove('push-active');
+    if (sect) sect.classList.add('push-prefs-disabled');
+  }
+};
+</script>
+{% endblock %}

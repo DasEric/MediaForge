@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}SyncPlay — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='syncplay.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sp-page" data-invite-room="{{ invite_room }}">
+
+  <div class="page-header">
+    <h1 class="page-title">SyncPlay</h1>
+    <p class="page-subtitle">{{ _('Watch together, perfectly in sync — phone, tablet and PC.') }}</p>
+  </div>
+
+  <!-- ── Lobby ───────────────────────────────────────────────── -->
+  <section class="sp-lobby" id="spLobby">
+    <div class="sp-card">
+      <h2 id="spLobbyTitle">{{ _('Start or join a room') }}</h2>
+      <div class="sp-field">
+        <label for="spRoomInput">{{ _('Room name') }}</label>
+        <input type="text" id="spRoomInput" placeholder="{{ _('e.g. movie-night') }}" autocomplete="off" />
+      </div>
+      <div class="sp-field">
+        <label for="spNameInput">{{ _('Your display name') }} <span class="sp-req">*</span></label>
+        <input type="text" id="spNameInput" placeholder="{{ _('Required') }}" autocomplete="off" maxlength="40" />
+      </div>
+      <div class="sp-field" id="spPwField" hidden>
+        <label for="spPwInput">{{ _('Room password') }}</label>
+        <input type="password" id="spPwInput" placeholder="{{ _('If the room is protected') }}" autocomplete="off" />
+      </div>
+      <button class="sp-btn sp-btn-primary" id="spJoinBtn" onclick="SP.join()">{{ _('Enter room') }}</button>
+      <p class="sp-lobby-hint">{{ _('Share the room link with friends — they can join without an account.') }}</p>
+    </div>
+
+    <div class="sp-rooms" id="spRooms" hidden>
+      <h3>{{ _('Active rooms') }}</h3>
+      <ul class="sp-room-list" id="spRoomList"></ul>
+    </div>
+  </section>
+
+  <!-- ── Room ────────────────────────────────────────────────── -->
+  <section class="sp-room" id="spRoom" hidden>
+    <div class="sp-room-bar">
+      <div class="sp-room-meta">
+        <span class="sp-room-name" id="spRoomName"></span>
+        <span class="sp-room-host" id="spRoomHost"></span>
+        <span class="sp-lock-badge" id="spLockBadge" hidden title="{{ _('Only the host controls playback') }}">🔒 {{ _('Host control') }}</span>
+      </div>
+      <div class="sp-room-actions">
+        <button class="sp-btn sp-btn-ghost" onclick="SP.openInvite()">{{ _('Invite') }}</button>
+        <button class="sp-btn sp-btn-ghost sp-host-only" onclick="SP.openHostSettings()" title="{{ _('Host settings') }}">⚙</button>
+        <button class="sp-btn sp-btn-ghost" onclick="SP.leave()">{{ _('Leave') }}</button>
+      </div>
+    </div>
+
+    <div class="sp-grid">
+      <div class="sp-main">
+        <!-- The shared player gets embedded here while watching (not a modal). -->
+        <div class="sp-stage" id="spStage" hidden></div>
+        <div class="sp-now" id="spNow">
+          <div class="sp-now-empty" id="spNowEmpty">
+            <p>{{ _('Nothing selected yet.') }}</p>
+            <button class="sp-btn sp-btn-primary sp-host-only" onclick="SP.openPicker()">{{ _('Choose what to watch') }}</button>
+            <p class="sp-guest-note sp-guest-only">{{ _('Waiting for the host to pick something…') }}</p>
+          </div>
+          <div class="sp-now-card" id="spNowCard" hidden>
+            <img class="sp-now-poster" id="spNowPoster" alt="" />
+            <div class="sp-now-info">
+              <div class="sp-now-title" id="spNowTitle"></div>
+              <div class="sp-now-sub" id="spNowSub"></div>
+              <div class="sp-now-buttons">
+                <button class="sp-btn sp-btn-primary" id="spWatchBtn" onclick="SP.openCurrent()">{{ _('Watch') }}</button>
+                <button class="sp-btn sp-btn-ghost sp-host-only" onclick="SP.openPicker()">{{ _('Change') }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick reactions -->
+        <div class="sp-reactions" id="spReactions">
+          <button onclick="SP.react('👍')">👍</button>
+          <button onclick="SP.react('😂')">😂</button>
+          <button onclick="SP.react('😮')">😮</button>
+          <button onclick="SP.react('😢')">😢</button>
+          <button onclick="SP.react('🔥')">🔥</button>
+          <button onclick="SP.react('❤️')">❤️</button>
+        </div>
+
+        <!-- Room history -->
+        <div class="sp-panel sp-history" id="spHistoryPanel" hidden>
+          <h3>{{ _('Watched in this room') }}</h3>
+          <ul class="sp-history-list" id="spHistoryList"></ul>
+        </div>
+      </div>
+
+      <aside class="sp-side">
+        <div class="sp-panel sp-members">
+          <h3>{{ _('Watching') }} <span id="spMemberCount" class="sp-count">0</span></h3>
+          <ul id="spMemberList" class="sp-member-list"></ul>
+        </div>
+
+        <div class="sp-panel sp-chat">
+          <h3>{{ _('Chat') }}</h3>
+          <div class="sp-chat-log" id="spChatLog"></div>
+          <div class="sp-typing" id="spTyping"></div>
+          <form class="sp-chat-form" onsubmit="return SP.sendChat(event)">
+            <input type="text" id="spChatInput" placeholder="{{ _('Message…') }}" autocomplete="off" maxlength="2000" oninput="SP.onType()" />
+            <button type="submit" class="sp-btn sp-btn-primary">{{ _('Send') }}</button>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ── Media picker (host) ─────────────────────────────────── -->
+  <div class="sp-modal" id="spPicker" hidden>
+    <div class="sp-modal-box">
+      <div class="sp-modal-head">
+        <h2>{{ _('Choose what to watch') }}</h2>
+        <input type="text" id="spPickerSearch" class="sp-picker-search" placeholder="{{ _('Search library…') }}" oninput="SP.filterPicker()" />
+        <button class="sp-modal-close" onclick="SP.closePicker()" aria-label="Close">&times;</button>
+      </div>
+      <div class="sp-picker-tabs" id="spPickerTabs">
+        <button class="sp-picker-tab active" data-ptab="series" onclick="SP.pickTab('series')">{{ _('Series') }}</button>
+        <button class="sp-picker-tab" data-ptab="movies" onclick="SP.pickTab('movies')">{{ _('Movies') }}</button>
+      </div>
+      <div class="sp-picker-grid" id="spPickerGrid"></div>
+      <div class="sp-picker-empty" id="spPickerEmpty" hidden>{{ _('No media found in your library.') }}</div>
+    </div>
+  </div>
+
+  <!-- ── Invite modal (link + QR) ────────────────────────────── -->
+  <div class="sp-modal" id="spInvite" hidden>
+    <div class="sp-modal-box sp-modal-small">
+      <div class="sp-modal-head">
+        <h2>{{ _('Invite to room') }}</h2>
+        <button class="sp-modal-close" onclick="SP.closeInvite()" aria-label="Close">&times;</button>
+      </div>
+      <div class="sp-invite-body">
+        <div class="sp-qr" id="spQr"></div>
+        <div class="sp-invite-link">
+          <input type="text" id="spInviteLink" readonly />
+          <button class="sp-btn sp-btn-primary" onclick="SP.copyInvite()">{{ _('Copy') }}</button>
+        </div>
+        <p class="sp-lobby-hint">{{ _('Scan the code or share the link. Guests can join without an account.') }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Host settings modal ─────────────────────────────────── -->
+  <div class="sp-modal" id="spHostSettings" hidden>
+    <div class="sp-modal-box sp-modal-small">
+      <div class="sp-modal-head">
+        <h2>{{ _('Host settings') }}</h2>
+        <button class="sp-modal-close" onclick="SP.closeHostSettings()" aria-label="Close">&times;</button>
+      </div>
+      <div class="sp-host-settings">
+        <label class="sp-toggle-row">
+          <span>{{ _('Only I control playback') }}</span>
+          <input type="checkbox" class="chb-main" id="spHostLock" onchange="SP.setHostLock(this.checked)" />
+        </label>
+        <div class="sp-field">
+          <label for="spMaxInput">{{ _('Max participants (0 = unlimited)') }}</label>
+          <input type="number" id="spMaxInput" min="0" max="100" value="0" />
+          <button class="sp-btn sp-btn-ghost" onclick="SP.setMax()">{{ _('Apply') }}</button>
+        </div>
+        <div class="sp-field">
+          <label for="spRoomPwInput">{{ _('Room password (empty = none)') }}</label>
+          <input type="text" id="spRoomPwInput" autocomplete="off" />
+          <button class="sp-btn sp-btn-ghost" onclick="SP.setRoomPassword()">{{ _('Set') }}</button>
+        </div>
+        <button class="sp-btn sp-btn-danger" onclick="SP.closeRoom()">{{ _('Close room for everyone') }}</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="spToast" class="toast"></div>
+<script src="{{ url_for('static', filename='qrcode.min.js') }}"></script>
+<script src="{{ url_for('static', filename='syncplay_page.js') }}"></script>
+{% endblock %}

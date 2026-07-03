@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Library') }} — MediaForge{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='library.css') }}">{% endblock %}
+{% block content %}
+<div class="library-container">
+
+  <!-- Header -->
+  <div class="page-header" style="margin-bottom:18px">
+    <h1 class="page-title">{{ _('Library') }}</h1>
+    <div id="libSummaryPills" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"></div>
+  </div>
+
+  <!-- Toolbar (sticky) -->
+  <div class="lib-toolbar" id="libToolbar">
+
+    <!-- Suche -->
+    <div class="lib-search-row">
+      <input class="lib-search-input" id="libSearchInput" type="search"
+             placeholder="{{ _('Search series, movie or file…') }}"
+             oninput="libOnSearch(this.value)" autocomplete="off">
+    </div>
+
+
+    <!-- Filter + Sort + Refresh -->
+    <div class="lib-controls">
+      <!-- Filter -->
+      <div class="lib-sort-group">
+        <button class="lib-sort-btn active" id="libFilter-all"    onclick="libSetFilter('all')"    title="{{ _('Show all') }}">{{ _('All') }}</button>
+        <button class="lib-sort-btn"        id="libFilter-series" onclick="libSetFilter('series')" title="{{ _('Series only') }}">{{ _('Series') }}</button>
+        <button class="lib-sort-btn"        id="libFilter-movies" onclick="libSetFilter('movies')" title="{{ _('Movies only') }}">{{ _('Movies') }}</button>
+      </div>
+      <!-- Sort -->
+      <div class="lib-sort-group">
+        <button class="lib-sort-btn active" id="libSort-name"     onclick="libSetSort('name')"     title="{{ _('Sort by name') }}">A–Z <span id="libSortDir-name" style="font-size:0.7rem;opacity:0.8">↑</span></button>
+        <button class="lib-sort-btn"        id="libSort-size"     onclick="libSetSort('size')"     title="{{ _('Sort by size') }}">{{ _('Size') }} <span id="libSortDir-size" style="font-size:0.7rem;opacity:0.8"></span></button>
+        <button class="lib-sort-btn"        id="libSort-episodes" onclick="libSetSort('episodes')" title="{{ _('Sort by episode count') }}">{{ _('Ep.') }} <span id="libSortDir-episodes" style="font-size:0.7rem;opacity:0.8"></span></button>
+      </div>
+      <!-- Right side -->
+      <div class="lib-toolbar-right">
+        <button class="lib-refresh-btn" id="libRefreshBtn" onclick="libLoad(true)" title="{{ _('Refresh') }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Status-Zeile -->
+    <div class="lib-status-row">
+      <!-- Scan-Badge -->
+      <span class="lib-scan-badge" id="libScanBadge">
+        <span class="lib-scan-spinner"></span>{{ _('Scanning…') }}
+      </span>
+      <!-- Watcher -->
+      <span class="lib-watcher-status" id="libWatcherTip" title="">
+        <span class="lib-watcher-dot" id="libWatcherDot"></span>
+        <span class="lib-watcher-label" id="libWatcherLabel">{{ _('Watcher…') }}</span>
+      </span>
+      <!-- Move-Pill -->
+      <span class="lib-move-pill" id="libMovePill" style="display:none" onclick="libOpenMoveProgress()" title="{{ _('Move in progress') }}">
+        <span class="lib-move-pill-spinner"></span>
+        <span id="libMovePillPct">0%</span>
+        <span class="lib-move-pill-label">{{ _('moving') }}</span>
+      </span>
+      <!-- Last scan -->
+      <span class="lib-last-scanned" id="libLastScanned"></span>
+    </div>
+  </div>
+
+  <div id="libList"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  var libraryCanDelete = {{ 'true' if not auth_enabled or (current_user and current_user.role == 'admin') else 'false' }};
+  var libraryCanStream = true;
+</script>
+<script src="{{ url_for('static', filename='library.js') }}"></script>
+{% endblock %}

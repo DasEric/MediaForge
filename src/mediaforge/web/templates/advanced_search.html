@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Advanced Search') }} — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='advanced_search.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="adv-search-page-container">
+  <div class="page-header adv-header">
+    <h1 class="page-title">{{ _('Advanced Search') }}</h1>
+    <p class="page-subtitle">{{ _('Discover new series and movies with TMDB filters') }}</p>
+  </div>
+
+  <div class="adv-filters-container" id="advFiltersContainer">
+    <!-- Basic Row (Always Visible) -->
+    <div class="adv-filters-basic-row">
+      <!-- Type Filter -->
+      <div class="filter-group basic-filter" id="mediaTypeGroup">
+        <div class="filter-buttons" id="mediaTypeFilter">
+          <button class="filter-btn active" data-type="tv">{{ _('Series') }}</button>
+          <button class="filter-btn" data-type="movie">{{ _('Movies') }}</button>
+        </div>
+      </div>
+
+      <!-- Genres Multi-Select Dropdown -->
+      <div class="filter-group basic-filter genre-select-group" id="genreSelectGroup">
+        <div class="custom-select" id="genreSelect">
+          <div class="custom-select-trigger" id="genreSelectTrigger">
+            <span id="genreSelectLabel">{{ _('All Genres') }}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" style="width:16px;height:16px">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          <div class="custom-select-dropdown" id="genreSelectDropdown">
+            <!-- Checkboxes will be injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions & Toggle -->
+      <div class="filter-actions-inline" id="filterActionsInline">
+        <button class="btn btn-secondary" id="resetFiltersBtn">{{ _('Reset') }}</button>
+        <button class="btn btn-primary adv-search-btn" id="runSearchBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" class="adv-search-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          {{ _('Search') }}
+        </button>
+
+        <!-- Toggle Expand Button -->
+        <button class="btn btn-icon toggle-adv-btn" id="advFiltersToggle" title="{{ _('Show advanced filters') }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" class="adv-filters-chevron">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Advanced Filters -->
+    <div class="adv-filters-body" id="advFiltersBody">
+      <div class="adv-filters-grid">
+        <!-- Sortierung -->
+        <div class="adv-filter-col">
+          <label class="filter-title" for="sortBy">{{ _('Sort by') }}</label>
+          <select id="sortBy" class="keyword-input" style="cursor:pointer">
+            <option value="popularity.desc">{{ _('Popularity (Descending)') }}</option>
+            <option value="popularity.asc">{{ _('Popularity (Ascending)') }}</option>
+            <option value="vote_average.desc">{{ _('Rating (Descending)') }}</option>
+            <option value="primary_release_date.desc">{{ _('Release (Newest first)') }}</option>
+            <option value="primary_release_date.asc">{{ _('Release (Oldest first)') }}</option>
+          </select>
+        </div>
+
+        <!-- Keywords -->
+        <div class="adv-filter-col">
+          <label class="filter-title" for="keywordInput">Keywords</label>
+          <div class="keyword-search-wrap">
+            <input type="text" id="keywordInput" class="keyword-input" placeholder="{{ _('Search keyword (e.g. anime)...') }}"
+              autocomplete="off" />
+            <div class="keyword-autocomplete" id="keywordAutocomplete" style="display:none"></div>
+          </div>
+          <div class="selected-keywords" id="selectedKeywords"></div>
+        </div>
+
+        <!-- Erscheinungsjahr -->
+        <div class="adv-filter-col">
+          <span class="filter-title">{{ _('Release year') }}</span>
+          <div class="range-inputs">
+            <input type="number" id="yearMin" placeholder="{{ _('From (e.g. 2000)') }}" min="1900" max="2099" />
+            <span class="range-sep">-</span>
+            <input type="number" id="yearMax" placeholder="{{ _('To (e.g. 2024)') }}" min="1900" max="2099" />
+          </div>
+        </div>
+
+        <!-- TMDB Bewertung -->
+        <div class="adv-filter-col">
+          <span class="filter-title">{{ _('TMDB Rating') }} (<span id="voteLabel">0 - 10</span>)</span>
+          <div class="range-slider-wrap">
+            <input type="range" id="voteMin" min="0" max="10" step="1" value="0" />
+          </div>
+        </div>
+
+        <!-- Watch Region -->
+        <div class="adv-filter-col">
+          <label class="filter-title" for="watchRegion">{{ _('Watch Region') }}</label>
+          <select id="watchRegion" class="keyword-input" style="cursor:pointer">
+            <option value="">{{ _('Any region') }}</option>
+          </select>
+          <span class="filter-hint">{{ _('Required for provider filters') }}</span>
+        </div>
+
+        <!-- Include Providers -->
+        <div class="adv-filter-col">
+          <label class="filter-title" for="includeProviderInput">{{ _('Include Providers') }}</label>
+          <div class="keyword-search-wrap">
+            <input type="text" id="includeProviderInput" class="keyword-input"
+              placeholder="{{ _('Search provider (e.g. Netflix)...') }}" autocomplete="off" />
+            <div class="keyword-autocomplete" id="includeProviderAutocomplete" style="display:none"></div>
+          </div>
+          <div class="selected-keywords" id="selectedIncludeProviders"></div>
+        </div>
+
+        <!-- Exclude Providers -->
+        <div class="adv-filter-col">
+          <label class="filter-title" for="excludeProviderInput">{{ _('Exclude Providers') }}</label>
+          <div class="keyword-search-wrap">
+            <input type="text" id="excludeProviderInput" class="keyword-input"
+              placeholder="{{ _('Search provider (e.g. Netflix)...') }}" autocomplete="off" />
+            <div class="keyword-autocomplete" id="excludeProviderAutocomplete" style="display:none"></div>
+          </div>
+          <div class="selected-keywords" id="selectedExcludeProviders"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Area -->
+    <div class="adv-results" id="advResults">
+      <div class="results-header">
+        <h2>{{ _('Results') }}</h2>
+        <div class="pagination" id="advPagination" style="display:none">
+          <button class="btn btn-secondary pagination-btn" id="prevPageBtn" title="{{ _('Back') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" style="width:16px;height:16px;">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <span id="pageIndicator" class="page-indicator">{{ _('Page') }} 1</span>
+          <button class="btn btn-secondary pagination-btn" id="nextPageBtn" title="{{ _('Next') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" style="width:16px;height:16px;">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+        <span class="results-count" id="resultsCount"></span>
+      </div>
+      <div class="results-grid" id="resultsGrid">
+        <div class="adv-empty-state">
+          {{ _('Please select your filters and click Search.') }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AniWorld Search Modal (pops up when clicking a TMDB result) -->
+  <div class="adv-search-overlay" id="aniSearchModalOverlay" style="display:none;"
+    onclick="closeAniSearchModalOutside(event)">
+    <div class="ani-search-modal" id="aniSearchModal">
+      <button class="close ani-search-close" onclick="closeAniSearchModal()" aria-label="{{ _('Close') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+          stroke-linejoin="round" style="width:16px;height:16px;">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      <div class="ani-search-container">
+        <h2 id="aniSearchTitle">{{ _('Searching...') }}</h2>
+        <div id="aniSearchSpinner" class="spinner" style="display:none;">{{ _('Searching streams on AniWorld, S.TO & FilmPalast...') }}</div>
+        <div id="aniSearchResults" class="results-poster-grid"></div>
+      </div>
+    </div>
+  </div>
+  {% include "shared_modals.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

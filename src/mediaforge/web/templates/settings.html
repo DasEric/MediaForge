@@ -1,0 +1,966 @@
+{% extends "base.html" %} {% block title %}{{ _('Settings') }} — MediaForge<script>
+function setUiLanguage(lang) {
+  fetch('/api/user/language', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({language: lang})
+  }).then(r => r.json()).then(() => location.reload());
+}
+</script>
+{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">{% endblock %}
+{% set is_admin = not auth_enabled or (current_user and current_user.role == 'admin') %}
+{% block content %}
+<div class="settings-container">
+  <div class="page-header" style="margin-bottom:20px;">
+    <h1 class="page-title">{{ _('Settings') }}</h1>
+    <p class="page-subtitle">{{ _('Configuration & Management') }}</p>
+  </div>
+
+  <!-- .env migration banner — only shown if legacy .env still exists -->
+  {% if is_admin %}
+  <div id="envFileBanner"
+    style="display:none;margin-bottom:20px;padding:14px 18px;background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--accent,#6366f1);border-radius:var(--radius-lg);align-items:center;gap:14px;flex-wrap:wrap;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      stroke-linejoin="round" style="width:20px;height:20px;flex-shrink:0;color:var(--accent,#6366f1)">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+    <div style="flex:1;min-width:200px;">
+      <strong style="font-size:0.9rem;">{{ _('Your .env has been imported') }}</strong>
+      <p style="margin:2px 0 0;font-size:0.82rem;color:var(--text-muted);">{{ _('All settings from') }} <code>~/.mediaforge/.env</code> {{ _('are now stored in the database. The file is no longer needed.') }}</p>
+    </div>
+    <button class="btn btn-primary" onclick="deleteEnvFile()" style="flex-shrink:0;">
+      {{ _('Delete .env now') }}
+    </button>
+    <button onclick="document.getElementById('envFileBanner').style.display='none'"
+      style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:4px;"
+      title="{{ _('Close') }}">✕</button>
+  </div>
+  {% endif %}
+
+  <!-- Tab Navigation -->
+  <div class="settings-tabs" id="settingsTabs">
+    <button class="settings-tab" data-tab="general" onclick="switchTab('general')">{{ _('General') }}</button>
+    <button class="settings-tab active" data-tab="design" onclick="switchTab('design')">{{ _('Design') }}</button>
+    <button class="settings-tab" data-tab="downloads" onclick="switchTab('downloads')">{{ _('Downloads') }}</button>
+    <button class="settings-tab" data-tab="autosync" onclick="switchTab('autosync')">Auto-Sync</button>
+    <button class="settings-tab" data-tab="network" onclick="switchTab('network')">{{ _('Network') }}</button>
+    {% if is_admin %}
+    <button class="settings-tab" data-tab="auth" onclick="switchTab('auth')">{{ _('Authentication') }}</button>
+    <button class="settings-tab" data-tab="api" onclick="switchTab('api')">API</button>
+    {% endif %}
+    <button class="settings-tab" data-tab="updates" onclick="switchTab('updates')">{{ _('Updates') }}</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Allgemein
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-general">
+    <div class="settings-section" id="legacyImportSection" style="display:none;">
+      <h2>{{ _('Import from previous installation') }}</h2>
+      <div class="settings-hint" style="margin-bottom:14px;" id="legacyImportHint">
+        {{ _('A previous AniWorld Downloader installation was detected. Your data is imported automatically on first start; use the button below to copy any remaining files. An existing database is never overwritten.') }}
+      </div>
+      <div style="padding:0 22px 14px;">
+        <button class="btn btn-secondary" id="legacyImportBtn" type="button">{{ _('Import legacy data') }}</button>
+        <span id="legacyImportStatus" style="margin-left:10px;font-size:0.82rem;color:var(--text-muted);"></span>
+      </div>
+    </div>
+    <script>
+    (function () {
+      var sec = document.getElementById('legacyImportSection');
+      var btn = document.getElementById('legacyImportBtn');
+      var status = document.getElementById('legacyImportStatus');
+      if (!sec || !btn) return;
+      fetch('/api/settings/legacy-import').then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.legacy_exists) {
+          sec.style.display = '';
+          if (d.already_imported) status.textContent = '{{ _('Already imported.') }}';
+        }
+      }).catch(function () {});
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        status.textContent = '{{ _('Importing…') }}';
+        fetch('/api/settings/legacy-import', { method: 'POST', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            btn.disabled = false;
+            if (d && d.ok) {
+              var n = (d.copied || []).length;
+              status.textContent = n + ' {{ _('item(s) imported.') }}' + (d.restart_required_for_db ? ' {{ _('Restart to load an imported database.') }}' : '');
+            } else {
+              status.textContent = '{{ _('Nothing to import.') }}';
+            }
+          }).catch(function () { btn.disabled = false; status.textContent = '{{ _('Import failed.') }}'; });
+      });
+    })();
+    </script>
+    <div class="settings-section">
+      <h2>{{ _('Project & Support') }}</h2>
+      <div class="settings-hint" style="margin-bottom:14px;">
+        {{ _('MediaForge is an open-source project. For questions, bugs, or feature ideas please visit our GitHub repository.') }}
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; padding: 0 22px 14px;">
+        <a href="https://github.com/PD-Codes/MediaForge" target="_blank" rel="noopener noreferrer"
+          class="btn btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" style="width:16px;height:16px">
+            <path
+              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+            </path>
+          </svg>
+          GitHub Repository
+        </a>
+        <a href="https://github.com/PD-Codes/MediaForge/issues" target="_blank" rel="noopener noreferrer"
+          class="btn btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" style="width:16px;height:16px">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          Issue Tracker
+        </a>
+      </div>
+    </div>
+
+
+
+    <div class="settings-section">
+      <h2>{{ _('Language') }}</h2>
+      <div class="settings-row" style="gap:10px;padding:12px;">
+        <button class="appearance-theme-btn{% if ui_language == 'en' %} active{% endif %}"
+                onclick="setUiLanguage('en')">
+          🇺🇸 English
+        </button>
+        <button class="appearance-theme-btn{% if ui_language == 'de' %} active{% endif %}"
+                onclick="setUiLanguage('de')">
+          🇩🇪 Deutsch
+        </button>
+      </div>
+      <div class="settings-hint" style="padding:0 22px 14px;">{{ _('Choose the interface language. The page reloads automatically.') }}</div>
+    </div>
+
+
+    <div class="settings-section">
+      <h2>{{ _('Media Statistics') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" for="mediaStatsEnabled">
+          <input type="checkbox" class="chb-main" id="mediaStatsEnabled" onchange="saveMediaStatsEnabled()" />
+          <span>{{ _('Show Media category on the statistics page') }}</span>
+        </label>
+      </div>
+      <div class="settings-hint" style="padding:0 22px 14px;">{{ _('Adds a Media category to the statistics page with movie, series and episode counts based on your media library.') }}</div>
+    </div>
+
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Debug Mode') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" for="debugMode">
+          <input type="checkbox" class="chb-main" id="debugMode" onchange="saveDebugMode()" />
+          <span>{{ _('Enable debug logging') }}</span>
+        </label>
+      </div>
+      <div class="settings-hint" style="padding:0 22px 14px;">{{ _('Writes detailed logs. Takes effect immediately — no restart needed.') }}</div>
+      <div class="settings-hint" id="debugForcedHint" style="display:none;padding:0 22px 14px;color:var(--accent,#4ea1ff);">{{ _('The application was started with --debug. Debug mode is locked on and cannot be changed here.') }}</div>
+    </div>
+
+    <div class="settings-section">
+      <h2>{{ _('Web Console') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" for="webConsole">
+          <input type="checkbox" class="chb-main" id="webConsole" onchange="saveWebConsole()" />
+          <span>{{ _('Enable Web Console') }}</span>
+        </label>
+      </div>
+      <div class="settings-hint" style="padding:0 22px 14px;">{{ _('Show the console output directly here in the Web UI') }}</div>
+      <div class="web-console-wrap" id="webConsoleWrap" style="display:none;">
+        <div class="web-console-toolbar">
+          <span class="web-console-dot"></span>
+          <span class="web-console-title">{{ _('Console') }}</span>
+          <span class="web-console-status" id="webConsoleStatus"></span>
+          <label class="web-console-autoscroll">
+            <input type="checkbox" id="webConsoleAutoscroll" checked />
+            <span>{{ _('Auto-scroll') }}</span>
+          </label>
+        </div>
+        <pre class="web-console-output" id="webConsoleOutput" aria-live="polite" tabindex="0"></pre>
+      </div>
+    </div>
+
+    {% endif %}
+  </div><!-- /tab-general -->
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Design
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel active" id="tab-design">
+    <div class="settings-section">
+      <h2>{{ _('Design') }}</h2>
+      <h3 class="settings-subtitle">{{ _('Appearance') }}</h3>
+      <div class="settings-row">
+        <button class="appearance-theme-btn" id="themeBtnDark" onclick="setTheme('dark')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          Dark
+        </button>
+        <button class="appearance-theme-btn" id="themeBtnLight" onclick="setTheme('light')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          Light
+        </button>
+      </div>
+
+      <h3 class="settings-subtitle">{{ _('Accent Color') }}</h3>
+      <div class="settings-row">
+        <div class="accent-presets" id="accentPresetsSettings"></div>
+      </div>
+      <h3 class="settings-subtitle">{{ _('Custom Color') }}</h3>
+      <div class="settings-row">
+
+        <input type="text" class="settings-input" id="accentHexInput" maxlength="7" placeholder="#7c3aed" />
+        <div class="accent-color-swatch">
+          <input type="color" id="accentColorPicker" />
+        </div>
+        <button class="btn btn-secondary" onclick="resetAppearance()">{{ _('Reset appearance') }}</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h2>{{ _('Advanced Settings') }}</h2>
+      <div class="settings-hint">{{ _('These settings only change the design minimally.') }}</div>
+      <!-- Eine Glow Markierung aktiver Menüpunkte in der Akzentfarbe -->
+      <label class="settings-checkbox-row" for="glowEffect">
+        <input type="checkbox" class="chb-main" id="glowEffect" onchange="saveGlowEffect()" />
+        <span>{{ _('Add glow effect') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('A glow highlight for active menu items in the accent color') }}</div>
+      <!-- Header-Farbe mit der Akzentfarbe ändern-->
+      <label class="settings-checkbox-row" for="headerColor">
+        <input type="checkbox" class="chb-main" id="headerColor" onchange="saveHeaderColor()" />
+        <span>{{ _('Change header color with accent color') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('Change header color with accent color') }}</div>
+      <label class="settings-checkbox-row" for="headerColorHelp">
+        <input type="checkbox" class="chb-main" id="headerColorHelp" onchange="saveHeaderColorHelp()" />
+        <span>{{ _('Fade header color for easier readability') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('Invert header color') }}</div>
+      <!-- Ein animiertes Laden in der Übersichtsanzeige für die einzelnen Elemente-->
+      <label class="settings-checkbox-row" for="skeletonLoader">
+        <input type="checkbox" class="chb-main" id="skeletonLoader" onchange="saveSkeletonLoader()" />
+        <span>{{ _('Skeleton Loader') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('An animated loading indicator for items not yet loaded in the overview') }}</div>
+      <!-- Eine Markierung wenn man mit der Maus über einer der Filme hovert in der Akzentfarbe -->
+      <label class="settings-checkbox-row" for="chooseBorder">
+        <input type="checkbox" class="chb-main" id="chooseBorder" onchange="saveBorder()" />
+        <span>{{ _('Color highlight for selection') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('A highlight when hovering over a movie or series in the accent color') }}</div>
+      <!-- Eine Markierung in der Übersicht was aktuell heruntergeladen wird in der Akzentfarbe-->
+      <label class="settings-checkbox-row" for="activeDownloadGlow">
+        <input type="checkbox" class="chb-main" id="activeDownloadGlow" onchange="saveActiveDownloadGlow()" />
+        <span>{{ _('Color highlight for currently downloading items') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('A highlight for currently downloading items in the accent color') }}</div>
+      <!-- Eine Markierung in der Übersicht was aktuell heruntergeladen wird in der Akzentfarbe (Button wird etwas heller und um 5% kleiner beim Klick)-->
+      <label class="settings-checkbox-row" for="clickEffect">
+        <input type="checkbox" class="chb-main" id="clickEffect" onchange="saveClickEffect()" />
+        <span>{{ _('"Button Press" animation when clicking a button or link') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('Button becomes slightly brighter and 5%% smaller on click') }}</div>
+      <!-- Icons bewegen sich beim Hovern in den Menüs -->
+      <label class="settings-checkbox-row" for="iconMove">
+        <input type="checkbox" class="chb-main" id="iconMove" onchange="saveIconMove()" />
+        <span>{{ _('Icon animations') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('Icons animate on hover in menus') }}</div>
+    </div>
+  </div>
+
+
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Downloads
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel active" id="tab-downloads">
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Download Settings') }}</h2>
+
+      <h3 class="settings-subtitle">{{ _('Download Path') }}</h3>
+      <div class="settings-row">
+        <input type="text" id="downloadPath" placeholder="/path/to/downloads" />
+        <button onclick="saveDownloadPath()">{{ _('Save') }}</button>
+      </div>
+      <div class="settings-hint">{{ _('Changes take effect immediately for new downloads.') }}</div>
+
+      <h3 class="settings-subtitle" style="margin-top:18px;">{{ _('Default Language') }}</h3>
+      <div class="settings-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Download Language') }}</label>
+          <select id="downloadLanguage" onchange="saveDownloadLanguage()" class="sync-select">
+            <option value="German Dub">German Dub</option>
+            <option value="English Sub">English Sub</option>
+            <option value="German Sub">German Sub</option>
+            <option value="English Dub">English Dub</option>
+            <option value="English Dub (German Sub)">English Dub (German Sub)</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Default Provider') }}</label>
+          <select id="downloadProvider" onchange="saveDownloadProvider()" class="sync-select">
+            <option value="VOE">VOE</option>
+            <option value="Vidmoly">Vidmoly</option>
+            <option value="Vidoza">Vidoza</option>
+            <option value="Filemoon">Filemoon</option>
+            <option value="Doodstream">Doodstream</option>
+            <option value="Vidara">Vidara</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-hint">{{ _('Used as default when adding a new download.') }}</div>
+
+      <h3 class="settings-subtitle" style="margin-top:18px;">{{ _('File Naming Template') }}</h3>
+      <div class="settings-row">
+        <input type="text" id="namingTemplate"
+          placeholder="{title} ({year}) [imdbid-{imdbid}]/Season {season}/{title} S{season}E{episode}.mkv"
+          style="font-family:monospace;font-size:0.82rem;" />
+        <button onclick="saveNamingTemplate()">{{ _('Save') }}</button>
+        <button class="btn btn-danger" onclick="resetNamingTemplate()">{{ _('Reset') }}</button>
+      </div>
+      <div class="settings-hint">
+        {{ _('Placeholders:') }} <code>{title}</code> <code>{year}</code> <code>{imdbid}</code> <code>{season}</code>
+        <code>{episode}</code> <code>{language}</code>
+      </div>
+
+      <div style="margin-top:18px;">
+        <label class="settings-checkbox-row" for="langSeparation">
+          <input type="checkbox" class="chb-main" id="langSeparation" onchange="saveLangSeparation()" />
+          <span>{{ _('Separate languages into folders') }}</span>
+        </label>
+        <div class="settings-hint">{{ _('Downloads are sorted by language (e.g. german-dub/, english-sub/).') }}</div>
+
+        <label class="settings-checkbox-row" for="disableEnglishSub" style="margin-top:10px;">
+          <input type="checkbox" class="chb-main" id="disableEnglishSub" onchange="saveDisableEnglishSub()" />
+          <span>{{ _('Disable English subtitle downloads') }}</span>
+        </label>
+        <div class="settings-hint">{{ _('Hides English Sub from the language selection.') }}</div>
+
+        <label class="settings-checkbox-row" for="filmpalastSubfolder" style="margin-top:10px;">
+          <input type="checkbox" class="chb-main" id="filmpalastSubfolder" onchange="saveFilmpalastSubfolder()" />
+          <span>{{ _('Enable movie subfolders (Filmpalast)') }}</span>
+        </label>
+        <div class="settings-hint">{{ _('Each movie gets its own subfolder — recommended for Jellyfin.') }}</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>{{ _('Custom Paths') }}</h2>
+      <h3 class="settings-subtitle">{{ _('Add Path') }}</h3>
+      <div class="add-user-row" style="margin-bottom:16px">
+        <input type="text" id="newPathName" placeholder="{{ _('Name (e.g. NAS)') }}" />
+        <input type="text" id="newPathValue" placeholder="/mnt/nas/anime" />
+        <button onclick="addCustomPath()">{{ _('Add') }}</button>
+      </div>
+      <div class="user-table-wrapper">
+        <table class="user-table" id="customPathsTable">
+          <thead>
+            <tr>
+              <th>{{ _('Name') }}</th>
+              <th>{{ _('Path') }}</th>
+              <th>{{ _('Actions') }}</th>
+            </tr>
+          </thead>
+          <tbody id="customPathsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>{{ _('Bandwidth & Schedule') }}</h2>
+
+      <h3 class="settings-subtitle">{{ _('Bandwidth Limit') }}</h3>
+      <div class="settings-row" style="gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Max download speed (KB/s)') }}</label>
+          <input type="number" id="downloadRateLimit" min="0" step="64" placeholder="0"
+            style="max-width:160px;" />
+        </div>
+        <button onclick="saveDownloadRateLimit()">{{ _('Save') }}</button>
+      </div>
+      <div class="settings-hint">{{ _('Throttles all downloads to this speed. 0 = unlimited. Applies to new downloads.') }}</div>
+
+      <div class="settings-row" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-top:18px;">
+        <h3 class="settings-subtitle" style="margin:0;">{{ _('Download Time Window') }}</h3>
+        <div class="settings-field" style="display:flex; align-items:center; gap:8px; margin-bottom:0;">
+          <label class="settings-field-label" style="margin-bottom:0; font-size:0.8rem; font-weight:normal;">{{ _('Time Format') }}:</label>
+          <select id="timeFormatSetting" onchange="changeTimeFormatSetting()" class="sync-select" style="width:110px; height:28px; padding: 0 6px; font-size:0.8rem; border-radius: var(--radius-sm);">
+            <option value="24h">24h</option>
+            <option value="12h">12h (AM/PM)</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:10px; margin-top:10px;">
+        <label class="settings-checkbox-row" for="downloadWindowEnabled">
+          <input type="checkbox" class="chb-main" id="downloadWindowEnabled" onchange="saveDownloadWindow()" />
+          <span>{{ _('Only download during a specific time window') }}</span>
+        </label>
+      </div>
+      <div class="settings-row" style="gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('From') }}</label>
+          <input type="time" id="downloadWindowStart" onchange="saveDownloadWindow()" style="max-width:140px;" />
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Until') }}</label>
+          <input type="time" id="downloadWindowEnd" onchange="saveDownloadWindow()" style="max-width:140px;" />
+        </div>
+      </div>
+      <div class="settings-hint">{{ _('New downloads only start within this window (server local time). Overnight windows like 22:00–06:00 are supported. Running downloads are not interrupted.') }}</div>
+    </div>
+
+    <div class="settings-section">
+      <h2>{{ _('Download History') }}</h2>
+      <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Keep history for') }}</label>
+          <select id="historyRetention" onchange="saveHistoryRetention()" class="sync-select">
+            <option value="0">{{ _('Unlimited') }}</option>
+            <option value="7">7 {{ _('days') }}</option>
+            <option value="30">30 {{ _('days') }}</option>
+            <option value="90">90 {{ _('days') }}</option>
+            <option value="180">180 {{ _('days') }}</option>
+            <option value="365">365 {{ _('days') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-hint">{{ _('Automatically delete download-history entries older than the selected period. Runs about hourly.') }}</div>
+    </div>
+    {% endif %}
+
+  </div><!-- /tab-downloads -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Auto-Sync
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-autosync">
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Auto-Sync Defaults') }}</h2>
+      <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Mode') }}</label>
+          <select id="syncMode" onchange="onSyncModeChange()" class="sync-select">
+            <option value="interval">{{ _('Interval') }}</option>
+            <option value="weekly">{{ _('Weekly schedule') }}</option>
+          </select>
+        </div>
+        <div class="settings-field" id="syncIntervalField">
+          <label class="settings-field-label">{{ _('Schedule') }}</label>
+          <select id="syncSchedule" onchange="saveSyncSchedule()" class="sync-select">
+            <option value="0">{{ _('Disabled') }}</option>
+            <option value="1min">1 min (Debug)</option>
+            <option value="30min">30 min</option>
+            <option value="1h">{{ _('1 hour') }}</option>
+            <option value="2h">{{ _('2 hours') }}</option>
+            <option value="4h">{{ _('4 hours') }}</option>
+            <option value="8h">{{ _('8 hours') }}</option>
+            <option value="12h">{{ _('12 hours') }}</option>
+            <option value="16h">{{ _('16 hours') }}</option>
+            <option value="24h">{{ _('24 hours') }}</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Default Language') }}</label>
+          <select id="syncLanguage" onchange="saveSyncDefaults()" class="sync-select">
+            <option>German Dub</option>
+            <option>English Sub</option>
+            <option>German Sub</option>
+            <option>English Dub</option>
+            <option>English Dub (German Sub)</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Default Provider') }}</label>
+          <select id="syncProvider" onchange="saveSyncDefaults()" class="sync-select">
+            <option>VOE</option>
+            <option>Vidmoly</option>
+            <option>Vidoza</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Custom path unavailable') }}</label>
+          <select id="syncPathUnavailableAction" onchange="saveSyncPathAction()" class="sync-select">
+            <option value="skip">{{ _('Skip sync') }}</option>
+            <option value="hold">{{ _('Wait (Hold)') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="sync-weekly-block" id="syncWeeklyBlock" style="display:none;">
+        <div class="sync-weekly-field">
+          <label class="settings-field-label">{{ _('Weekdays') }}</label>
+          <div class="weekday-toggles" id="syncDaysToggles"></div>
+        </div>
+        <div class="sync-weekly-field">
+          <label class="settings-field-label">{{ _('Times') }}</label>
+          <div class="sync-times-list" id="syncTimesList"></div>
+          <button type="button" class="btn btn-ghost sync-add-time" onclick="addSyncTime()">+ {{ _('Add time') }}</button>
+        </div>
+      </div>
+      <div class="settings-hint">
+        {{ _('How often Auto-Sync checks for new episodes. Language and provider are defaults for new sync jobs.') }}<br>
+        <strong>{{ _('Custom path unavailable:') }}</strong> {{ _('Defines what Auto-Sync should do when the assigned custom path is not available. This is the default for all new jobs but can be overridden per job.') }}
+      </div>
+    </div>
+    <div class="settings-section">
+      <h2>{{ _('Auto-Sync Error Handling') }}</h2>
+      <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Retries on error') }}</label>
+          <select id="syncErrorRetries" onchange="saveSyncErrorRetries()" class="sync-select">
+            <option value="0">{{ _('No retries') }}</option>
+            <option value="1">{{ _('1 retry') }}</option>
+            <option value="2">{{ _('2 retries') }}</option>
+            <option value="3">{{ _('3 retries') }}</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Time between attempts') }}</label>
+          <select id="syncErrorRetryTime" onchange="saveSyncErrorRetryTime()" class="sync-select">
+            <option value="0min">{{ _('No delay') }}</option>
+            <option value="1min">{{ _('1 minute') }}</option>
+            <option value="2min">{{ _('2 minutes') }}</option>
+            <option value="3min">{{ _('3 minutes') }}</option>
+            <option value="4min">{{ _('4 minutes') }}</option>
+            <option value="5min">{{ _('5 minutes') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-hint">
+        {{ _('Defines how often and at what interval a failed Auto-Sync is retried before it is considered permanently failed.') }}
+      </div>
+    </div>
+    <div class="settings-section">
+      <h2>{{ _('Adaptive Auto-Sync') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" style="padding:unset !important;" for="syncAdaptiveEnabled">
+          <input type="checkbox" class="chb-main" id="syncAdaptiveEnabled" onchange="saveSyncAdaptiveEnabled()" />
+          <span>{{ _('Enable Adaptive Auto-Sync') }}</span>
+        </label>
+      </div>
+      <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Pause after') }}</label>
+          <select id="syncAdaptivePauseAfter" onchange="saveSyncAdaptivePauseAfter()" class="sync-select">
+            <option value="2w">{{ _('2 weeks') }}</option>
+            <option value="3w">{{ _('3 weeks') }}</option>
+            <option value="4w">{{ _('4 weeks') }}</option>
+            <option value="5w">{{ _('5 weeks') }}</option>
+            <option value="6w">{{ _('6 weeks') }}</option>
+            <option value="7w">{{ _('7 weeks') }}</option>
+            <option value="8w">{{ _('8 weeks') }}</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Retry after') }}</label>
+          <select id="syncAdaptiveRetryValue" onchange="saveSyncAdaptiveRetry()" class="sync-select">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">&nbsp;</label>
+          <select id="syncAdaptiveRetryUnit" onchange="saveSyncAdaptiveRetry()" class="sync-select">
+            <option value="days">{{ _('Days') }}</option>
+            <option value="weeks">{{ _('Weeks') }}</option>
+            <option value="months">{{ _('Months') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-hint">
+        {{ _('When an Auto-Sync job finds no new episodes for the selected period, it enters pause mode and is only re-checked at the wider interval below. As soon as a new episode is found again, it returns to the normal cycle.') }}
+      </div>
+    </div>
+    {% else %}
+    <div class="settings-section">
+      <div class="settings-hint">{{ _('Only administrators can change Auto-Sync settings.') }}</div>
+    </div>
+    {% endif %}
+  </div><!-- /tab-autosync -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Netzwerk
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-network">
+    <div class="settings-section">
+      <h2>{{ _('Network / DNS') }}</h2>
+      {% if is_admin %}
+      <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('DNS Mode') }}</label>
+          <select id="dnsMode" onchange="onDnsModeChange()" class="sync-select">
+            <option value="system">{{ _('System (Default)') }}</option>
+            <option value="cloudflare">Cloudflare (1.1.1.1)</option>
+            <option value="google">Google (8.8.8.8)</option>
+            <option value="quad9">Quad9 (9.9.9.9)</option>
+            <option value="custom">{{ _('Custom...') }}</option>
+          </select>
+        </div>
+        <div class="settings-field" id="dnsCustomField" style="display:none;flex:1;min-width:180px">
+          <label class="settings-field-label">{{ _('DNS Server IP') }}</label>
+          <input type="text" id="dnsServer" placeholder="z.B. 1.1.1.1" />
+        </div>
+        <button onclick="saveDnsSettings()">{{ _('Save') }}</button>
+      </div>
+      {% endif %}
+      <div class="settings-hint">
+        {{ _('Defines which DNS server resolves domains. Useful if your ISP blocks AniWorld or S.TO.') }}
+      </div>
+      <div style="padding:0 22px 16px;display:flex;gap:8px;align-items:center;">
+        <button onclick="toggleDnsTestPanel()" id="dnsTestToggleBtn" style="font-size:0.82rem;padding:5px 12px;">{{ _('Test DNS') }}</button>
+      </div>
+      <div id="dnsTestPanel" class="dns-test-panel" style="display:none">
+        <div class="dns-test-header">
+          <span>{{ _('DNS Diagnostics') }}</span>
+          <button class="dns-test-rerun" onclick="runDnsTest()" id="dnsTestRunBtn">▶ {{ _('Test') }}</button>
+        </div>
+        <div class="dns-test-block">
+          <div class="dns-test-block-title">{{ _('DNS Status') }}</div>
+          <div id="dnsTestStatus" class="dns-test-status-row">
+            <span class="dns-test-idle">{{ _('— Not tested yet') }}</span>
+          </div>
+        </div>
+        <div class="dns-test-block">
+          <div class="dns-test-block-title">{{ _('Reachability') }}</div>
+          <div class="dns-test-site-row" id="dnsTestRowAniWorld">
+            <span class="dns-test-site-name">aniworld.to</span>
+            <span class="dns-test-site-result dns-test-idle">—</span>
+          </div>
+          <div class="dns-test-site-row" id="dnsTestRowSTO">
+            <span class="dns-test-site-name">s.to</span>
+            <span class="dns-test-site-result dns-test-idle">—</span>
+          </div>
+          <div class="dns-test-site-row" id="dnsTestRowFilmpalast">
+            <span class="dns-test-site-name">filmpalast.to</span>
+            <span class="dns-test-site-result dns-test-idle">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Web Server') }}</h2>
+      <h3 class="settings-subtitle">{{ _('Base URL (Reverse Proxy)') }}</h3>
+      <div class="settings-row">
+        <input type="text" id="webBaseUrl" placeholder="https://mediaforge.example.com" />
+        <button onclick="saveWebBaseUrl()">{{ _('Save') }}</button>
+      </div>
+      <div class="settings-hint">
+        {{ _('Public URL when MediaForge runs behind a reverse proxy (e.g. Nginx, Traefik). Required for OIDC callbacks and absolute links. Leave empty if no proxy is used.') }}
+        <strong>{{ _('Changes take effect after the next restart.') }}</strong>
+      </div>
+    </div>
+    {% endif %}
+  </div><!-- /tab-network -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Authentifizierung
+  ══════════════════════════════════════════════════════ -->
+  {% if is_admin %}
+  <div class="settings-tab-panel" id="tab-auth">
+
+    <div class="settings-section">
+      <h2>{{ _('User Management') }}</h2>
+      {% if not force_sso %}
+      <h3 class="settings-subtitle">{{ _('Add User') }}</h3>
+      <div class="add-user-row" style="margin-bottom:16px">
+        <input type="text" id="newUsername" placeholder="{{ _('Username') }}" />
+        <input type="password" id="newPassword" placeholder="{{ _('Password') }}" />
+        <select id="newRole">
+          <option value="user">{{ _('User') }}</option>
+          <option value="admin">{{ _('Administrator') }}</option>
+        </select>
+        <button onclick="addUser()">{{ _('Add') }}</button>
+      </div>
+      {% endif %}
+      <div class="user-table-wrapper">
+        <table class="user-table" id="userTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{{ _('Username') }}</th>
+              <th>{{ _('Role') }}</th>
+              <th>{{ _('Authentication') }}</th>
+              <th>{{ _('Created') }}</th>
+              <th>{{ _('Actions') }}</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>{{ _('Single Sign-On (SSO / OIDC)') }}</h2>
+      <div class="settings-hint" style="margin-bottom:16px;">
+        {{ _('Connect MediaForge with an external identity provider (Keycloak, Authentik, Google, etc.).') }}
+        <strong>{{ _('Changes require a server restart.') }}</strong>
+      </div>
+
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;">
+        <label class="settings-checkbox-row" for="ssoEnabled">
+          <input type="checkbox" class="chb-main" id="ssoEnabled" onchange="onSsoToggle()" />
+          <span>{{ _('Enable SSO login') }}</span>
+        </label>
+        <label class="settings-checkbox-row" for="forceSso">
+          <input type="checkbox" class="chb-main" id="forceSso" onchange="onSsoToggle()" />
+          <span>{{ _('SSO only (disable local logins)') }}</span>
+        </label>
+      </div>
+
+      <div id="ssoFields">
+        <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-end;">
+          <div class="settings-field" style="flex:2;min-width:240px;">
+            <label class="settings-field-label">Issuer URL</label>
+            <input type="text" id="oidcIssuerUrl" placeholder="https://keycloak.example.com/realms/myrealm" />
+          </div>
+          <div class="settings-field" style="flex:1;min-width:160px;">
+            <label class="settings-field-label">Display-Name</label>
+            <input type="text" id="oidcDisplayName" placeholder="SSO" />
+          </div>
+        </div>
+        <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;">
+          <div class="settings-field" style="flex:1;min-width:180px;">
+            <label class="settings-field-label">Client ID</label>
+            <input type="text" id="oidcClientId" placeholder="mediaforge" />
+          </div>
+          <div class="settings-field" style="flex:1;min-width:180px;">
+            <label class="settings-field-label">Client Secret</label>
+            <input type="password" id="oidcClientSecret" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="settings-row" style="flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;">
+          <div class="settings-field" style="flex:1;min-width:180px;">
+            <label class="settings-field-label">{{ _('Admin username (SSO)') }}</label>
+            <input type="text" id="oidcAdminUser" placeholder="admin@example.com" />
+          </div>
+          <div class="settings-field" style="flex:1;min-width:180px;">
+            <label class="settings-field-label">{{ _('Admin subject (sub claim)') }}</label>
+            <input type="text" id="oidcAdminSubject" placeholder="UUID aus dem Identity-Provider" />
+          </div>
+        </div>
+        <div class="settings-hint" style="margin-top:6px;">
+          {{ _('The sub claim is more secure than the username. Found in server logs after the first SSO login.') }}
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <button class="btn btn-primary" onclick="saveSsoSettings()">{{ _('Save SSO settings') }}</button>
+        <span id="ssoSaveHint" style="margin-left:10px;font-size:0.82rem;color:var(--text-muted);display:none;">
+          {{ _('✓ Saved — restart required') }}
+        </span>
+      </div>
+    </div>
+
+  </div><!-- /tab-auth -->
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: API
+  ══════════════════════════════════════════════════════ -->
+  {% if is_admin %}
+  <div class="settings-tab-panel" id="tab-api">
+    <div class="settings-section">
+      <h2>MediaForge API</h2>
+      <div class="settings-hint">
+        {{ _('External REST API for Home Assistant & Co. Auth via X-Api-Key header or ?apikey=.') }}
+      </div>
+      <div class="settings-row" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div class="settings-field" style="flex:1;min-width:260px">
+          <label class="settings-field-label">API-Key</label>
+          <div class="api-key-input-row">
+            <input type="password" id="externalApiKeyDisplay" readonly
+              style="font-family:monospace;font-size:0.82rem;flex:1;" placeholder="{{ _('Loading...') }}" />
+            <div class="api-key-btn-group">
+              <button onclick="toggleApiKeyVisibility()" id="apiKeyToggleBtn">{{ _('Show') }}</button>
+              <button onclick="copyApiKey()">{{ _('Copy') }}</button>
+              <button onclick="regenerateApiKey()">{{ _('Regenerate') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 22px 6px;">
+        <div class="settings-subtitle" style="padding-left:0;">{{ _('Base URL') }}</div>
+        <code id="apiBaseUrlDisplay" style="font-size:0.85rem;">http://localhost:8080</code>
+      </div>
+      <div style="padding:4px 22px 16px;">
+        <div class="settings-subtitle" style="padding-left:0;margin-bottom:8px;">{{ _('Endpoints') }}</div>
+        <table class="api-endpoints-table">
+          <tbody>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/status</code></td>
+              <td>{{ _('Status & queue overview') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/queue</code></td>
+              <td>{{ _('Download queue') }} <span class="api-param">?status=queued|running|completed|failed</span></td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/queue/{id}</code></td>
+              <td>{{ _('Single queue item') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/library</code></td>
+              <td>{{ _('Library — all titles') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/library/series</code></td>
+              <td>{{ _('Series only') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/library/movies</code></td>
+              <td>{{ _('Movies only') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/stats</code></td>
+              <td>{{ _('Download statistics') }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="settings-hint" style="padding-top:0;">
+        <strong>{{ _('Example:') }}</strong> <code id="apiExampleUrl">…</code>
+      </div>
+    </div>
+  </div><!-- /tab-api -->
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Updates
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-updates">
+    <div class="settings-section">
+      <h2>Updates</h2>
+      <div class="settings-row" style="align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+          <span class="settings-field-label">{{ _('Installed') }}</span>
+          <code id="localVersion">{{ app_version or _('unknown') }}</code>
+        </div>
+        <div>
+          <span class="settings-field-label">{{ _('Available') }}</span>
+          <code id="latestVersion">—</code>
+        </div>
+        <button onclick="checkForUpdates(true)" id="updateCheckBtn">{{ _('Check now') }}</button>
+      </div>
+      <div id="updateStatus" class="settings-hint" style="margin-top:8px"></div>
+      <div id="updateBanner" style="display:none;margin-top:12px">
+        <div class="settings-hint" style="margin-bottom:8px">
+          🆕 <strong id="updateBannerText"></strong> —
+          <a id="updateReleaseLink" href="#" target="_blank" rel="noopener">{{ _('Open release') }}</a>
+        </div>
+        <div id="updateInstallRow" style="display:none;margin:4px 0 12px">
+          <button type="button" class="update-install-btn" id="updateInstallBtn" onclick="installUpdateNow()">⬇️ {{ _('Install update now') }}</button>
+        </div>
+        <pre id="updateChangelog"
+          style="background:var(--input-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:6px;padding:12px;font-size:0.78rem;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;margin:0"></pre>
+        <div style="margin-top:12px">
+          <span class="settings-field-label">{{ _('Install update') }}</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+            <code id="updatePipCmd"
+              style="flex:1;background:var(--input-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:6px;padding:8px 12px;font-size:0.82rem;white-space:nowrap;overflow-x:auto;display:block"></code>
+            <button onclick="copyUpdateCmd()" style="white-space:nowrap">{{ _('Copy') }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel switch — only for self-updatable installs (pip / pipx) -->
+      <div id="updateChannelRow" style="display:none;margin-top:20px;border-top:1px solid var(--border,#333);padding-top:16px; padding-left: 24px;">
+        <span class="settings-field-label" style="display:block;margin-bottom:8px">{{ _('Update channel') }}</span>
+        <div class="update-channel-switch" id="updateChannelSwitch">
+          <button type="button" class="update-channel-btn" data-channel="stable" onclick="switchChannel('stable')">{{ _('Stable') }}</button>
+          <button type="button" class="update-channel-btn" data-channel="dev" onclick="switchChannel('dev')">🧪 Dev</button>
+        </div>
+        <div style="margin-top:10px;font-size: 0.8rem;color: var(--text-muted);line-height: 1.5;padding-bottom: 12px;">
+          {{ _('Switch between the stable release and the development channel (latest commits from the models branch — may be unstable). Switching installs the selected version right away.') }}
+        </div>
+      </div>
+
+      <!-- Dev-Channel-Hinweis — nur bei stabilem Release sichtbar -->
+      <div id="devChannelHint" style="display:none;margin-top:20px;border-top:1px solid var(--border,#333);padding-top:16px">
+        <span class="settings-field-label" style="display:block;margin-bottom:6px;padding: 8px 22px 14px;font-size: medium;">🧪 {{ _('Development channel') }}</span>
+        <div class="settings-hint" style="margin-bottom:10px">
+          {{ _('You are using a stable release. The development channel contains the latest commits directly from the models branch — it may be unstable or contain unfinished features.') }}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding: 0rem 0rem 1rem 1rem;">
+          <code id="devChannelCmd"
+            style="flex:1;background:var(--input-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:6px;padding:8px 12px;font-size:0.82rem;white-space:nowrap;overflow-x:auto;display:block">pip install --upgrade "git+https://github.com/PD-Codes/MediaForge.git@models"</code>
+          <button onclick="copyDevChannelCmd()" style="white-space:nowrap;padding-right: 1rem;">{{ _('Copy') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section" id="autoUpdateSection" style="display:none">
+      <h2>{{ _('Automatic updates') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" for="autoUpdateEnabled">
+          <input type="checkbox" class="chb-main" id="autoUpdateEnabled" onchange="saveAutoUpdate()" />
+          <span>{{ _('Install available updates automatically') }}</span>
+        </label>
+      </div>
+      <div class="auto-update-block" id="autoUpdateBlock" style="display:none">
+        <div class="auto-update-field">
+          <label class="settings-field-label">{{ _('Weekdays') }}</label>
+          <div class="weekday-toggles" id="autoUpdateDays"></div>
+        </div>
+        <div class="auto-update-field">
+          <label class="settings-field-label">{{ _('Time') }}</label>
+          <input type="time" id="autoUpdateTime" class="auto-update-time-input" value="03:00" onchange="saveAutoUpdate()">
+        </div>
+      </div>
+      <div class="settings-hint" style="padding:0 22px 14px;">
+        {{ _('When enabled, an available update is installed automatically at the selected time on the chosen weekdays. The app restarts itself and running downloads resume afterwards.') }}
+      </div>
+    </div>
+  </div><!-- /tab-updates -->
+
+</div><!-- /settings-container -->
+{% endblock %}
+{% block scripts %}
+<script>var settingsCanEdit = {{ 'true' if is_admin else 'false' }};</script>
+<script src="{{ url_for('static', filename='settings.js') }}"></script>
+<script src="{{ url_for('static', filename='pwa.js') }}"></script>
+{% endblock %}

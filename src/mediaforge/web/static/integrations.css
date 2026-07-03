@@ -1,0 +1,464 @@
+/* =================================================================
+   INTEGRATIONS PAGE  —  integrations.css
+   Alle integ-* Klassen sowie seitenspezifische Korrekturen.
+   ================================================================= */
+
+
+/* ── Seitenheader ── */
+.integ-page-header { margin-bottom: 28px; }
+
+
+/* ── Abschnitt-Badges (Jellyfin / Plex / TMDB) ── */
+.section-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 9px;
+  border-radius: 99px;
+  vertical-align: middle;
+  margin-left: 8px;
+  border: 1px solid transparent;
+}
+.integ-jf-badge   { background: rgba(99,102,241,.14); color: #818cf8; border-color: rgba(99,102,241,.26); }
+.integ-tmdb-badge { background: rgba(59,130,246,.14);  color: #60a5fa; border-color: rgba(59,130,246,.26); }
+
+
+/* ── Hinweis-Varianten ── */
+.integ-hint-sep,
+.integ-hint-border {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 0;
+  background: none;
+  border-radius: 0;
+}
+
+
+/* ── Link-Farbe ── */
+.integ-link { color: var(--text-link); text-decoration: none; }
+.integ-link:hover { color: var(--text-link-hover); text-decoration: underline; }
+
+
+/* ── Fix: settings-row braucht justify-content: space-between ──────
+   In style.css gibt es zwei .settings-row-Definitionen. Die zweite
+   (Settings-Seite, später im File) entfernt justify-content:
+   space-between, was die CineInfo-Toggle-Zeilen auf dieser Seite
+   kaputtmacht. Mit höherer Spezifität stellen wir es hier wieder her.
+   ──────────────────────────────────────────────────────────────────── */
+.settings-container .settings-row {
+  justify-content: space-between;
+}
+
+
+/* ── Generische Form-Zeile (Label links · Control rechts) ── */
+.integ-form-row       { padding: 14px 22px; }
+.integ-border-b       { border-bottom: 1px solid var(--border); }
+
+.integ-form-row-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.integ-form-row-inner.integ-wrap {
+  align-items: flex-start;
+}
+/* Toggle-Zeilen bleiben immer horizontal — kein Umbruch */
+.integ-form-row-inner.integ-toggle-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+
+/* ── Label-Gruppe (Titel + Beschreibung) ── */
+.integ-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.integ-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.integ-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+
+/* ── Control-Gruppen ── */
+.integ-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* Speichern-Button im Mediaplayer-Typ-Feld (kein .btn) */
+.integ-control-group > button:not(.btn) {
+  height: 36px;
+  padding: 0 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.integ-control-group > button:not(.btn):hover { background: var(--accent-hover); }
+
+.integ-plex-token-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 320px;
+}
+.integ-lib-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+
+/* ── Selects ── */
+.integ-select {
+  height: 36px;
+  padding: 0 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  width: auto;
+}
+.integ-lib-select { min-width: 160px; flex: 1; }
+
+.integ-cineinfo-select {
+  height: 40px;
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+
+/* ── Felder-Grid (z. B. Server-URL + API-Key nebeneinander) ── */
+.integ-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 22px;
+}
+.integ-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+/* ── Token-Badge & Plex-Login ── */
+.integ-token-badge {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: rgba(148,163,184,.12);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.integ-plex-login-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.integ-oauth-status {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.integ-icon-sm {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: block;
+}
+
+
+/* ── Hinweis-Box (Jellyfin- / Plex-Tipp) ── */
+.integ-hint-box {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  margin: 0 22px 4px;
+  padding: 8px 12px;
+  background: rgba(99,102,241,.07);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(99,102,241,.18);
+  line-height: 1.5;
+}
+
+
+/* ── Action-Bar (Verbindung testen) ── */
+.integ-action-bar {
+  display: flex;
+  gap: 10px;
+  padding: 12px 22px;
+}
+
+
+/* ── Ergebnis-Box (Verbindungstest-Feedback) ── */
+.integ-result-box {
+  margin: 0 22px 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+}
+
+
+/* ── Input-Zeilen: Seerr / CineInfo (Label + Felder + Speichern) ── */
+.integ-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.integ-input-row .settings-field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.integ-input-row > button {
+  flex-shrink: 0;
+  align-self: flex-end;
+  height: 40px;
+  padding: 0 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+.integ-input-row > button:hover { background: var(--accent-hover); }
+.integ-country-field { flex: 1 1 130px; max-width: 190px; min-width: 0; }
+
+
+/* =================================================================
+   RESPONSIVE  ≤ 640 px
+   ================================================================= */
+@media (max-width: 640px) {
+
+  /* Form-Zeilen: Label oben, Control unten */
+  .integ-form-row { padding: 12px 14px; }
+  .integ-form-row-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  /* Toggle-Zeilen bleiben horizontal */
+  .integ-form-row-inner.integ-toggle-row {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  /* Control-Gruppen füllen die volle Breite */
+  .integ-control-group,
+  .integ-plex-token-ctrl,
+  .integ-lib-ctrl {
+    flex-shrink: 1;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Speichern-Button in Control-Gruppe füllt Zeile */
+  .integ-control-group > button:not(.btn) { flex: 1; }
+
+  .integ-select { width: 100%; }
+
+  /* Felder-Grid: eine Spalte */
+  .integ-fields-grid {
+    grid-template-columns: 1fr;
+    padding: 12px 14px;
+  }
+
+  /* Token-Badge nimmt volle Breite ein */
+  .integ-token-badge {
+    text-align: center;
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+  .integ-plex-login-btn { flex: 1; justify-content: center; }
+
+  /* Bibliotheks-Control bleibt einzeilig */
+  .integ-lib-ctrl   { flex-wrap: nowrap; }
+  .integ-lib-select { flex: 1; min-width: 0; }
+
+  /* Hinweis-Box + Action-Bar */
+  .integ-hint-box   { margin: 0 14px 4px; }
+  .integ-action-bar { padding: 12px 14px; }
+  .integ-action-bar button { flex: 1; }
+  .integ-result-box { margin: 0 14px 12px; }
+
+  /* Seerr / CineInfo Input-Zeilen: alles gestapelt */
+  .integ-input-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+  }
+  .integ-input-row .settings-field { flex: 1 1 100%; }
+  .integ-input-row > button {
+    width: 100%;
+    align-self: auto;
+  }
+  .integ-country-field   { max-width: 100%; flex: 1 1 100%; }
+  .integ-cineinfo-select { width: 100%; }
+
+  /* CineInfo Anzeige-Optionen Toggle-Zeilen */
+  .settings-container .settings-row { padding: 12px 14px; }
+}
+
+
+/* ──────────────────────────────────────────────
+   MediaScan
+   ────────────────────────────────────────────── */
+
+.integ-ms-badge {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.integ-ms-status-card {
+  margin: 0 0 4px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,.03);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.integ-ms-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.integ-ms-status-label { color: var(--text-secondary); }
+.integ-ms-status-val   { color: var(--text-primary); font-weight: 500; }
+
+.integ-ms-progress-wrap {
+  padding: 12px 20px 4px;
+  border-top: 1px solid var(--border);
+}
+
+.integ-ms-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.integ-ms-progress-bar-track {
+  height: 5px;
+  background: rgba(255,255,255,.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.integ-ms-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #a855f7, #c084fc);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* indeterminate pulse when total is unknown */
+.integ-ms-progress-bar.indeterminate {
+  width: 40% !important;
+  animation: ms-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ms-pulse {
+  0%   { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+.integ-warn-box {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-left: 3px solid rgba(245, 158, 11, 0.6) !important;
+  color: #fbbf24 !important;
+}
+
+
+/* ──────────────────────────────────────────────
+   CineInfo — Hover-Effekte Untersektion
+   ────────────────────────────────────────────── */
+
+.integ-subsection-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 22px 6px;
+}
+
+.integ-subsection-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.integ-subsection-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  text-transform: uppercase;
+}
+
+.integ-subsection-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0 22px 10px;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .integ-subsection-header { padding: 16px 14px 6px; }
+  .integ-subsection-hint   { padding: 0 14px 10px; }
+}

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="{{ ui_language }}" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ _('Sign in') }} — MediaForge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('aw-theme') || 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch(e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="auth-container">
+      <div style="margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;display:block;margin:0 auto;">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      </div>
+      <h1>MediaForge</h1>
+      <h2>{{ _('Sign in') }}</h2>
+      {% if error %}
+      <div class="auth-error">{{ error }}</div>
+      {% endif %}
+      {% if not force_sso %}
+      <form method="post" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="text" name="username" placeholder="{{ _('Username') }}" required autofocus />
+        <input type="password" name="password" placeholder="{{ _('Password') }}" required />
+        <button type="submit">{{ _('Sign in') }}</button>
+      </form>
+      {% endif %}
+      {% if oidc_enabled and not force_sso %}
+      <div class="auth-divider"><span>{{ _('or') }}</span></div>
+      {% endif %}
+      {% if oidc_enabled %}
+      <a href="{{ url_for('auth.oidc_login') }}" class="sso-button">
+        {{ _('Sign in with') }} {{ oidc_display_name }}
+      </a>
+      {% endif %}
+    </div>
+  </body>
+</html>

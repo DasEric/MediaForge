@@ -1,0 +1,199 @@
+name: Auto-release on version bump
+
+on:
+  push:
+    branches:
+      - models
+    paths:
+      - pyproject.toml
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # -----------------------------------------------------------------------
+  # 1. Read version, create tag + GitHub Release
+  # -----------------------------------------------------------------------
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag:    ${{ steps.version.outputs.tag }}
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(python -c "import re,pathlib; m=re.search(r'version = \"([^\"]+)\"', pathlib.Path('pyproject.toml').read_text()); print(m.group(1))")
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          if git rev-parse "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog from commits
+        if: steps.check.outputs.exists == 'false'
+        id: changelog
+        run: |
+          PREV=$(git tag --sort=-version:refname | sed -n '1p')
+          if [ -z "$PREV" ]; then
+            RAW=$(git log --pretty=format:"%B" --no-merges)
+          else
+            RAW=$(git log ${PREV}..HEAD --pretty=format:"%B" --no-merges)
+          fi
+          PREFIXES="feat fix refactor perf chore docs style test build ci"
+          NOTES=""
+          for PREFIX in $PREFIXES; do
+            SECTION=$(echo "$RAW" | grep -E "^${PREFIX}:" | sed "s/^/- /")
+            if [ -n "$SECTION" ]; then
+              NOTES="${NOTES}${SECTION}"$'\n'
+            fi
+          done
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2.3.2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          body: ${{ steps.changelog.outputs.notes }}
+
+  # -----------------------------------------------------------------------
+  # 2. Build executables (all platforms in parallel)
+  # -----------------------------------------------------------------------
+  build:
+    needs: create-release
+    if: needs.create-release.outputs.exists == 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: mediaforge-windows-x86_64.exe
+            dist:     mediaforge.exe
+          - os: ubuntu-latest
+            artifact: mediaforge-linux-x86_64
+            dist:     mediaforge
+          - os: macos-latest
+            artifact: mediaforge-macos-arm64
+            dist:     mediaforge
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install . pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller mediaforge.spec
+
+      - name: Rename artifact
+        shell: bash
+        run: mv dist/${{ matrix.dist }} dist/${{ matrix.artifact }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2.3.2
+        with:
+          tag_name: ${{ needs.create-release.outputs.tag }}
+          files: dist/${{ matrix.artifact }}
+
+  # -----------------------------------------------------------------------
+  # 3. Build, attach sdist + wheel, and publish to PyPI
+  # -----------------------------------------------------------------------
+  publish-dist:
+    needs: create-release
+    if: needs.create-release.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypiforge
+      url: https://pypi.org/project/mediaforge/
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Build distribution
+        run: |
+          pip install build
+          python -m build
+
+      - name: Upload dist to GitHub Release
+        uses: softprops/action-gh-release@v2.3.2
+        with:
+          tag_name: ${{ needs.create-release.outputs.tag }}
+          files: |
+            dist/*.tar.gz
+            dist/*.whl
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  # -----------------------------------------------------------------------
+  # 4. Build and push Docker image to GitHub Container Registry (ghcr.io)
+  # -----------------------------------------------------------------------
+  publish-docker:
+    needs: create-release
+    if: needs.create-release.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: docker
+      url: https://ghcr.io/pd-codes/mediaforge
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/mediaforge
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.create-release.outputs.tag }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

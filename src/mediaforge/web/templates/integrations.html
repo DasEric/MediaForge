@@ -1,0 +1,758 @@
+{% extends "base.html" %} {% block title %}{{ _('Integrations') }} — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='integrations.css') }}">{% endblock %}
+{% block content %}
+<div class="settings-container">
+  <div class="page-header integ-page-header">
+    <h1 class="page-title">{{ _('Integrations') }}</h1>
+    <p class="page-subtitle">{{ _('Connect external services') }}</p>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="settings-tabs" id="integTabs">
+    <button class="settings-tab active" data-tab="seerr" onclick="switchIntegTab('seerr')">Seerr</button>
+    <button class="settings-tab" data-tab="mediaplayer" onclick="switchIntegTab('mediaplayer')">Mediaplayer</button>
+    <button class="settings-tab" data-tab="cineinfo" onclick="switchIntegTab('cineinfo')">CineInfo</button>
+    <button class="settings-tab" data-tab="syncplay" onclick="switchIntegTab('syncplay')">SyncPlay</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Seerr
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel active" id="tab-seerr">
+    <div class="settings-section">
+      <h2>{{ _('Seerr Integration') }}</h2>
+      <div class="settings-hint integ-hint-border">
+        {{ _('Connect MediaForge with your Jellyseerr or Overseerr instance. Pending requests will appear under "Seerr Requests".') }}
+      </div>
+      <div class="integ-input-row">
+        <div class="settings-field">
+          <label class="settings-field-label">Seerr URL</label>
+          <input type="text" id="seerrUrl" placeholder="http://192.168.1.100:5055" />
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">API Key</label>
+          <input type="password" id="seerrApiKey" placeholder="{{ _('Settings → General') }}" />
+        </div>
+        <button onclick="saveSeerrSettings()">{{ _('Save') }}</button>
+      </div>
+    </div>
+  </div><!-- /tab-seerr -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Mediaplayer (Jellyfin / Plex + MediaScan)
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-mediaplayer">
+
+    <!-- ===== Jellyfin / Plex ===== -->
+    <div class="settings-section">
+      <h2>
+        Mediaplayer
+        <span class="section-badge integ-jf-badge">Jellyfin / Plex</span>
+      </h2>
+      <div class="settings-hint integ-hint-sep">
+        {{ _('After every completed download, a library refresh is automatically triggered on the selected server.') }}
+      </div>
+
+      <!-- Dienst -->
+      <div class="integ-form-row integ-border-b">
+        <div class="integ-form-row-inner">
+          <div class="integ-label-group">
+            <div class="integ-label">{{ _('Service') }}</div>
+            <div class="integ-desc">{{ _('Which media server should MediaForge use?') }}</div>
+          </div>
+          <div class="integ-control-group">
+            <select id="mediaplayerType" class="integ-select" onchange="onMediaplayerTypeChange()">
+              <option value="">{{ _('— Disabled —') }}</option>
+              <option value="jellyfin">Jellyfin</option>
+              <option value="plex">Plex</option>
+            </select>
+            <button onclick="saveMediaplayerSettings()" id="mediaplayerSaveBtn">{{ _('Save') }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Jellyfin ────────────────────────────────────────────────── -->
+      <div id="mediaplayerJellyfinFields" style="display:none;">
+        <div class="integ-fields-grid integ-border-b">
+          <div class="integ-field">
+            <label class="settings-field-label">Server-URL</label>
+            <input type="text" id="mediaplayerUrl" placeholder="192.168.1.100:8096" oninput="onJfUrlInput()" />
+          </div>
+          <div class="integ-field">
+            <label class="settings-field-label">API Key</label>
+            <input type="password" id="mediaplayerApikey" placeholder="{{ _('Enter API key') }}" autocomplete="off" />
+          </div>
+        </div>
+        <div class="integ-form-row integ-border-b">
+          <div class="integ-form-row-inner integ-toggle-row">
+            <div class="integ-label-group">
+              <div class="integ-label">SSL / HTTPS</div>
+              <div class="integ-desc">{{ _('Enable if your Jellyfin is accessible via HTTPS') }}</div>
+            </div>
+            <label class="toggle"><input type="checkbox"  id="mediaplayerSsl" onchange="onJfSslToggle()" /><span
+                class="toggle-slider"></span></label>
+          </div>
+        </div>
+        <div class="integ-hint-box">
+          💡 {{ _('Jellyfin Dashboard → Advanced → API Keys → Create → copy the key and paste it here.') }}
+        </div>
+        <div class="integ-action-bar">
+          <button class="btn btn-ghost" onclick="testMediaplayerConnection()" id="mediaplayerTestBtn">{{ _('Test connection') }}</button>
+          <button class="btn btn-ghost" onclick="triggerMediaScan()" id="mediaplayerScanBtn">{{ _('Test media scan') }}</button>
+        </div>
+        <div id="mediaplayerTestResult" class="integ-result-box" style="display:none;"></div>
+      </div>
+
+      <!-- ── Plex ─────────────────────────────────────────────────────── -->
+      <div id="mediaplayerPlexFields" style="display:none;">
+        <div class="integ-fields-grid integ-border-b">
+          <div class="integ-field">
+            <label class="settings-field-label">Server-URL</label>
+            <input type="text" id="mediaplayerPlexUrl" placeholder="192.168.1.100:32400" oninput="onPlexUrlInput()" />
+          </div>
+        </div>
+        <div class="integ-form-row integ-border-b">
+          <div class="integ-form-row-inner integ-toggle-row">
+            <div class="integ-label-group">
+              <div class="integ-label">SSL / HTTPS</div>
+              <div class="integ-desc">{{ _('Enable if your Plex is accessible via HTTPS') }}</div>
+            </div>
+            <label class="toggle"><input type="checkbox"  id="mediaplayerPlexSsl" onchange="onPlexSslToggle()" /><span
+                class="toggle-slider"></span></label>
+          </div>
+        </div>
+        <div class="integ-form-row integ-border-b">
+          <div class="integ-form-row-inner integ-wrap">
+            <div class="integ-label-group">
+              <div class="integ-label">Plex Token</div>
+              <div class="integ-desc">{{ _('Retrieve automatically via Plex login') }}</div>
+            </div>
+            <div class="integ-plex-token-ctrl">
+              <span id="plexTokenBadge" class="integ-token-badge">{{ _('No token stored') }}</span>
+              <button class="btn btn-ghost integ-plex-login-btn" onclick="startPlexOAuth()" id="plexLoginBtn">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="integ-icon-sm">
+                  <path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z" />
+                </svg>
+                {{ _('Sign in with Plex') }}
+              </button>
+              <span id="plexOAuthStatus" class="integ-oauth-status" style="display:none;"></span>
+            </div>
+          </div>
+          <input type="hidden" id="mediaplayerPlexApikey" />
+        </div>
+        <div class="integ-form-row integ-border-b">
+          <div class="integ-form-row-inner integ-wrap">
+            <div class="integ-label-group">
+              <div class="integ-label">{{ _('Library') }}</div>
+              <div class="integ-desc">{{ _('Which one should be refreshed after a download?') }}</div>
+            </div>
+            <div class="integ-lib-ctrl">
+              <select id="mediaplayerPlexSectionId" class="integ-select integ-lib-select">
+                <option value="">{{ _('Scan all') }}</option>
+              </select>
+              <button class="btn btn-ghost" onclick="loadPlexLibraries()" id="plexLibLoadBtn" title="{{ _('Load libraries') }}">↻ {{ _('Load') }}</button>
+            </div>
+          </div>
+        </div>
+        <div class="integ-action-bar">
+          <button class="btn btn-ghost" onclick="testMediaplayerConnection()" id="mediaplayerTestBtn2">{{ _('Test connection') }}</button>
+          <button class="btn btn-ghost" onclick="triggerMediaScan()" id="mediaplayerScanBtn2">{{ _('Test media scan') }}</button>
+        </div>
+        <div id="mediaplayerTestResult2" class="integ-result-box" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ===== MediaScan ===== -->
+    <div class="settings-section">
+      <h2>
+        MediaScan
+        <span class="section-badge integ-ms-badge">Plex / Jellyfin</span>
+      </h2>
+      <div class="settings-hint integ-hint-border">
+        {{ _('Detects whether a series is already in your Plex or Jellyfin library and shows the ✓ Present badge on the home page. Connection data is automatically taken from the Mediaplayer integration.') }}
+      </div>
+
+      <!-- Aktiv-Toggle -->
+      <div class="integ-form-row integ-border-b">
+        <div class="integ-form-row-inner integ-toggle-row">
+          <div class="integ-label-group">
+            <div class="integ-label">{{ _('Enable') }}</div>
+            <div class="integ-desc">{{ _('Presence detection via library instead of folder scan') }}</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="mediascanEnabled" onchange="onMediascanToggle()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Quelle -->
+      <div id="mediascanFields" style="display:none;">
+        <div class="integ-form-row integ-border-b">
+          <div class="integ-form-row-inner">
+            <div class="integ-label-group">
+              <div class="integ-label">{{ _('Source') }}</div>
+              <div class="integ-desc">{{ _('Which library should be used for detection?') }}</div>
+            </div>
+            <div class="integ-control-group">
+              <select id="mediascanSource" class="integ-select" onchange="onMediascanSourceChange()">
+                <option value="folders">📁 {{ _('Folders (Default)') }}</option>
+                <option value="jellyfin">Jellyfin</option>
+                <option value="plex">Plex</option>
+              </select>
+              <button onclick="saveMediascanSettings()">{{ _('Save') }}</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Jellyfin ── -->
+        <div id="mediascanJellyfinFields" style="display:none;">
+          <div class="integ-fields-grid integ-border-b">
+            <div class="integ-field">
+              <label class="settings-field-label">Server-URL</label>
+              <input type="text" id="mediascanJfUrl" placeholder="192.168.1.100:8096" oninput="onMsJfUrlInput()" />
+            </div>
+            <div class="integ-field">
+              <label class="settings-field-label">API Key</label>
+              <input type="password" id="mediascanJfApikey" placeholder="API-Key eingeben" autocomplete="off" />
+            </div>
+          </div>
+          <div class="integ-form-row integ-border-b">
+            <div class="integ-form-row-inner integ-toggle-row">
+              <div class="integ-label-group">
+                <div class="integ-label">SSL / HTTPS</div>
+                <div class="integ-desc">{{ _('Enable if Jellyfin is accessible via HTTPS') }}</div>
+              </div>
+              <label class="toggle"><input type="checkbox"  id="mediascanJfSsl" /><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Plex ── -->
+        <div id="mediascanPlexFields" style="display:none;">
+          <div class="integ-fields-grid integ-border-b">
+            <div class="integ-field">
+              <label class="settings-field-label">Server-URL</label>
+              <input type="text" id="mediascanPlexUrl" placeholder="192.168.1.100:32400" oninput="onMsPlexUrlInput()" />
+            </div>
+          </div>
+          <div class="integ-form-row integ-border-b">
+            <div class="integ-form-row-inner integ-toggle-row">
+              <div class="integ-label-group">
+                <div class="integ-label">SSL / HTTPS</div>
+                <div class="integ-desc">{{ _('Enable if Plex is accessible via HTTPS') }}</div>
+              </div>
+              <label class="toggle"><input type="checkbox"  id="mediascanPlexSsl" /><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="integ-form-row integ-border-b">
+            <div class="integ-form-row-inner integ-wrap">
+              <div class="integ-label-group">
+                <div class="integ-label">Plex Token</div>
+                <div class="integ-desc">{{ _('Shared with Mediaplayer — sign in once for both') }}</div>
+              </div>
+              <div class="integ-plex-token-ctrl">
+                <span id="msPlexTokenBadge" class="integ-token-badge">{{ _('No token stored') }}</span>
+                <button class="btn btn-ghost integ-plex-login-btn" onclick="startMsPlexOAuth()" id="msPlexLoginBtn">
+                  <svg viewBox="0 0 24 24" fill="currentColor" class="integ-icon-sm">
+                    <path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z" />
+                  </svg>
+                  {{ _('Sign in with Plex') }}
+                </button>
+                <span id="msPlexOAuthStatus" class="integ-oauth-status" style="display:none;"></span>
+              </div>
+            </div>
+            <input type="hidden" id="mediascanPlexTokenHidden" />
+          </div>
+          <div class="integ-form-row integ-border-b">
+            <div class="integ-form-row-inner integ-wrap">
+              <div class="integ-label-group">
+                <div class="integ-label">{{ _('Library') }}</div>
+                <div class="integ-desc">{{ _('Which one should be used for detection?') }}</div>
+              </div>
+              <div class="integ-lib-ctrl">
+                <select id="mediascanPlexSection" class="integ-select integ-lib-select">
+                  <option value="">{{ _('Scan all') }}</option>
+                </select>
+                <button class="btn btn-ghost" onclick="loadMsPlexLibraries()" id="msPlexLibLoadBtn" title="{{ _('Load libraries') }}">↻ {{ _('Load') }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kein TMDB-Key Warnung -->
+        <div id="mediascanNoTmdbWarn" class="integ-hint-box integ-warn-box" style="display:none;">
+          ⚠️ <strong>{{ _('CineInfo not configured.') }}</strong>
+          {{ _('A TMDB API key is required for accurate matching (German ↔ English). Please configure it under') }} <a href="/integrations#cineinfo" class="integ-link">CineInfo</a>. {{ _('Until then, MediaScan is disabled.') }}
+        </div>
+
+        <!-- Status-Karte -->
+        <div id="mediascanStatusCard" class="integ-ms-status-card" style="display:none;">
+          <div class="integ-ms-status-row">
+            <span class="integ-ms-status-label">{{ _('Last update') }}</span>
+            <span id="mediascanLastUpdated" class="integ-ms-status-val">—</span>
+          </div>
+          <div class="integ-ms-status-row">
+            <span class="integ-ms-status-label">{{ _('Cached entries') }}</span>
+            <span id="mediascanCount" class="integ-ms-status-val">—</span>
+          </div>
+          <div class="integ-ms-status-row" id="mediascanScanRow">
+            <span class="integ-ms-status-label">{{ _('Status') }}</span>
+            <span id="mediascanScanStatus" class="integ-ms-status-val">—</span>
+          </div>
+        </div>
+
+        <!-- Fortschrittsbalken -->
+        <div id="mediascanProgressWrap" class="integ-ms-progress-wrap" style="display:none;">
+          <div class="integ-ms-progress-label">
+            <span id="mediascanProgressText">{{ _('Scan running…') }}</span>
+            <span id="mediascanProgressPct"></span>
+          </div>
+          <div class="integ-ms-progress-bar-track">
+            <div id="mediascanProgressBar" class="integ-ms-progress-bar"></div>
+          </div>
+        </div>
+
+        <!-- Aktionsleiste -->
+        <div class="integ-action-bar">
+          <button class="btn btn-ghost" onclick="triggerMediascanRefresh()" id="mediascanRefreshBtn">
+            ↻ {{ _('Refresh library now') }}
+          </button>
+        </div>
+        <div id="mediascanResult" class="integ-result-box" style="display:none;"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-mediaplayer -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: CineInfo
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-cineinfo">
+    <div class="settings-section">
+      <h2>
+        CineInfo
+        <span class="section-badge integ-tmdb-badge">TMDB</span>
+      </h2>
+
+      <div class="settings-hint integ-hint-border">
+        {{ _('Shows streaming providers, genres and age rating on the home page and in the detail modal. Requires a free API key from') }} <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" class="integ-link">themoviedb.org</a>. {{ _('Without a key, CineInfo is automatically inactive.') }}
+      </div>
+
+      <!-- API Key + Land -->
+      <div class="integ-input-row">
+        <div class="settings-field">
+          <label class="settings-field-label">TMDB API Key (v3)</label>
+          <input type="password" id="cineinfoApiKey" placeholder="{{ _('Your TMDB API key') }}" autocomplete="off" />
+        </div>
+        <div class="settings-field integ-country-field">
+          <label class="settings-field-label">{{ _('Country (Providers &amp; Age Rating)') }}</label>
+          <select id="cineinfoCountry" class="integ-cineinfo-select">
+            <option value="DE">🇩🇪 {{ _('Germany') }}</option>
+            <option value="AT">🇦🇹 {{ _('Austria') }}</option>
+            <option value="CH">🇨🇭 {{ _('Switzerland') }}</option>
+            <option value="US">🇺🇸 USA</option>
+            <option value="GB">🇬🇧 {{ _('United Kingdom') }}</option>
+          </select>
+        </div>
+        <button onclick="saveCineinfoSettings()">{{ _('Save') }}</button>
+      </div>
+
+      <!-- Erweiterte TMDB Suche — direkt nach dem Setup -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Advanced TMDB Search') }}</div>
+          <div class="settings-row-desc">{{ _('Shows a menu item in the sidebar for advanced search including genres and keywords.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoAdvancedSearch" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Kalenderansicht -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Calendar View') }}</div>
+          <div class="settings-row-desc">{{ _('Shows a sidebar menu item with upcoming episode air dates for your AutoSync jobs based on TMDB data.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoCalendar" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Seerr-Anfragen im Kalender (Unterpunkt) -->
+      <div class="settings-row" id="cineinfoCalendarSeerrRow" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Show Seerr requests in calendar') }}</div>
+          <div class="settings-row-desc">{{ _('Adds open Seerr requests to the calendar based on their TMDB air/release dates.') }}</div>
+          <div class="settings-row-desc" id="cineinfoCalendarSeerrHint" style="display:none;color:var(--warning)">{{ _('Enable the calendar above and set up Seerr first to use this option.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoCalendarSeerr" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Mediathek im Kalender (Unterpunkt) -->
+      <div class="settings-row" id="cineinfoCalendarMediathekRow" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Show Media Library series in calendar') }}</div>
+          <div class="settings-row-desc">{{ _('Adds series from your Media Library to the calendar.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoCalendarMediathek" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Kalender Refresh Intervall (Unterpunkt) -->
+      <div class="settings-row" id="cineinfoCalendarRefreshIntervalRow" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Calendar refresh interval') }}</div>
+          <div class="settings-row-desc">{{ _('How often to refresh existing calendar data from TMDB (in hours).') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <select id="cineinfoCalendarRefreshInterval" class="integ-select" style="width: auto; min-width: 100px; padding: 4px 8px;" onchange="saveCineinfoDisplayOptions()">
+            <option value="8">8 {{ _('Hours') }}</option>
+            <option value="12">12 {{ _('Hours') }}</option>
+            <option value="16">16 {{ _('Hours') }}</option>
+            <option value="24">24 {{ _('Hours') }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ── Anzeige-Optionen ── -->
+      <h3 class="settings-subtitle">{{ _('Display Options') }}</h3>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Streaming Providers') }}</div>
+          <div class="settings-row-desc">{{ _('1 provider on the card · all in the modal below the title') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowProviders" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Age Rating (FSK)') }}</div>
+          <div class="settings-row-desc">{{ _('FSK badge on the card and centered below the cover in the modal') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowFsk" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('TMDB Genres') }}</div>
+          <div class="settings-row-desc">{{ _('Replaces the original site genres in the modal with TMDB genres (e.g. Action, Fantasy)') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowGenres" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Rating') }}</div>
+          <div class="settings-row-desc">{{ _('Shows the TMDB user rating as a badge next to the series title in the modal') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowRating" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Similar Series (Recommendations)') }}</div>
+          <div class="settings-row-desc">{{ _('Shows a list of similar series based on TMDB below the episodes') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowRecommendations" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Show trailer') }}</div>
+          <div class="settings-row-desc">{{ _('Shows a YouTube trailer in the series detail modal (if available)') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowTrailer" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ── Hover-Effekte (Design) ── -->
+      <div class="integ-subsection-header">
+        <span class="integ-subsection-title">{{ _('Hover Effects') }}</span>
+        <span class="integ-subsection-badge">Design</span>
+      </div>
+      <div class="integ-subsection-hint">
+        {{ _('These options control which info is shown when hovering over a series card on the home page.') }}
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Show rating') }}</div>
+          <div class="settings-row-desc">{{ _('Shows the TMDB rating when hovering on the home page') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowHoverRating" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Show genres') }}</div>
+          <div class="settings-row-desc">{{ _('Shows the TMDB genres when hovering on the home page') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowHoverGenres" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Show age rating') }}</div>
+          <div class="settings-row-desc">{{ _('Shows the age rating when hovering on the home page') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="cineinfoShowHoverFsk" onchange="saveCineinfoDisplayOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      </div>
+      <div class="settings-section">
+      <!-- ══ Crunchyroll (login, provider pill, calendar sync) ══ -->
+      <div class="integ-subsection-header">
+        <span class="integ-subsection-title">Crunchyroll</span>
+        <span class="integ-subsection-badge" style="background:#F47521;color:#fff;">API</span>
+      </div>
+      <div class="integ-subsection-hint">
+        {{ _('Logs in to Crunchyroll to add provider pills for current simulcasts (which TMDB often lacks) and to sync the Crunchyroll calendar. Your password is stored encrypted. Without login, only public metadata is available in anonymous mode.') }}
+      </div>
+
+      <!-- Master toggle -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable Crunchyroll integration') }}</div>
+          <div class="settings-row-desc">{{ _('Master switch for all Crunchyroll features below.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crEnabled" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Credentials -->
+      <div class="integ-input-row" id="crCredentialsRow">
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Email') }}</label>
+          <input type="email" id="crEmail" placeholder="{{ _('Crunchyroll account email') }}" autocomplete="off" />
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">{{ _('Password') }}</label>
+          <input type="password" id="crPassword" placeholder="{{ _('Stored encrypted') }}" autocomplete="new-password" />
+        </div>
+        <div class="settings-field integ-country-field">
+          <label class="settings-field-label">{{ _('Language (Locale)') }}</label>
+          <select id="crLocale" class="integ-cineinfo-select">
+            <option value="de-DE">🇩🇪 Deutsch</option>
+            <option value="en-US">🇺🇸 English</option>
+            <option value="en-GB">🇬🇧 English (UK)</option>
+            <option value="fr-FR">🇫🇷 Français</option>
+            <option value="es-ES">🇪🇸 Español</option>
+            <option value="it-IT">🇮🇹 Italiano</option>
+            <option value="pt-BR">🇧🇷 Português</option>
+          </select>
+        </div>
+        <button onclick="saveCrunchyrollSettings()">{{ _('Save') }}</button>
+        <button class="btn-secondary" id="crTestBtn" onclick="testCrunchyroll(this)">{{ _('Test connection') }}</button>
+      </div>
+      <div class="settings-row-desc" id="crTestResult" style="display:none;margin-top:-6px;"></div>
+
+      <!-- Profile selector (populated after a successful login) -->
+      <div class="settings-row" id="crProfileRow" style="display:none;">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Profile') }}</div>
+          <div class="settings-row-desc">{{ _('Which account profile to use for watchlist and calendar sync.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <select id="crProfile" class="integ-select" onchange="saveCrunchyrollOptions()"></select>
+        </div>
+      </div>
+
+      <!-- Anonymous mode -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Anonymous mode (no account)') }}</div>
+          <div class="settings-row-desc">{{ _('Use public metadata only — no login required. Watchlist sync needs an account and is unavailable here.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crAnon" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Provider pill -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Crunchyroll provider pill') }}</div>
+          <div class="settings-row-desc">{{ _('Adds a Crunchyroll pill in the detail modal when a title is on Crunchyroll — even for new simulcasts TMDB does not list yet.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crShowProviders" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Calendar: simulcast -->
+      <div class="settings-row" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Sync Crunchyroll simulcast calendar') }}</div>
+          <div class="settings-row-desc">{{ _('Adds the current Crunchyroll simulcast lineup to the calendar. Episode air dates are resolved via TMDB (CineInfo API key required).') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crCalSimulcast" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Calendar: watchlist -->
+      <div class="settings-row" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Sync with my CR Watchlist') }}</div>
+          <div class="settings-row-desc">{{ _('Adds your Crunchyroll watchlist series to the calendar — works even when the general Crunchyroll display is off, as long as a Crunchyroll account is configured. Episode dates come from TMDB (CineInfo API key required).') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crCalWatchlist" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Calendar: custom lists (Crunchylists) -->
+      <div class="settings-row" style="padding-left:44px;">
+        <div class="settings-row-left">
+          <div class="settings-row-label" style="font-size:0.9rem;">{{ _('↳ Sync with my custom lists (Crunchylists)') }}</div>
+          <div class="settings-row-desc">{{ _('Adds the series from your Crunchyroll custom lists (Crunchylists) to the calendar — works even when the general Crunchyroll display is off, as long as a Crunchyroll account is configured. Episode dates come from TMDB (CineInfo API key required).') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="crCalLists" onchange="saveCrunchyrollOptions()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row-desc" id="crCalTmdbHint" style="display:none;padding-left:44px;color:var(--warning)">{{ _('Calendar sync requires a TMDB API key — configure it in CineInfo above.') }}</div>
+      </div>
+      <div class="settings-section">
+      <!-- ── Cache / Info ── -->
+       <div class="integ-subsection-header">
+        <span class="integ-subsection-title">{{ _('Cache Options') }}</span>
+        <span class="integ-subsection-badge" style="background:#f42121;color:#fff;">{{ _('ATTENTION') }}</span>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Clear cache &amp; reload') }}</div>
+          <div class="settings-row-desc">{{ _('Deletes all stored TMDB data and restarts the preloading process. Useful when info is outdated or after an API key change.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <button id="clearCineinfoBtn" onclick="clearCineinfoCache(this)">{{ _('Clear cache') }}</button>
+        </div>
+      </div>
+
+      <div class="settings-hint">
+        {{ _('Metadata is preloaded in the background and cached in the database for 24 h.') }}
+      </div>
+    </div>
+  </div><!-- /tab-cineinfo -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: SyncPlay (native watch-together, own server)
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-syncplay">
+    <div class="settings-section">
+      <h2>SyncPlay <span class="section-badge" style="background:var(--accent);color:#fff;">{{ _('Watch Together') }}</span></h2>
+      <div class="settings-hint integ-hint-border">
+        {{ _('Watch films and series together, perfectly in sync across phone, tablet and PC. Everyone connects to this instance — no third-party server. Invited guests can join via a link without an account.') }}
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable SyncPlay') }}</div>
+          <div class="settings-row-desc">{{ _('Adds a SyncPlay entry to the sidebar and lets you start watch-together rooms.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="spEnabled" onchange="saveSyncplaySettings()" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row" id="spOpenRow" style="display:none;">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Open SyncPlay') }}</div>
+          <div class="settings-row-desc">{{ _('Also appears in the sidebar on the left once enabled.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <a href="/syncplay" class="settings-btn integ-open-btn">{{ _('Open SyncPlay →') }}</a>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-syncplay -->
+
+</div>
+<div id="toast" class="toast"></div>
+<script src="{{ url_for('static', filename='integrations.js') }}"></script>
+{% endblock %}

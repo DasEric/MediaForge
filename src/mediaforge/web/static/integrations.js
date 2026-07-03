@@ -1,0 +1,1199 @@
+// ─── Tab Navigation ────────────────────────────────────────────────────────
+
+function switchIntegTab(name) {
+  document.querySelectorAll("#integTabs .settings-tab").forEach(function (btn) {
+    btn.classList.toggle("active", btn.dataset.tab === name);
+  });
+  document.querySelectorAll(".settings-tab-panel").forEach(function (panel) {
+    panel.classList.toggle("active", panel.id === "tab-" + name);
+  });
+  try {
+    history.replaceState(null, "", "#" + name);
+    localStorage.setItem("integActiveTab", name);
+  } catch (e) {}
+}
+
+(function restoreIntegTab() {
+  var hash = "";
+  try { hash = (window.location.hash || "").replace("#", "").trim(); } catch (e) {}
+  var valid = ["seerr", "mediaplayer", "cineinfo", "syncplay"];
+  var tab = (hash && valid.indexOf(hash) !== -1) ? hash : "";
+  if (!tab) {
+    try { tab = localStorage.getItem("integActiveTab") || "seerr"; } catch (e) { tab = "seerr"; }
+  }
+  if (valid.indexOf(tab) === -1) tab = "seerr";
+  switchIntegTab(tab);
+})();
+
+// ===== Settings Caching Helper =====
+let _combinedSettingsPromise = null;
+function _getSettings() {
+  if (!_combinedSettingsPromise) {
+    _combinedSettingsPromise = (async () => {
+      try {
+        const resp = await fetch("/api/settings");
+        return await resp.json();
+      } catch (e) {
+        console.error("Failed to load settings:", e);
+        return {};
+      }
+    })();
+  }
+  return _combinedSettingsPromise;
+}
+
+// ===== Seerr =====
+async function loadIntegrations() {
+  try {
+    const data = await _getSettings();
+    const el1 = document.getElementById("seerrUrl");
+    const el2 = document.getElementById("seerrApiKey");
+    if (el1) el1.value = data.seerr_url || "";
+    if (el2) el2.value = data.seerr_api_key || "";
+  } catch (e) {
+    showToast(t("Einstellungen konnten nicht geladen werden: ", "Settings could not be loaded: ") + e.message);
+  }
+}
+
+function _seerrIsConfigured() {
+  const url = (document.getElementById("seerrUrl")?.value || "").trim();
+  const key = (document.getElementById("seerrApiKey")?.value || "").trim();
+  return !!(url && key);
+}
+
+async function saveSeerrSettings() {
+  const url = (document.getElementById("seerrUrl")?.value || "").trim();
+  const key = (document.getElementById("seerrApiKey")?.value || "").trim();
+  try {
+    const resp = await fetch("/api/settings/seerr", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seerr_url: url, seerr_api_key: key }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(t("Seerr-Einstellungen gespeichert", "Seerr settings saved"));
+      // Configuration may have changed — re-evaluate the calendar Seerr sub-option
+      window._seerrConfigured = _seerrIsConfigured();
+      if (typeof _applyCalendarSeerrState === "function") _applyCalendarSeerrState();
+    } else {
+      showToast(data.error || "Fehler beim Speichern");
+    }
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message));
+  }
+}
+
+// ===== CineInfo =====
+async function loadCineinfoSettings() {
+  try {
+    const data = await _getSettings();
+    const d = data.cineinfo || {};
+
+    const keyEl = document.getElementById("cineinfoApiKey");
+    const countryEl = document.getElementById("cineinfoCountry");
+    const provEl = document.getElementById("cineinfoShowProviders");
+    const fskEl = document.getElementById("cineinfoShowFsk");
+    const genresEl = document.getElementById("cineinfoShowGenres");
+    const ratingEl = document.getElementById("cineinfoShowRating");
+    const recEl = document.getElementById("cineinfoShowRecommendations");
+    const trailerEl = document.getElementById("cineinfoShowTrailer");
+    const hRatingEl = document.getElementById("cineinfoShowHoverRating");
+    const hGenresEl = document.getElementById("cineinfoShowHoverGenres");
+    const hFskEl = document.getElementById("cineinfoShowHoverFsk");
+    const advancedSearchEl = document.getElementById("cineinfoAdvancedSearch");
+    const calendarEl = document.getElementById("cineinfoCalendar");
+
+    if (keyEl) keyEl.value = d.tmdb_api_key || "";
+    if (countryEl) countryEl.value = d.country || "DE";
+    if (provEl) provEl.checked = d.show_providers !== "0";
+    if (fskEl) fskEl.checked = d.show_fsk !== "0";
+    if (genresEl) genresEl.checked = d.show_genres === "1";
+    if (ratingEl) ratingEl.checked = d.show_rating === "1";
+    if (recEl) recEl.checked = d.show_recommendations !== "0";
+    if (trailerEl) trailerEl.checked = d.show_trailer !== "0";
+    if (hRatingEl) hRatingEl.checked = d.show_hover_rating === "1";
+    if (hGenresEl) hGenresEl.checked = d.show_hover_genres === "1";
+    if (hFskEl) hFskEl.checked = d.show_hover_fsk === "1";
+    if (advancedSearchEl) {
+      advancedSearchEl.checked = d.advanced_search === "1";
+      const sidebarAdvancedSearch = document.getElementById("sidebarAdvancedSearch");
+      if (sidebarAdvancedSearch) {
+        sidebarAdvancedSearch.style.display = d.advanced_search === "1" ? "flex" : "none";
+      }
+    }
+    if (calendarEl) {
+      calendarEl.checked = d.calendar === "1";
+      const sidebarCalendar = document.getElementById("sidebarCalendar");
+      if (sidebarCalendar) {
+        sidebarCalendar.style.display = d.calendar === "1" ? "flex" : "none";
+      }
+    }
+    const calSeerrEl = document.getElementById("cineinfoCalendarSeerr");
+    if (calSeerrEl) calSeerrEl.checked = d.calendar_seerr === "1";
+    const calMediathekEl = document.getElementById("cineinfoCalendarMediathek");
+    if (calMediathekEl) calMediathekEl.checked = d.calendar_mediathek === "1";
+    const calIntervalEl = document.getElementById("cineinfoCalendarRefreshInterval");
+    if (calIntervalEl) calIntervalEl.value = d.calendar_refresh_interval || "24";
+
+    // Remember whether Seerr is configured (server-evaluated) for the gating check
+    window._seerrConfigured = !!data.seerr_configured;
+    _applyCalendarSeerrState();
+  } catch (e) {
+    showToast(t("CineInfo-Einstellungen konnten nicht geladen werden: ", "CineInfo-Settings could not be loaded: ") + e.message);
+  }
+}
+
+// The "Show Seerr requests in calendar" sub-option is only changeable when the
+// calendar is enabled AND a Seerr integration is configured.
+function _applyCalendarSeerrState() {
+  const calEl = document.getElementById("cineinfoCalendar");
+  const subEl = document.getElementById("cineinfoCalendarSeerr");
+  const hint = document.getElementById("cineinfoCalendarSeerrHint");
+  const mediathekEl = document.getElementById("cineinfoCalendarMediathek");
+  const intervalEl = document.getElementById("cineinfoCalendarRefreshInterval");
+
+  const calendarOn = !!(calEl && calEl.checked);
+  if (mediathekEl) mediathekEl.disabled = !calendarOn;
+  if (intervalEl) intervalEl.disabled = !calendarOn;
+
+  if (!subEl) return;
+  const seerrOk = (typeof _seerrIsConfigured === "function" && _seerrIsConfigured()) || !!window._seerrConfigured;
+  const enabled = calendarOn && seerrOk;
+  subEl.disabled = !enabled;
+  if (hint) hint.style.display = enabled ? "none" : "block";
+}
+
+async function saveCineinfoSettings() {
+  const key = (document.getElementById("cineinfoApiKey")?.value || "").trim();
+  const country = (document.getElementById("cineinfoCountry")?.value || "DE");
+  try {
+    const resp = await fetch("/api/settings/cineinfo", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tmdb_api_key: key, country }),
+    });
+    const data = await resp.json();
+    showToast(data.ok ? t("CineInfo gespeichert","CineInfo saved") : (data.error || t("Fehler", "Error")));
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message));
+  }
+}
+
+async function saveCineinfoDisplayOptions() {
+  const show_providers = document.getElementById("cineinfoShowProviders")?.checked ? "1" : "0";
+  const show_fsk = document.getElementById("cineinfoShowFsk")?.checked ? "1" : "0";
+  const show_genres = document.getElementById("cineinfoShowGenres")?.checked ? "1" : "0";
+  const show_rating = document.getElementById("cineinfoShowRating")?.checked ? "1" : "0";
+  const show_recommendations = document.getElementById("cineinfoShowRecommendations")?.checked ? "1" : "0";
+  const show_trailer = document.getElementById("cineinfoShowTrailer")?.checked ? "1" : "0";
+  const show_hover_rating = document.getElementById("cineinfoShowHoverRating")?.checked ? "1" : "0";
+  const show_hover_genres = document.getElementById("cineinfoShowHoverGenres")?.checked ? "1" : "0";
+  const show_hover_fsk = document.getElementById("cineinfoShowHoverFsk")?.checked ? "1" : "0";
+  const advanced_search = document.getElementById("cineinfoAdvancedSearch")?.checked ? "1" : "0";
+  const calendar = document.getElementById("cineinfoCalendar")?.checked ? "1" : "0";
+  // Sub-option: only meaningful when the calendar is on and Seerr is configured
+  const calSeerrEl = document.getElementById("cineinfoCalendarSeerr");
+  const calendar_seerr = (calendar === "1" && calSeerrEl && calSeerrEl.checked && !calSeerrEl.disabled) ? "1" : "0";
+  
+  const calMediathekEl = document.getElementById("cineinfoCalendarMediathek");
+  const calendar_mediathek = (calendar === "1" && calMediathekEl && calMediathekEl.checked) ? "1" : "0";
+  const calIntervalEl = document.getElementById("cineinfoCalendarRefreshInterval");
+  const calendar_refresh_interval = (calIntervalEl && calIntervalEl.value) || "24";
+
+  // Instantly toggle sidebar menu link visibility
+  const sidebarAdvancedSearch = document.getElementById("sidebarAdvancedSearch");
+  if (sidebarAdvancedSearch) {
+    sidebarAdvancedSearch.style.display = advanced_search === "1" ? "flex" : "none";
+  }
+  const sidebarCalendar = document.getElementById("sidebarCalendar");
+  if (sidebarCalendar) {
+    sidebarCalendar.style.display = calendar === "1" ? "flex" : "none";
+  }
+  // Re-evaluate the sub-option's enabled state (e.g. calendar was just toggled)
+  _applyCalendarSeerrState();
+
+  try {
+    await fetch("/api/settings/cineinfo", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        show_providers, show_fsk, show_genres, show_rating, show_recommendations, show_trailer,
+        show_hover_rating, show_hover_genres, show_hover_fsk, advanced_search, calendar,
+        calendar_seerr, calendar_mediathek, calendar_refresh_interval
+      }),
+    });
+  } catch (e) { /* silent */ }
+}
+
+// ===== CineInfo Cache =====
+async function clearCineinfoCache(btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t("Wird geleert…", "Clearing…");
+  }
+  try {
+    const resp = await fetch("/api/tmdb/cache/clear", { method: "POST" });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(t("Cache geleert — TMDB-Daten werden im Hintergrund neu geladen", "Cache cleared — TMDB data will be reloaded in the background"));
+    } else {
+      showToast(t("Fehler beim Leeren des Caches", "Error clearing cache"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message), "error");
+  } finally {
+    if (btn) {
+      // Re-enable after a short delay so the user sees feedback
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = t("Cache leeren", "Clear cache");
+      }, 2000);
+    }
+  }
+}
+
+// ===== Crunchyroll =====
+async function loadCrunchyrollSettings() {
+  try {
+    const data = await _getSettings();
+    const d = data.crunchyroll || {};
+    window.__tmdbKeySet = !!(data.cineinfo && data.cineinfo.tmdb_api_key);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    const chk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v; };
+
+    chk("crEnabled", d.enabled === "1");
+    set("crEmail", d.email || "");
+    set("crLocale", d.locale || "de-DE");
+    chk("crAnon", d.anon === "1");
+    chk("crShowProviders", d.show_providers !== "0");
+    chk("crCalSimulcast", d.calendar_simulcast === "1");
+    chk("crCalWatchlist", d.calendar_watchlist === "1");
+    chk("crCalLists", d.calendar_lists === "1");
+    window.__crProfileId = d.profile_id || "";
+    // Real (non-anon) account configured? Lets the watchlist/list calendar
+    // toggles stay usable even when the master display toggle is off.
+    window.__crHasAccount = !!((d.email || "") && d.has_password);
+
+    // Password is never returned; only show whether one is stored.
+    const pw = document.getElementById("crPassword");
+    if (pw) {
+      pw.value = "";
+      pw.placeholder = d.has_password
+        ? t("•••••••• (gespeichert)", "•••••••• (saved)")
+        : t("Wird verschlüsselt gespeichert", "Stored encrypted");
+    }
+    _applyCrunchyrollState();
+    // Populate the profile selector if we have an account login configured.
+    if (d.enabled === "1" && d.anon !== "1" && (d.email || "")) {
+      _loadCrProfiles(window.__crProfileId);
+    }
+  } catch (e) {
+    showToast(t("Crunchyroll-Einstellungen konnten nicht geladen werden: ", "Crunchyroll settings could not be loaded: ") + e.message);
+  }
+}
+
+// Fill the profile dropdown from the account; called on load and after a test.
+async function _loadCrProfiles(selectedId) {
+  try {
+    const resp = await fetch("/api/settings/crunchyroll/profiles");
+    const d = await resp.json();
+    _populateCrProfiles(d.profiles || [], selectedId);
+  } catch (e) { /* silent */ }
+}
+
+function _populateCrProfiles(profiles, selectedId) {
+  const sel = document.getElementById("crProfile");
+  const row = document.getElementById("crProfileRow");
+  if (!sel || !row) return;
+  if (!profiles.length) { row.style.display = "none"; return; }
+  const want = selectedId || window.__crProfileId || "";
+  sel.innerHTML = "";
+  profiles.forEach(function (p) {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = p.name + (p.is_primary ? " " + t("(Haupt)", "(primary)") : "");
+    if (p.id === want) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  window.__crProfileId = sel.value;
+  const anon = !!document.getElementById("crAnon")?.checked;
+  const enabled = !!document.getElementById("crEnabled")?.checked;
+  row.style.display = (enabled && !anon) ? "flex" : "none";
+}
+
+// Enable/disable Crunchyroll inputs depending on the master + anonymous toggles.
+function _applyCrunchyrollState() {
+  const enabled = !!document.getElementById("crEnabled")?.checked;
+  const anon = !!document.getElementById("crAnon")?.checked;
+  ["crEmail", "crPassword", "crLocale", "crAnon", "crShowProviders",
+   "crCalSimulcast", "crTestBtn"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !enabled;
+  });
+  // Account-only inputs are pointless in anonymous mode.
+  ["crEmail", "crPassword", "crProfile"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el && enabled) el.disabled = anon;
+  });
+  const profileRow = document.getElementById("crProfileRow");
+  if (profileRow && (!enabled || anon)) profileRow.style.display = "none";
+
+  // Calendar sync needs TMDB (CineInfo) for the episode dates.
+  const tmdbOk = !!window.__tmdbKeySet;
+  // Simulcast sync is tied to the master Crunchyroll display toggle.
+  const simEl = document.getElementById("crCalSimulcast");
+  if (simEl) simEl.disabled = !enabled || !tmdbOk;
+  // Watchlist & custom-list sync are personal-account features: they work even
+  // with the master display toggle off, as long as a real (non-anonymous)
+  // account is configured and TMDB is set.
+  const hasAccount = !!window.__crHasAccount;
+  ["crCalWatchlist", "crCalLists"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !tmdbOk || anon || (!enabled && !hasAccount);
+  });
+  const hint = document.getElementById("crCalTmdbHint");
+  if (hint) hint.style.display = ((enabled || hasAccount) && !tmdbOk) ? "block" : "none";
+}
+
+async function saveCrunchyrollSettings() {
+  const email = (document.getElementById("crEmail")?.value || "").trim();
+  const locale = (document.getElementById("crLocale")?.value || "de-DE");
+  const pwEl = document.getElementById("crPassword");
+  const password = (pwEl?.value || "").trim();
+  const body = { email, locale };
+  if (password) body.password = password;     // only send when actually typed
+  try {
+    const resp = await fetch("/api/settings/crunchyroll", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(t("Crunchyroll gespeichert", "Crunchyroll saved"));
+      if (pwEl && password) {
+        pwEl.value = "";
+        pwEl.placeholder = t("•••••••• (gespeichert)", "•••••••• (saved)");
+      }
+    } else {
+      showToast(data.error || t("Fehler", "Error"));
+    }
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message));
+  }
+}
+
+// Persist the toggle-style options (and the locale) immediately on change.
+async function saveCrunchyrollOptions() {
+  _applyCrunchyrollState();
+  const body = {
+    enabled:            document.getElementById("crEnabled")?.checked ? "1" : "0",
+    anon:               document.getElementById("crAnon")?.checked ? "1" : "0",
+    show_providers:     document.getElementById("crShowProviders")?.checked ? "1" : "0",
+    calendar_simulcast: document.getElementById("crCalSimulcast")?.checked ? "1" : "0",
+    calendar_watchlist: document.getElementById("crCalWatchlist")?.checked ? "1" : "0",
+    calendar_lists: document.getElementById("crCalLists")?.checked ? "1" : "0",
+    locale:             document.getElementById("crLocale")?.value || "de-DE",
+    profile_id:         document.getElementById("crProfile")?.value || "",
+  };
+  window.__crProfileId = body.profile_id;
+  try {
+    await fetch("/api/settings/crunchyroll", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) { /* silent */ }
+}
+
+async function testCrunchyroll(btn) {
+  const result = document.getElementById("crTestResult");
+  if (btn) { btn.disabled = true; btn.textContent = t("Teste…", "Testing…"); }
+  const body = {
+    email:    (document.getElementById("crEmail")?.value || "").trim(),
+    locale:   document.getElementById("crLocale")?.value || "de-DE",
+    anon:     document.getElementById("crAnon")?.checked ? "1" : "0",
+  };
+  body.profile_id = document.getElementById("crProfile")?.value || window.__crProfileId || "";
+  const pw = (document.getElementById("crPassword")?.value || "").trim();
+  if (pw) body.password = pw;
+  try {
+    const resp = await fetch("/api/settings/crunchyroll/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await resp.json();
+    if (result) {
+      result.style.display = "block";
+      if (d.ok) {
+        let msg = d.mode === "anonymous"
+          ? t("✓ Anonyme Verbindung erfolgreich", "✓ Anonymous connection successful")
+          : t("✓ Angemeldet", "✓ Logged in");
+        if (d.profile) msg += " · " + d.profile;
+        if (d.mode === "account") msg += d.premium
+          ? " · " + t("Premium aktiv", "Premium active")
+          : " · " + t("kein Premium", "no Premium");
+        result.textContent = msg;
+        result.style.color = "var(--success, #2ecc71)";
+        // Bottom toast, like other settings actions.
+        showToast(msg, "success");
+        // Populate the profile selector with the freshly returned profiles.
+        if (Array.isArray(d.profiles) && d.profiles.length) {
+          _populateCrProfiles(d.profiles, d.profile_id || window.__crProfileId);
+        }
+      } else {
+        const map = {
+          login_failed: t("✗ Login fehlgeschlagen — Zugangsdaten prüfen", "✗ Login failed — check credentials"),
+          missing_credentials: t("✗ Bitte E-Mail und Passwort angeben", "✗ Please enter email and password"),
+          cloudflare: t("✗ Von Cloudflare blockiert — später erneut versuchen", "✗ Blocked by Cloudflare — try again later"),
+          library_unavailable: t("✗ Crunchyroll-Bibliothek nicht verfügbar", "✗ Crunchyroll library unavailable"),
+        };
+        const errMsg = map[d.error] || t("✗ Verbindung fehlgeschlagen", "✗ Connection failed");
+        result.textContent = errMsg;
+        result.style.color = "var(--danger, #e74c3c)";
+        showToast(errMsg, "error");
+      }
+    }
+  } catch (e) {
+    if (result) {
+      result.style.display = "block";
+      result.textContent = t("✗ Fehler: " + e.message, "✗ Error: " + e.message);
+      result.style.color = "var(--danger, #e74c3c)";
+    }
+  } finally {
+    if (btn) {
+      setTimeout(() => { btn.disabled = false; btn.textContent = t("Verbindung testen", "Test connection"); _applyCrunchyrollState(); }, 300);
+    }
+  }
+}
+
+// ===== Toast =====
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.className = "toast" + (type ? " toast-" + type : "");
+  t.style.display = "";
+  t.classList.remove("show");
+  void t.offsetWidth;
+  t.classList.add("show");
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+// ===== SyncPlay =====
+async function loadSyncplaySettings() {
+  try {
+    const data = await _getSettings();
+    const en = document.getElementById("spEnabled");
+    if (en) en.checked = data.syncplay_enabled === "1";
+    _applySyncplayState();
+  } catch (e) {}
+}
+
+function _applySyncplayState() {
+  const on = !!document.getElementById("spEnabled")?.checked;
+  const row = document.getElementById("spOpenRow");
+  if (row) row.style.display = on ? "" : "none";
+}
+
+async function saveSyncplaySettings() {
+  const on = !!document.getElementById("spEnabled")?.checked;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ syncplay_enabled: on }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    _applySyncplayState();
+    // Reload so the sidebar SyncPlay entry appears/disappears immediately.
+    setTimeout(function () { location.reload(); }, 250);
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message);
+  }
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  loadIntegrations();
+  loadSyncplaySettings();
+  loadCineinfoSettings();
+  loadCrunchyrollSettings();
+  loadMediaplayerSettings();
+  loadMediascanSettings();
+});
+
+
+// ===== Mediaplayer (Jellyfin / Plex) =====
+async function loadMediaplayerSettings() {
+  try {
+    const r = await fetch("/api/settings/mediaplayer");
+    const d = await r.json();
+    const typeEl = document.getElementById("mediaplayerType");
+    if (typeEl) typeEl.value = d.type || "";
+
+    // Jellyfin fields
+    const jfUrl = document.getElementById("mediaplayerUrl");
+    const jfKey = document.getElementById("mediaplayerApikey");
+    const jfSsl = document.getElementById("mediaplayerSsl");
+    if (jfUrl) jfUrl.value = _stripScheme(d.url || "");
+    if (jfKey) jfKey.value = d.apikey || "";
+    if (jfSsl) jfSsl.checked = (d.url || "").startsWith("https://");
+
+    // Plex fields
+    const plexUrl = document.getElementById("mediaplayerPlexUrl");
+    const plexSect = document.getElementById("mediaplayerPlexSectionId");
+    const plexSsl = document.getElementById("mediaplayerPlexSsl");
+    if (plexUrl) plexUrl.value = _stripScheme(d.plex_url || "");
+    if (plexSect) plexSect.value = d.plex_section || "";
+    if (plexSsl) plexSsl.checked = (d.plex_url || "").startsWith("https://");
+
+    // Plex token badge
+    _updatePlexTokenBadge(d.has_token, d.apikey);
+
+    onMediaplayerTypeChange();
+
+    // If Plex is configured with a token, pre-load libraries and restore selection
+    if (d.type === "plex" && d.has_token) {
+      // Store saved ID on select element so loadPlexLibraries can restore it
+      const libSel = document.getElementById("mediaplayerPlexSectionId");
+      if (libSel) libSel.dataset.saved = d.plex_section || "";
+      loadPlexLibraries(d.plex_section || "");
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function _updatePlexTokenBadge(hasToken, token) {
+  const badge = document.getElementById("plexTokenBadge");
+  if (!badge) return;
+  if (hasToken && token) {
+    const masked = token.slice(0, 4) + "••••" + token.slice(-4);
+    badge.textContent = t("✓ Token gespeichert ","✓ Token saved ") + "(" + masked + ")";
+    badge.style.background = "rgba(34,197,94,.12)";
+    badge.style.color = "#4ade80";
+    badge.style.border = "1px solid rgba(34,197,94,.3)";
+  } else {
+    badge.textContent = t("Kein Token gespeichert", "No token saved");
+    badge.style.background = "rgba(148,163,184,.12)";
+    badge.style.color = "var(--text-secondary)";
+    badge.style.border = "1px solid var(--border)";
+  }
+}
+
+function onMediaplayerTypeChange() {
+  const svc = (document.getElementById("mediaplayerType")?.value || "");
+  const jfFields = document.getElementById("mediaplayerJellyfinFields");
+  const plexFields = document.getElementById("mediaplayerPlexFields");
+  if (jfFields) jfFields.style.display = svc === "jellyfin" ? "block" : "none";
+  if (plexFields) plexFields.style.display = svc === "plex" ? "block" : "none";
+}
+
+
+function _normalizeUrl(raw, useSSL) {
+  raw = (raw || "").trim().replace(/\/+$/, "");
+  // Strip any existing scheme first
+  raw = raw.replace(/^https?:\/\//i, "");
+  if (!raw) return "";
+  return (useSSL ? "https://" : "http://") + raw;
+}
+
+// Strip scheme for display in the input field
+function _stripScheme(url) {
+  return (url || "").replace(/^https?:\/\//i, "");
+}
+
+async function saveMediaplayerSettings() {
+  const svc = document.getElementById("mediaplayerType")?.value || "";
+  const body = { type: svc };
+
+  if (svc === "jellyfin") {
+    const jfSslOn = document.getElementById("mediaplayerSsl")?.checked || false;
+    body.url = _normalizeUrl(document.getElementById("mediaplayerUrl")?.value || "", jfSslOn);
+    body.apikey = document.getElementById("mediaplayerApikey")?.value || "";
+  } else if (svc === "plex") {
+    const plexSslOn = document.getElementById("mediaplayerPlexSsl")?.checked || false;
+    body.plex_url = _normalizeUrl(document.getElementById("mediaplayerPlexUrl")?.value || "", plexSslOn);
+    const libSel = document.getElementById("mediaplayerPlexSectionId");
+    body.plex_section = libSel ? libSel.value : "";
+    // token is already saved by the OAuth poll – don't overwrite with empty
+    const hiddenKey = document.getElementById("mediaplayerPlexApikey");
+    if (hiddenKey && hiddenKey.value) body.apikey = hiddenKey.value;
+  }
+
+  try {
+    const r = await fetch("/api/settings/mediaplayer", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) showToast(t("Mediaplayer-Einstellungen gespeichert", "Mediaplayer settings saved"));
+    else showToast(d.error || t("Fehler beim Speichern", "Error saving"));
+  } catch (e) { showToast(t("Fehler: " + e.message, "Error: " + e.message)); }
+}
+
+// ── Plex OAuth popup ────────────────────────────────────────────────────────
+let _plexPollInterval = null;
+
+async function startPlexOAuth() {
+  const btn = document.getElementById("plexLoginBtn");
+  const status = document.getElementById("plexOAuthStatus");
+  if (btn) btn.disabled = true;
+  if (status) { status.style.display = "inline"; status.textContent = t("Verbinde mit Plex…", "Connecting to Plex…"); }
+
+  try {
+    // Step 1: create pin via backend proxy
+    const r = await fetch("/api/settings/mediaplayer/plex-pin", { method: "POST" });
+    const d = await r.json();
+    if (!d.ok) { _plexOAuthError(d.error || t("Pin-Erstellung fehlgeschlagen", "Pin creation failed")); return; }
+
+    // Step 2: open auth popup
+    const popup = window.open(d.auth_url, "plex_auth",
+      "width=800,height=700,scrollbars=yes,resizable=yes");
+    if (!popup) { _plexOAuthError(t("Popup wurde blockiert – bitte Popup-Blocker deaktivieren", "Popup blocked - please disable popup blocker")); return; }
+
+    if (status) status.textContent = t("Warte auf Plex-Login…", "Waiting for Plex login…");
+
+    // Step 3: poll backend for token
+    let attempts = 0;
+    _plexPollInterval = setInterval(async () => {
+      attempts++;
+      if (attempts > 60) {   // 2 min timeout
+        clearInterval(_plexPollInterval);
+        _plexOAuthError(t("Timeout – bitte erneut versuchen", "Timeout - please try again"));
+        if (!popup.closed) popup.close();
+        if (btn) btn.disabled = false;
+        return;
+      }
+      try {
+        const pr = await fetch("/api/settings/mediaplayer/plex-pin/" + d.id);
+        const pd = await pr.json();
+        if (pd.ok && pd.authorized && pd.token) {
+          clearInterval(_plexPollInterval);
+          if (!popup.closed) popup.close();
+          // Store token in hidden field + update badge
+          const hiddenKey = document.getElementById("mediaplayerPlexApikey");
+          if (hiddenKey) hiddenKey.value = pd.token;
+          _updatePlexTokenBadge(true, pd.token);
+          if (status) { status.style.display = "none"; }
+          if (btn) btn.disabled = false;
+          showToast(t("\u2713 Plex-Anmeldung erfolgreich!", "\u2713 Plex login successful!"));
+          // Auto-save then load libraries
+          await saveMediaplayerSettings();
+          await loadPlexLibraries();
+        }
+      } catch (_) { }
+    }, 2000);
+
+  } catch (e) {
+    _plexOAuthError(e.message);
+  }
+}
+
+function _plexOAuthError(msg) {
+  if (_plexPollInterval) { clearInterval(_plexPollInterval); _plexPollInterval = null; }
+  const btn = document.getElementById("plexLoginBtn");
+  const status = document.getElementById("plexOAuthStatus");
+  if (btn) btn.disabled = false;
+  if (status) { status.style.display = "inline"; status.style.color = "#f87171"; status.textContent = "\u2717 " + msg; }
+}
+
+
+// ── SSL toggle ↔ URL input sync ─────────────────────────────────────────────
+function onJfSslToggle() {
+  // Just visual feedback – actual scheme applied on save
+  const url = document.getElementById("mediaplayerUrl");
+  if (url) url.placeholder = document.getElementById("mediaplayerSsl")?.checked
+    ? "192.168.1.100:8096  (https)"
+    : "192.168.1.100:8096";
+}
+function onPlexSslToggle() {
+  const url = document.getElementById("mediaplayerPlexUrl");
+  if (url) url.placeholder = document.getElementById("mediaplayerPlexSsl")?.checked
+    ? "192.168.1.100:32400  (https)"
+    : "192.168.1.100:32400";
+}
+// Auto-detect scheme if user pastes a full URL with http(s)://
+function onJfUrlInput() {
+  const url = document.getElementById("mediaplayerUrl");
+  const ssl = document.getElementById("mediaplayerSsl");
+  if (!url || !ssl) return;
+  if (/^https:\/\//i.test(url.value)) { ssl.checked = true; url.value = url.value.replace(/^https:\/\//i, ""); }
+  else if (/^http:\/\//i.test(url.value)) { ssl.checked = false; url.value = url.value.replace(/^http:\/\//i, ""); }
+}
+function onPlexUrlInput() {
+  const url = document.getElementById("mediaplayerPlexUrl");
+  const ssl = document.getElementById("mediaplayerPlexSsl");
+  if (!url || !ssl) return;
+  if (/^https:\/\//i.test(url.value)) { ssl.checked = true; url.value = url.value.replace(/^https:\/\//i, ""); }
+  else if (/^http:\/\//i.test(url.value)) { ssl.checked = false; url.value = url.value.replace(/^http:\/\//i, ""); }
+}
+// ── Plex library loader ────────────────────────────────────────────────────
+async function loadPlexLibraries(selectedId) {
+  const sel = document.getElementById("mediaplayerPlexSectionId");
+  const btn = document.getElementById("plexLibLoadBtn");
+  if (!sel) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+
+  try {
+    const r = await fetch("/api/settings/mediaplayer/plex-libraries");
+    const d = await r.json();
+
+    // Keep "Alle scannen" as first option
+    while (sel.options.length > 1) sel.remove(1);
+
+    if (d.ok && d.libraries && d.libraries.length) {
+      d.libraries.forEach(lib => {
+        const o = document.createElement("option");
+        o.value = lib.id;
+        o.textContent = lib.title + (lib.type ? "  (" + lib.type + ")" : "");
+        sel.appendChild(o);
+      });
+      // Restore saved selection
+      const saved = selectedId !== undefined ? selectedId : sel.dataset.saved || "";
+      if (saved) sel.value = saved;
+    } else if (!d.ok) {
+      showToast(t("Bibliotheken: " + (d.error || "Fehler"), "Libraries: " + (d.error || "Error")));
+    }
+  } catch (e) {
+    showToast(t("Bibliotheken konnten nicht geladen werden", "Libraries could not be loaded"));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "↻ Laden"; }
+  }
+}
+
+// ── Connection test ─────────────────────────────────────────────────────────
+async function triggerMediaScan() {
+  const btns = ["mediaplayerScanBtn", "mediaplayerScanBtn2"]
+    .map(id => document.getElementById(id)).filter(Boolean);
+  const toast = msg => { if (typeof showToast === "function") showToast(msg); };
+  const setBtns = label => btns.forEach(b => { b.textContent = label; });
+  const TIMEOUT_MS = 10 * 60 * 1000; // 10 min max
+  const POLL_MS = 2000;
+  const NO_SCAN_MAX = 5 * 60 * 1000; // if never seen scanning=true after 5 min, warn
+
+  btns.forEach(b => b.disabled = true);
+  setBtns("Wird ausgelöst…");
+
+  // 1. Trigger scan
+  try {
+    const r = await fetch("/api/settings/mediaplayer/scan", { method: "POST" });
+    const d = await r.json();
+    if (!d.ok) {
+      toast("✗ " + (d.error || t("Fehler beim Auslösen", "Error triggering scan")));
+      btns.forEach(b => b.disabled = false);
+      setBtns(t("Mediascan testen", "Test media scan"));
+      return;
+    }
+    console.debug(t("[MediaScan] Scan ausgelöst:","[MediaScan] Scan triggered:") + d.message);
+  } catch (e) {
+    toast("✗ " + e.message);
+    btns.forEach(b => b.disabled = false);
+    setBtns(t("Mediascan testen", "Test media scan"));
+    return;
+  }
+
+  // 2. Poll until server reports scanning=true (started), then scanning=false (done)
+  setBtns(t("Scan läuft…", "Scan running…"));
+  const deadline = Date.now() + TIMEOUT_MS;
+  const noScanLimit = Date.now() + NO_SCAN_MAX;
+  let seenScanning = false;
+
+  const poll = async () => {
+    if (Date.now() > deadline) {
+      console.warn(t("[MediaScan] Timeout nach 10 min", "[MediaScan] Timeout after 10 min"));
+      toast(t("⚠ Scan-Timeout – möglicherweise läuft er noch im Hintergrund", "⚠ Scan timeout – it may still be running in the background"));
+      btns.forEach(b => b.disabled = false);
+      setBtns(t("Mediascan testen", "Test media scan"));
+      return;
+    }
+    try {
+      const r = await fetch("/api/settings/mediaplayer/scan-status");
+      const d = await r.json();
+      console.debug(t("[MediaScan] Status:","[MediaScan] Status:"), d);
+      if (d.scanning) {
+        seenScanning = true;
+        setTimeout(poll, POLL_MS);
+      } else if (seenScanning) {
+        console.debug(t("[MediaScan] Abgeschlossen", "[MediaScan] Completed"));
+        toast(t("✓ Mediascan abgeschlossen", "✓ Media scan completed"));
+        btns.forEach(b => b.disabled = false);
+        setBtns(t("Mediascan testen", "Test media scan"));
+      } else if (Date.now() > noScanLimit) {
+        // Never saw scanning=true after 20s — something may be wrong
+        console.warn(t("[MediaScan] Kein Scan erkannt nach 20s – prüfe Plex/Jellyfin manuell", "[MediaScan] No scan detected after 20s - check Plex/Jellyfin manually"));
+        toast(t("⚠ Kein aktiver Scan erkannt – prüfe ob Plex/Jellyfin scant", "⚠ No active scan detected - check if Plex/Jellyfin is scanning"));
+        btns.forEach(b => b.disabled = false);
+        setBtns(t("Mediascan testen", "Test media scan"));
+      } else {
+        // Not scanning yet — give it more time to start
+        setTimeout(poll, POLL_MS);
+      }
+    } catch (e) {
+      console.warn(t("[MediaScan] Poll-Fehler:","[MediaScan] Poll-Error:"), e.message);
+      setTimeout(poll, POLL_MS);
+    }
+  };
+
+  setTimeout(poll, 1500); // short delay to let server start the scan
+}
+
+
+async function testMediaplayerConnection() {
+  const svc = document.getElementById("mediaplayerType")?.value || "";
+  const resultId = svc === "plex" ? "mediaplayerTestResult2" : "mediaplayerTestResult";
+  const btnId = svc === "plex" ? "mediaplayerTestBtn2" : "mediaplayerTestBtn";
+  const btn = document.getElementById(btnId);
+  const result = document.getElementById(resultId);
+  if (btn) btn.disabled = true;
+  if (result) { result.style.display = "none"; result.textContent = ""; }
+  try {
+    await saveMediaplayerSettings();
+    const r = await fetch("/api/settings/mediaplayer/test", { method: "POST" });
+    const d = await r.json();
+    if (result) {
+      result.style.display = "block";
+      result.style.background = d.ok ? "rgba(34,197,94,.12)" : "rgba(239,68,68,.12)";
+      result.style.color = d.ok ? "#4ade80" : "#f87171";
+      result.style.border = "1px solid " + (d.ok ? "rgba(34,197,94,.3)" : "rgba(239,68,68,.3)");
+      result.textContent = d.ok
+        ? t("\u2713 Verbunden mit: " + (d.name || "Server"), "\u2713 Connected to: " + (d.name || "Server"))
+        : t("\u2717 " + (d.error || "Verbindung fehlgeschlagen"), "\u2717 " + (d.error || "Connection failed"));
+    }
+  } catch (e) {
+    if (result) {
+      result.style.display = "block";
+      result.style.color = "#f87171";
+      result.textContent = "\u2717 " + e.message;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+
+// ===== MediaScan =====
+
+let _mediascanPollTimer  = null;
+async function loadMediascanSettings() {
+  try {
+    const resp = await fetch("/api/settings/mediascan");
+    const d    = await resp.json();
+
+    const enabledEl = document.getElementById("mediascanEnabled");
+    const sourceEl  = document.getElementById("mediascanSource");
+    if (enabledEl) enabledEl.checked = !!d.enabled;
+    if (sourceEl && d.source) sourceEl.value = d.source;
+
+    // Jellyfin fields
+    const jfUrl    = document.getElementById("mediascanJfUrl");
+    const jfKey    = document.getElementById("mediascanJfApikey");
+    const jfSsl    = document.getElementById("mediascanJfSsl");
+    if (jfUrl) jfUrl.value     = d.jf_url    || "";
+    if (jfKey) jfKey.value     = d.jf_apikey || "";
+    if (jfSsl) jfSsl.checked   = !!d.jf_ssl;
+
+    // Plex fields
+    const plexUrl  = document.getElementById("mediascanPlexUrl");
+    const plexSsl  = document.getElementById("mediascanPlexSsl");
+    const plexSect = document.getElementById("mediascanPlexSection");
+    if (plexUrl)  plexUrl.value  = d.plex_url     || "";
+    if (plexSsl)  plexSsl.checked = !!d.plex_ssl;
+    if (plexSect) plexSect.dataset.saved = d.plex_section || "";
+
+    _updateMsPlexTokenBadge(d.has_plex_token, d.plex_token_masked);
+    _applyMediascanUI(d);
+    _updateMediascanStatusUI(d);
+
+    // Restore Plex library list if token present
+    if (d.source === "plex" && d.has_plex_token) loadMsPlexLibraries(d.plex_section || "");
+
+    // If a scan is running (started before user navigated away) keep polling
+    if (d.scan_running) _startMediascanPoll();
+  } catch (e) { /* best-effort */ }
+}
+
+function _updateMsPlexTokenBadge(hasToken, masked) {
+  const badge = document.getElementById("msPlexTokenBadge");
+  if (!badge) return;
+  if (hasToken) {
+    badge.textContent = t("✓ Token gespeichert (" + (masked || "••••") + ")", "✓ Token saved (" + (masked || "••••") + ")");
+    badge.style.background = "rgba(34,197,94,.12)";
+    badge.style.color = "#4ade80";
+    badge.style.border = "1px solid rgba(34,197,94,.3)";
+  } else {
+    badge.textContent = t("Kein Token gespeichert", "No token saved");
+    badge.style.background = "rgba(148,163,184,.12)";
+    badge.style.color = "var(--text-secondary)";
+    badge.style.border = "1px solid var(--border)";
+  }
+}
+
+function onMediascanToggle() {
+  const en = document.getElementById("mediascanEnabled")?.checked;
+  const fields = document.getElementById("mediascanFields");
+  if (fields) fields.style.display = en ? "block" : "none";
+  saveMediascanSettings();
+}
+
+function onMediascanSourceChange() {
+  const source = document.getElementById("mediascanSource")?.value || "";
+  document.getElementById("mediascanJellyfinFields").style.display = source === "jellyfin" ? "block" : "none";
+  document.getElementById("mediascanPlexFields").style.display     = source === "plex"     ? "block" : "none";
+  saveMediascanSettings();
+}
+
+function _applyMediascanUI(d) {
+  const en     = !!d.enabled;
+  const source = d.source || "";
+  const fields = document.getElementById("mediascanFields");
+  if (fields) fields.style.display = en ? "block" : "none";
+
+  // Show/hide source-specific fields
+  const jfF   = document.getElementById("mediascanJellyfinFields");
+  const plexF = document.getElementById("mediascanPlexFields");
+  if (jfF)   jfF.style.display   = source === "jellyfin" ? "block" : "none";
+  if (plexF) plexF.style.display = source === "plex"     ? "block" : "none";
+
+  // TMDB warning
+  const warn = document.getElementById("mediascanNoTmdbWarn");
+  if (warn) warn.style.display = en && source && source !== "folders" && !d.has_tmdb ? "block" : "none";
+
+  // Status card
+  const card = document.getElementById("mediascanStatusCard");
+  if (card) card.style.display = en && source && source !== "folders" ? "block" : "none";
+}
+
+function _formatRelTime(ts) {
+  if (!ts) return "—";
+  const diff = Math.round((Date.now() / 1000) - ts);
+  if (diff < 60)  return "Gerade eben";
+  if (diff < 3600) return `vor ${Math.round(diff/60)} Min.`;
+  if (diff < 86400) return `vor ${Math.round(diff/3600)} Std.`;
+  return `vor ${Math.round(diff/86400)} Tag(en)`;
+}
+
+function _updateMediascanStatusUI(d) {
+  const lastEl   = document.getElementById("mediascanLastUpdated");
+  const countEl  = document.getElementById("mediascanCount");
+  const statusEl = document.getElementById("mediascanScanStatus");
+  const progWrap = document.getElementById("mediascanProgressWrap");
+  const progBar  = document.getElementById("mediascanProgressBar");
+  const progText = document.getElementById("mediascanProgressText");
+  const progPct  = document.getElementById("mediascanProgressPct");
+  const refreshBtn = document.getElementById("mediascanRefreshBtn");
+
+  if (lastEl)  lastEl.textContent  = _formatRelTime(d.last_updated || d.scan_finished);
+  if (countEl) countEl.textContent = d.cached_count !== undefined ? `${d.cached_count} ${t("Einträge", "Entries")}` : (d.count ? `${d.count} ${t("Einträge", "Entries")}` : "—");
+
+  if (d.scan_running || d.running) {
+    // Show progress
+    if (progWrap) progWrap.style.display = "block";
+    if (statusEl) statusEl.textContent = t("Scan läuft…", "Scan running…");
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = t("Scan läuft…", "Scan running…"); }
+
+    const total = d.scan_total || d.total || 0;
+    const done  = d.scan_count || d.count || 0;
+    if (total > 0) {
+      const pct = Math.min(100, Math.round((done / total) * 100));
+      if (progBar) { progBar.classList.remove("indeterminate"); progBar.style.width = pct + "%"; }
+      if (progText) progText.textContent = `${done} / ${total} ${t("Einträge", "Entries")}`;
+      if (progPct)  progPct.textContent  = pct + "%";
+    } else {
+      if (progBar) { progBar.classList.add("indeterminate"); progBar.style.width = "40%"; }
+      if (progText) progText.textContent = t("Scan läuft…", "Scan running…");
+      if (progPct)  progPct.textContent  = "";
+    }
+  } else {
+    // Scan idle
+    if (progWrap) progWrap.style.display = "none";
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = t("↻ Mediathek jetzt aktualisieren", "↻ Update library now"); }
+
+    if (d.scan_error || d.error) {
+      if (statusEl) {
+        statusEl.textContent = t("Fehler", "Error");
+        statusEl.style.color = "#f87171";
+      }
+    } else if (d.scan_finished || d.finished_at) {
+      if (statusEl) {
+        statusEl.textContent = t("Bereit", "Ready");
+        statusEl.style.color = "#4ade80";
+      }
+    } else {
+      if (statusEl) { statusEl.textContent = t("Noch kein Scan", "No scan yet"); statusEl.style.color = ""; }
+    }
+  }
+}
+
+// ── URL input helpers ─────────────────────────────────────────────────────
+function onMsJfUrlInput() {
+  const url = document.getElementById("mediascanJfUrl");
+  const ssl = document.getElementById("mediascanJfSsl");
+  if (!url || !ssl) return;
+  if (/^https:\/\//i.test(url.value)) { ssl.checked = true;  url.value = url.value.replace(/^https:\/\//i, ""); }
+  else if (/^http:\/\//i.test(url.value)) { ssl.checked = false; url.value = url.value.replace(/^http:\/\//i, ""); }
+}
+function onMsPlexUrlInput() {
+  const url = document.getElementById("mediascanPlexUrl");
+  const ssl = document.getElementById("mediascanPlexSsl");
+  if (!url || !ssl) return;
+  if (/^https:\/\//i.test(url.value)) { ssl.checked = true;  url.value = url.value.replace(/^https:\/\//i, ""); }
+  else if (/^http:\/\//i.test(url.value)) { ssl.checked = false; url.value = url.value.replace(/^http:\/\//i, ""); }
+}
+
+async function saveMediascanSettings() {
+  const enabled = document.getElementById("mediascanEnabled")?.checked || false;
+  const source  = document.getElementById("mediascanSource")?.value    || "";
+  const body = { enabled, source };
+
+  if (source === "jellyfin") {
+    body.jf_url    = document.getElementById("mediascanJfUrl")?.value    || "";
+    body.jf_apikey = document.getElementById("mediascanJfApikey")?.value || "";
+    body.jf_ssl    = document.getElementById("mediascanJfSsl")?.checked  || false;
+  } else if (source === "plex") {
+    body.plex_url     = document.getElementById("mediascanPlexUrl")?.value || "";
+    body.plex_ssl     = document.getElementById("mediascanPlexSsl")?.checked || false;
+    const sect = document.getElementById("mediascanPlexSection");
+    body.plex_section = sect ? sect.value : "";
+  }
+
+  try {
+    const r = await fetch("/api/settings/mediascan", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) showToast(t("MediaScan gespeichert", "MediaScan saved"));
+    else showToast(d.error || t("Fehler beim Speichern", "Error saving"));
+    await loadMediascanSettings();
+  } catch (e) {
+    showToast("Fehler: " + e.message);
+  }
+}
+
+// ── Plex OAuth (reuses the same backend pin endpoints as Mediaplayer) ──────
+let _msPollInterval = null;
+
+async function startMsPlexOAuth() {
+  const btn    = document.getElementById("msPlexLoginBtn");
+  const status = document.getElementById("msPlexOAuthStatus");
+  if (btn) btn.disabled = true;
+  if (status) { status.style.display = "inline"; status.textContent = t("Verbinde mit Plex…", "Connecting to Plex…"); }
+  try {
+    const r = await fetch("/api/settings/mediaplayer/plex-pin", { method: "POST" });
+    const d = await r.json();
+    if (!d.ok) { _msPlexOAuthError(d.error || t("Pin-Erstellung fehlgeschlagen", "Pin creation failed")); return; }
+    const popup = window.open(d.auth_url, "plex_auth_ms", "width=800,height=700,scrollbars=yes,resizable=yes");
+    if (!popup) { _msPlexOAuthError(t("Popup blockiert — bitte Popup-Blocker deaktivieren", "Popup blocked - please disable popup blocker")); return; }
+    if (status) status.textContent = t("Warte auf Plex-Login…", "Waiting for Plex login…");
+    let attempts = 0;
+    _msPollInterval = setInterval(async () => {
+      attempts++;
+      if (attempts > 60) {
+        clearInterval(_msPollInterval);
+        _msPlexOAuthError("Timeout");
+        if (!popup.closed) popup.close();
+        if (btn) btn.disabled = false;
+        return;
+      }
+      try {
+        const pr = await fetch("/api/settings/mediaplayer/plex-pin/" + d.id);
+        const pd = await pr.json();
+        if (pd.ok && pd.authorized && pd.token) {
+          clearInterval(_msPollInterval);
+          if (!popup.closed) popup.close();
+          _updateMsPlexTokenBadge(true, pd.token.slice(0,4) + "••••" + pd.token.slice(-4));
+          if (status) status.style.display = "none";
+          if (btn) btn.disabled = false;
+          showToast(t("✓ Plex-Anmeldung erfolgreich!", "✓ Plex login successful!"));
+          await saveMediascanSettings();
+          await loadMsPlexLibraries();
+        }
+      } catch (_) {}
+    }, 2000);
+  } catch (e) { _msPlexOAuthError(e.message); }
+}
+
+function _msPlexOAuthError(msg) {
+  if (_msPollInterval) { clearInterval(_msPollInterval); _msPollInterval = null; }
+  const btn    = document.getElementById("msPlexLoginBtn");
+  const status = document.getElementById("msPlexOAuthStatus");
+  if (btn) btn.disabled = false;
+  if (status) { status.style.display = "inline"; status.style.color = "#f87171"; status.textContent = "✗ " + msg; }
+}
+
+async function loadMsPlexLibraries(selectedId) {
+  const sel = document.getElementById("mediascanPlexSection");
+  const btn = document.getElementById("msPlexLibLoadBtn");
+  if (!sel) return;
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+  try {
+    const r = await fetch("/api/settings/mediascan/plex-libraries");
+    const d = await r.json();
+    while (sel.options.length > 1) sel.remove(1);
+    if (d.ok && d.libraries && d.libraries.length) {
+      d.libraries.forEach(lib => {
+        const o = document.createElement("option");
+        o.value = lib.id;
+        o.textContent = lib.title + (lib.type ? "  (" + lib.type + ")" : "");
+        sel.appendChild(o);
+      });
+      const saved = selectedId !== undefined ? selectedId : sel.dataset.saved || "";
+      if (saved) sel.value = saved;
+    } else if (!d.ok) {
+      showToast(t("Bibliotheken: " + (d.error || "Fehler"), "Libraries: " + (d.error || "Error")));
+    }
+  } catch (e) {
+    showToast(t("Bibliotheken konnten nicht geladen werden", "Could not load libraries"));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = t("↻ Laden", "↻ Load"); }
+  }
+}
+
+async function triggerMediascanRefresh() {
+  const btn = document.getElementById("mediascanRefreshBtn");
+  if (btn) { btn.disabled = true; btn.textContent = t("Wird gestartet…", "Starting…"); }
+
+  try {
+    const r = await fetch("/api/settings/mediascan/refresh", { method: "POST" });
+    const d = await r.json();
+    if (!d.ok) {
+      showToast("✗ " + (d.error || t("Fehler beim Starten", "Error while starting")), "error");
+      if (btn) { btn.disabled = false; btn.textContent = t("↻ Mediathek jetzt aktualisieren", "↻ Update library now"); }
+      return;
+    }
+    showToast(t("Scan gestartet…", "Scan started…"));
+    _startMediascanPoll();
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message), "error");
+    if (btn) { btn.disabled = false; btn.textContent = t("↻ Mediathek jetzt aktualisieren", "↻ Update library now"); }
+  }
+}
+
+function _startMediascanPoll() {
+  if (_mediascanPollTimer) clearInterval(_mediascanPollTimer);
+  _mediascanPollTimer = setInterval(async () => {
+    try {
+      const r = await fetch("/api/settings/mediascan/status");
+      const d = await r.json();
+      _updateMediascanStatusUI(d);
+      if (!d.running) {
+        clearInterval(_mediascanPollTimer);
+        _mediascanPollTimer = null;
+        if (d.error) showToast("✗ " + (d.error || t("Scan fehlgeschlagen", "Scan failed")), "error");
+        else showToast("✓ " + t("Mediathek aktualisiert — " + (d.cached_count || d.count || 0) + " Einträge", "Media library updated — " + (d.cached_count || d.count || 0) + " entries"));
+        // Update last-updated display
+        const lastEl = document.getElementById("mediascanLastUpdated");
+        if (lastEl) lastEl.textContent = _formatRelTime(d.last_updated || d.finished_at);
+        const countEl = document.getElementById("mediascanCount");
+        if (countEl) countEl.textContent = (d.cached_count || d.count || 0) + t(" Einträge", " Entries");
+      }
+    } catch (_) { /* network hiccup — keep polling */ }
+  }, 1500);
+}

@@ -1,0 +1,231 @@
+{% extends "base.html" %} {% block title %}Auto-Sync — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='autosync.css') }}">
+{% endblock %}
+{% block content %}
+<div class="autosync-container">
+  <div class="page-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px;">
+    <div>
+      <h1 class="page-title" style="margin:0;">Auto-Sync</h1>
+      <p class="autosync-intro" style="margin:4px 0 0;">
+        {{ _('Automatically search for new episodes and download them on a schedule.') }}
+      </p>
+    </div>
+    <div class="autoSyncHeader" >
+      <button class="btn btn-primary" id="syncAllBtn" onclick="syncAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        {{ _('Sync all') }}
+      </button>
+      <button class="btn btn-ghost autosync-hdr-btn" onclick="exportAutosync()" title="{{ _('Export all jobs as JSON') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <label class="btn btn-ghost autosync-hdr-btn autosync-import-lbl" title="{{ _('Import jobs from JSON') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="17"/></svg>
+        Import
+        <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importAutosync(this)" />
+      </label>
+    </div>
+  </div>
+
+  <!-- View / group controls -->
+  <datalist id="groupDatalist"></datalist>
+  <div class="autosync-controls">
+    <div class="autosync-control-field">
+      <label class="autosync-control-label" for="viewSelect">{{ _('View') }}</label>
+      <select id="viewSelect" class="sync-select" onchange="onViewChange()"></select>
+    </div>
+    <div class="autosync-control-field">
+      <label class="autosync-control-label" for="autoGroupSelect">{{ _('Auto-grouping') }}</label>
+      <select id="autoGroupSelect" class="sync-select" onchange="onAutoGroupChange()">
+        <option value="off">{{ _('Off') }}</option>
+        <option value="path">{{ _('Path') }}</option>
+        <option value="language">{{ _('Language') }}</option>
+        <option value="provider">{{ _('Provider') }}</option>
+        <option value="user">{{ _('User') }}</option>
+      </select>
+    </div>
+    <div class="autosync-control-field autosync-search-field">
+      <label class="autosync-control-label" for="syncSearch">{{ _('Search') }}</label>
+      <input type="search" id="syncSearch" class="autosync-search-input" placeholder="{{ _('Search by name…') }}" autocomplete="off" oninput="onSearchInput(this.value)" />
+    </div>
+    <button type="button" id="renameGroupBtn" class="btn btn-ghost autosync-rename-btn" style="display:none;" onclick="promptRenameGroup()" title="{{ _('Rename group') }}">
+      ✎ {{ _('Rename group') }}
+    </button>
+  </div>
+
+  <!-- Batch toolbar (shown when checkboxes are selected) -->
+  <div id="batchToolbar" class="batch-toolbar" style="display:none;">
+    <div class="batch-head">
+      <label class="batch-selinfo">
+        <input type="checkbox" class="chb-main chb-autosync-all" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)" />
+        <span id="batchSelectionLabel">{{ _('0 selected') }}</span>
+      </label>
+      <button type="button" class="batch-clear" onclick="clearSelection()" title="{{ _('Clear selection') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span>{{ _('Clear selection') }}</span>
+      </button>
+    </div>
+
+    <div class="batch-actions">
+      <div class="batch-group bg-status">
+        <span class="batch-group-label">{{ _('Status') }}</span>
+        <div class="batch-group-controls">
+          <button class="btn btn-ghost batch-btn" onclick="batchAction('enable')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ _('Enable') }}
+          </button>
+          <button class="btn btn-ghost batch-btn" onclick="batchAction('disable')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
+            {{ _('Disable') }}
+          </button>
+        </div>
+      </div>
+
+
+      <div class="batch-group bg-path">
+        <span class="batch-group-label">{{ _('Path') }}</span>
+        <div class="batch-group-controls">
+          <select id="batchPathSelect" class="batch-select">
+            <option value="">{{ _('Default') }}</option>
+          </select>
+          <button class="btn btn-ghost batch-btn" onclick="batchAction('set_path')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            {{ _('Set') }}
+          </button>
+        </div>
+      </div>
+
+
+      <div class="batch-group bg-group">
+        <span class="batch-group-label">{{ _('Group') }}</span>
+        <div class="batch-group-controls">
+          <input type="text" id="batchGroupInput" list="groupDatalist" placeholder="{{ _('Group name') }}" class="batch-input" autocomplete="off" />
+          <button class="btn btn-ghost batch-btn" onclick="batchAction('set_group')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {{ _('Set') }}
+          </button>
+          <button class="btn btn-ghost batch-btn" onclick="batchAction('remove_group')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {{ _('Remove') }}
+          </button>
+        </div>
+      </div>
+
+
+      <div class="batch-group bg-delete">
+        <div class="batch-group-controls">
+          <button class="btn btn-danger batch-btn" onclick="batchAction('delete')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            {{ _('Delete') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="autosync-table-wrap">
+    <div id="autosyncList">
+      <div class="queue-empty" id="autosyncEmpty">
+        {{ _('No sync jobs yet. Add a series from the search page.') }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="overlay" id="editOverlay" onclick="if (event.target === this) closeEditModal();">
+  <div class="modal editModal" id="editModal">
+    <button class="close" onclick="closeEditModal()" aria-label="{{ _('Close') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <h2 style="margin-bottom: 4px">{{ _('Edit sync job') }}</h2>
+    <div id="editJobTitle" class="modal-info-text" style="margin-bottom:18px;"></div>
+    <input type="hidden" id="editJobId" />
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Language') }}</label>
+      <select id="editLanguage" class="sync-select">
+        <option>German Dub</option>
+        <option>English Sub</option>
+        <option>German Sub</option>
+        <option>English Dub</option>
+        <option>English Dub (German Sub)</option>
+      </select>
+    </div>
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Provider') }}</label>
+      <select id="editProvider" class="sync-select">
+        <option>VOE</option>
+        <option>Vidmoly</option>
+        <option>Vidoza</option>
+      </select>
+    </div>
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Path') }}</label>
+      <select id="editPath" class="sync-select">
+        <option value="">{{ _('Default') }}</option>
+      </select>
+    </div>
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Group') }}</label>
+      <input type="text" id="editGroup" list="groupDatalist" class="sync-select" placeholder="{{ _('No group') }}" autocomplete="off" />
+    </div>
+    <div class="settings-row" style="display:block !important;">
+      <label class="settings-field-label" style="display:block; margin-bottom: 8px;">{{ _('Seasons & episodes') }}</label>
+      <div id="editFilterPicker"></div>
+    </div>
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Status') }}</label>
+      <select id="editEnabled" class="sync-select">
+        <option value="1">{{ _('Enabled') }}</option>
+        <option value="0">{{ _('Disabled') }}</option>
+      </select>
+    </div>
+    <div class="settings-row" style="margin-bottom: 4px">
+      <label class="settings-field-label" style="min-width: 80px">{{ _('Path unavailable') }}</label>
+      <select id="editPathUnavailableAction" class="sync-select">
+        <option value="skip">{{ _('Skip sync') }}</option>
+        <option value="hold">{{ _('Wait (Hold)') }}</option>
+      </select>
+    </div>
+    <div class="editModalHint">
+      <strong>{{ _('Skip:') }}</strong> {{ _('This sync run will be skipped. It will be retried on the next scheduled check.') }}<br>
+      <strong>{{ _('Wait (Hold):') }}</strong> {{ _('The sync pauses until the custom path is reachable again — then starts automatically.') }}
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost" onclick="closeEditModal()">{{ _('Cancel') }}</button>
+      <button class="btn btn-primary" onclick="saveEdit()">{{ _('Save') }}</button>
+    </div>
+  </div>
+</div>
+<!-- Rename Group Modal -->
+<div class="overlay" id="renameOverlay" onclick="if (event.target === this) closeRenameModal();">
+  <div class="modal" id="renameModal" style="max-width:420px;">
+    <button class="close" onclick="closeRenameModal()" aria-label="{{ _('Close') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <h2 style="margin-bottom: 4px">{{ _('Rename group') }}</h2>
+    <div id="renameOldName" class="modal-info-text" style="margin-bottom:18px;"></div>
+    <div class="settings-row" style="margin-bottom: 12px">
+      <label class="settings-field-label" style="min-width: 90px">{{ _('New name') }}</label>
+      <input type="text" id="renameNewInput" class="sync-select" autocomplete="off"
+             onkeydown="if(event.key==='Enter')confirmRenameGroup();" />
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost" onclick="closeRenameModal()">{{ _('Cancel') }}</button>
+      <button class="btn btn-primary" onclick="confirmRenameGroup()">{{ _('Save') }}</button>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+{% set is_admin = not auth_enabled or (current_user and current_user.role == 'admin') %}
+<script>var autosyncCanManage = {{ 'true' if is_admin else 'false' }};</script>
+<script src="{{ url_for('static', filename='autosync.js') }}"></script>
+{% endblock %}

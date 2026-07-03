@@ -1,0 +1,203 @@
+<!-- Direct Link Modal -->
+<div class="directlink-overlay" id="directLinkOverlay" onclick="closeDLModalOutside(event)">
+  <div class="directlink-modal" id="directLinkModal">
+    <button class="close" onclick="closeDirectLinkModal()" aria-label="{{ _('Close') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+        stroke-linejoin="round" style="width:16px;height:16px;">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+    <h3 class="dl-title">{{ _('Direct Link') }}</h3>
+    <p class="dl-hint">{{ _('Paste a s.to or aniworld.to series URL') }}</p>
+    <div class="dl-input-row">
+      <input type="text" id="directLinkInput" placeholder="https://s.to/serie/from" autocomplete="off" />
+      <button id="directLinkSearchBtn" onclick="submitDirectLink()">{{ _('Search') }}</button>
+    </div>
+    <div class="dl-error" id="directLinkError"></div>
+  </div>
+</div>
+<!-- Series/Movie Modal -->
+<div class="overlay" id="overlay" onclick="closeModalOutside(event)">
+  <div class="modal" id="modal">
+    <button class="close" onclick="closeModal()" aria-label="{{ _('Close') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+        stroke-linejoin="round" style="width:16px;height:16px;">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+    <div class="modal-header">
+      <div class="modal-poster-col">
+        <div style="position:relative; display:inline-flex;">
+          <img id="modalPoster" src="" alt="" onload="document.getElementById('favouriteBtn').style.display='flex'" />
+          <button id="favouriteBtn" onclick="toggleFavourite()" aria-label="{{ _('Bookmark') }}"
+            style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); border:none; border-radius:50%; width:34px; height:34px; cursor:pointer; font-size:1.2rem; line-height:1; color:var(--text-secondary); transition:color 0.15s, transform 0.15s; display:none; align-items:center; justify-content:center;"
+            onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">♡</button>
+        </div>
+        <div id="tmdbFsk" class="tmdb-fsk-badge"></div>
+      </div>
+      <div class="modal-meta">
+        <h2 id="modalTitle"></h2>
+        <div id="tmdbProviders" class="tmdb-providers"></div>
+        <div class="genres" id="modalGenres"></div>
+        <div class="year" id="modalYear"></div>
+        <div class="desc" id="modalDesc"></div>
+      </div>
+    </div>
+    <!-- Trailer  -->
+    <div id="trailerSection" class="season-section" style="display:none">
+      <div class="season-header trailer-header"
+        onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+        <div class="season-label"><span class="season-arrow">&#9654;</span>
+          <svg fill="#FFFFFF" width="20px" height="20px" viewBox="0 0 36 36" version="1.1"
+            preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink">
+            <title>film-strip-line</title>
+            <path class="clr-i-outline clr-i-outline-path-1"
+              d="M30,4H6A2,2,0,0,0,4,6V30a2,2,0,0,0,2,2H30a2,2,0,0,0,2-2V6A2,2,0,0,0,30,4Zm0,26H6V6H30Z"></path>
+            <path class="clr-i-outline clr-i-outline-path-2"
+              d="M14.6,23.07a1.29,1.29,0,0,0,1.24.09l8.73-4a1.3,1.3,0,0,0,0-2.37h0l-8.73-4A1.3,1.3,0,0,0,14,14v8A1.29,1.29,0,0,0,14.6,23.07Zm1-8.6L23.31,18,15.6,21.51Z">
+            </path>
+            <rect class="clr-i-outline clr-i-outline-path-3" x="8" y="7" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-4" x="14" y="7" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-5" x="20" y="7" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-6" x="26" y="7" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-7" x="8" y="26" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-8" x="14" y="26" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-9" x="20" y="26" width="2" height="3"></rect>
+            <rect class="clr-i-outline clr-i-outline-path-10" x="26" y="26" width="2" height="3"></rect>
+            <rect x="0" y="0" width="36" height="36" fill-opacity="0" />
+          </svg>Trailer
+        </div>
+      </div>
+      <div class="season-body">
+        <div id="modalTrailer" class="modal-trailer"></div>
+      </div>
+    </div>
+    <!-- End Trailer -->
+    <!-- Recommendations -->
+    <div id="recommendationsSection" class="season-section" style="display:none">
+      <div class="season-header recommendations-header"
+        onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+        <div class="season-label"><span class="season-arrow">&#9654;</span>
+          <svg width="20px" height="20px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink">
+            <g id="🔍-Product-Icons" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <g id="ic_fluent_recommended_24_filled" fill="#FFFFFF" fill-rule="nonzero">
+                <path
+                  d="M17.0020594,17.4830721 L17.0007001,22.2453233 C17.0007001,22.7945586 16.4297842,23.157512 15.9324488,22.9244522 L12.0005291,21.0818879 L8.07069102,22.9243915 C7.5733438,23.1575726 7.00231009,22.7946207 7.00231009,22.2453233 L7.00260026,17.4861909 C8.43218245,18.4424048 10.1509746,19 12,19 C13.8510348,19 15.5715531,18.4411922 17.0020594,17.4830721 Z M12,2 C16.418278,2 20,5.581722 20,10 C20,14.418278 16.418278,18 12,18 C7.581722,18 4,14.418278 4,10 C4,5.581722 7.581722,2 12,2 Z M11.8084497,6.58610926 L11.7712148,6.64234387 L10.8586922,8.49499737 L8.81472896,8.79035658 C8.62860433,8.81725218 8.54185205,9.02358857 8.63135587,9.17274189 L8.67333197,9.22553178 L10.1533251,10.6658938 L9.80260908,12.7010893 C9.77067264,12.8864156 9.94010228,13.0326834 10.1096137,12.9936511 L10.1727912,12.9700424 L12,12.0075816 L13.8272087,12.9700424 C13.9935181,13.0576439 14.1849216,12.9418506 14.2003028,12.7686538 L14.1974269,12.7012993 L13.8484251,10.6658938 L15.326776,9.22542655 C15.4614232,9.09422981 15.4102807,8.87641205 15.2502405,8.80838398 L15.185271,8.79035658 L13.1413078,8.49499737 L12.2287851,6.64234387 C12.1560771,6.494728 11.9762193,6.46192448 11.8558892,6.54393329 L11.8084497,6.58610926 L11.8084497,6.58610926 Z"
+                  id="🎨-Color">
+                </path>
+              </g>
+            </g>
+          </svg>{{ _('Recommendations') }}
+        </div>
+      </div>
+      <div class="season-body">
+        <div id="modalRecommendations" class="modal-recommendations"></div>
+      </div>
+    </div>
+    <!-- End Recommendations -->
+    <div class="controls">
+      <select id="languageSelect">
+        {% if lang_labels is defined %}
+        {% for key, label in lang_labels.items() %}
+        <option value="{{ label }}">{{ label }}</option>
+        {% endfor %}
+        {% endif %}
+      </select>
+      <select id="providerSelect">
+        {% if supported_providers is defined %}
+        {% for p in supported_providers %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+        {% endif %}
+      </select>
+      <select id="customPathSelect" style="display: none">
+        <option value="">{{ _('Default') }}</option>
+      </select>
+    </div>
+    <script>
+      window.ANIWORLD_LANGS = {% if lang_labels is defined %}{{ lang_labels | tojson }}{% else %}{}{% endif %};
+      window.STO_LANGS = {% if sto_lang_labels is defined %}{{ sto_lang_labels | tojson }}{% else %}{}{% endif %};
+    </script>
+    <div class="lang-avail-banner" id="langAvailBanner" style="display:none"></div>
+    <div class="episodes-header" id="episodesHeader">
+      <h3 id="episodesHeading">{{ _('Episodes') }}</h3>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <label class="select-all-label">
+          <input type="checkbox" class="chb-main" id="selectAll" onchange="toggleSelectAll()" />
+          {{ _('Select all') }}
+        </label>
+      </div>
+    </div>
+    <div class="season-accordion" id="seasonAccordion"></div>
+    <div class="spinner" id="episodeSpinner">{{ _('Loading episodes...') }}</div>
+    <div class="status-bar" id="statusBar">
+      <span id="statusText"></span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:16px; padding: 6px 0 2px 2px;">
+      <button type="button" class="btn btn-ghost" id="autoSyncConfigBtn" onclick="openAutoSyncConfig()"
+        style="display:inline-flex; align-items:center; gap:8px; font-size:0.875rem;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <span id="autoSyncConfigLabel">{{ _('Set up Auto-Sync') }}</span>
+      </button>
+      <div id="upscaleCheckWrapper" style="display:none;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.875rem; color:var(--text-secondary); cursor:pointer; user-select:none;">
+          <input type="checkbox" class="chb-main" id="upscaleCheck" style="width:15px; height:15px; cursor:pointer; accent-color:var(--accent);">
+          {{ _('Upscale with Anime4K') }}
+      </label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-download-selected" id="downloadSelectedBtn" onclick="startDownload(false)">
+        {{ _('Download selected') }}
+      </button>
+      <button class="btn-download-all" id="downloadAllBtn" onclick="startDownload(true)">
+        {{ _('Download all') }}
+      </button>
+      <button class="btn-download-all-langs" id="downloadAllLangsBtn" onclick="startDownloadAllLangs()"
+        style="display: none">
+        {{ _('Download all languages') }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- VeeV Availability Check Overlay -->
+<div id="veevCheckOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg-elevated,#1a1a2e);border:1px solid var(--border,#333);border-radius:16px;padding:40px 48px;text-align:center;max-width:420px;width:90%;display:flex;flex-direction:column;align-items:center;gap:16px">
+    <h3 style="margin:0;font-size:1.1rem;font-weight:600;color:var(--text-primary,#fff)">{{ _('Checking Availability') }}</h3>
+    <div id="veevCheckSpinnerWrap" style="display:flex;align-items:center;justify-content:center;margin:4px 0">
+      <div id="veevCheckSpinner" style="width:52px;height:52px;border-radius:50%;border:3px solid rgba(255,255,255,0.08);border-top-color:#6c8ef7;animation:veev-spin 0.85s linear infinite"></div>
+    </div>
+    <p id="veevCheckText" style="margin:0;font-size:0.88rem;color:var(--text-muted,#aaa);line-height:1.55;max-width:300px">{{ _('Checking if the selected content is available on Veev') }}</p>
+    <div id="veevCheckError" style="display:none;font-size:0.88rem;color:#e05a5a;background:rgba(224,90,90,0.1);border:1px solid rgba(224,90,90,0.25);border-radius:8px;padding:10px 14px;line-height:1.5;text-align:left;width:100%"></div>
+    <button id="veevCheckCloseBtn" onclick="closeVeevCheck()" style="display:none;background:var(--bg-surface,#222);border:1px solid var(--border,#333);color:var(--text-primary,#fff);font-size:0.85rem;padding:8px 22px;border-radius:8px;cursor:pointer">{{ _('Close') }}</button>
+  </div>
+</div>
+<style>@keyframes veev-spin{to{transform:rotate(360deg)}}</style>
+
+<!-- Language Mismatch Modal (manual download only) -->
+<div id="langMismatchOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg-elevated,#1a1a2e);border:1px solid var(--border,#333);border-radius:16px;padding:26px 28px;max-width:560px;width:92%;max-height:82vh;display:flex;flex-direction:column;gap:14px">
+    <h3 id="langMismatchTitle" style="margin:0;font-size:1.1rem;font-weight:600;color:var(--text-primary,#fff)">{{ _('Language not available') }}</h3>
+    <p id="langMismatchIntro" style="margin:0;font-size:0.88rem;color:var(--text-muted,#aaa);line-height:1.55"></p>
+    <div id="langMismatchList" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px"></div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:2px">
+      <button id="langMismatchCancel" type="button" class="btn btn-ghost" onclick="closeLangMismatchModal()">{{ _('Cancel') }}</button>
+      <button id="langMismatchConfirm" type="button" class="btn-download-selected" onclick="confirmLangMismatch()">{{ _('Confirm') }}</button>
+    </div>
+  </div>
+</div>
+<style>
+  .lang-mismatch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg-surface,#222);border:1px solid var(--border,#333);border-radius:8px;padding:8px 12px}
+  .lang-mismatch-row .lmm-ep{font-size:0.85rem;color:var(--text-primary,#fff);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+  .lang-mismatch-row .lmm-select{flex:0 0 auto;max-width:55%;background:var(--bg-elevated,#1a1a2e);color:var(--text-primary,#fff);border:1px solid var(--border,#333);border-radius:6px;padding:5px 8px;font-size:0.82rem}
+  @media (max-width:540px){.lang-mismatch-row{flex-direction:column;align-items:stretch}.lang-mismatch-row .lmm-select{max-width:100%}}
+</style>

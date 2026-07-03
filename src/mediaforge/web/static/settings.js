@@ -1,0 +1,1826 @@
+// ─── Tab navigation ────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll(".settings-tab-btn, .settings-tab").forEach(function (btn) {
+    btn.classList.toggle("active", btn.dataset.tab === name);
+  });
+  document.querySelectorAll(".settings-tab-panel").forEach(function (panel) {
+    panel.classList.toggle("active", panel.id === "tab-" + name);
+  });
+  // Sync sidebar sub-links
+  document.querySelectorAll(".sidebar-sub-link[data-settings-tab]").forEach(function (a) {
+    a.classList.toggle("active", a.dataset.settingsTab === name);
+  });
+  // Update URL hash without scrolling
+  try {
+    history.replaceState(null, "", "#" + name);
+    localStorage.setItem("settingsActiveTab", name);
+  } catch (e) { }
+}
+
+(function restoreTab() {
+  var hash = "";
+  try { hash = (window.location.hash || "").replace("#", "").trim(); } catch (e) { }
+  var validTabs = ["general", "downloads", "autosync", "network", "auth", "api", "updates"];
+  var tab = (hash && validTabs.indexOf(hash) !== -1) ? hash : "";
+  if (!tab) {
+    try { tab = localStorage.getItem("settingsActiveTab") || "downloads"; } catch (e) { tab = "downloads"; }
+  }
+  if (validTabs.indexOf(tab) === -1) tab = "downloads";
+  switchTab(tab);
+})();
+
+// ─── Element references ─────────────────────────────────────────────────────
+
+const downloadPathInput = document.getElementById("downloadPath");
+const langSeparationCb = document.getElementById("langSeparation");
+const disableEnglishSubCb = document.getElementById("disableEnglishSub");
+const filmpalastSubfolderCb = document.getElementById("filmpalastSubfolder");
+const syncScheduleSelect         = document.getElementById("syncSchedule");
+const syncLanguageSelect         = document.getElementById("syncLanguage");
+const syncProviderSelect         = document.getElementById("syncProvider");
+const syncPathUnavailableSelect  = document.getElementById("syncPathUnavailableAction");
+const historyRetentionSelect     = document.getElementById("historyRetention");
+const syncModeSelect             = document.getElementById("syncMode");
+const syncIntervalField          = document.getElementById("syncIntervalField");
+const syncWeeklyBlock            = document.getElementById("syncWeeklyBlock");
+const syncDaysToggles            = document.getElementById("syncDaysToggles");
+const syncTimesList              = document.getElementById("syncTimesList");
+
+// ─── Load all settings ──────────────────────────────────────────────────────
+
+async function loadSettings() {
+  try {
+    const resp = await fetch("/api/settings?_=" + Date.now()); //Prohibit Browser Caching because of "new URL"(Yes there was in issue during development)
+    const data = await resp.json();
+
+    // Downloads tab
+    if (downloadPathInput) downloadPathInput.value = data.download_path || "";
+    if (langSeparationCb) langSeparationCb.checked = data.lang_separation === "1";
+    if (disableEnglishSubCb) disableEnglishSubCb.checked = data.disable_english_sub === "1";
+    if (filmpalastSubfolderCb) filmpalastSubfolderCb.checked = data.filmpalast_movie_subfolder === "1";
+
+    const dlLangEl = document.getElementById("downloadLanguage");
+    if (dlLangEl && data.download_language) dlLangEl.value = data.download_language;
+
+    const dlProvEl = document.getElementById("downloadProvider");
+    if (dlProvEl && data.download_provider) dlProvEl.value = data.download_provider;
+
+    const nmTplEl = document.getElementById("namingTemplate");
+    if (nmTplEl) nmTplEl.value = data.naming_template || "{title} - S{season:02d}E{episode:02d}";
+
+    const rateLimitEl = document.getElementById("downloadRateLimit");
+    if (rateLimitEl && data.download_rate_limit !== undefined) rateLimitEl.value = data.download_rate_limit;
+    const winEnabledEl = document.getElementById("downloadWindowEnabled");
+    if (winEnabledEl) winEnabledEl.checked = data.download_window_enabled === "1";
+    const winStartEl = document.getElementById("downloadWindowStart");
+    if (winStartEl) {
+      if (data.download_window_start) winStartEl.value = data.download_window_start;
+      createCustomTimePicker(winStartEl);
+      if (winStartEl.syncCustomPicker) winStartEl.syncCustomPicker();
+    }
+    const winEndEl = document.getElementById("downloadWindowEnd");
+    if (winEndEl) {
+      if (data.download_window_end) winEndEl.value = data.download_window_end;
+      createCustomTimePicker(winEndEl);
+      if (winEndEl.syncCustomPicker) winEndEl.syncCustomPicker();
+    }
+    const timeFormatEl = document.getElementById("timeFormatSetting");
+    if (timeFormatEl) {
+      timeFormatEl.value = localStorage.getItem("timeFormatSetting") || "24h";
+    }
+    updateDownloadWindowDisabledState();
+
+    // Auto-Sync tab
+    if (syncScheduleSelect && data.sync_schedule) syncScheduleSelect.value = data.sync_schedule;
+    if (historyRetentionSelect && data.history_retention_days != null) historyRetentionSelect.value = String(data.history_retention_days);
+    if (syncModeSelect) syncModeSelect.value = data.sync_mode === "weekly" ? "weekly" : "interval";
+    _renderSyncDays(data.sync_days || "0,1,2,3,4,5,6");
+    _renderSyncTimes(data.sync_times || "06:00");
+    _applySyncModeUI();
+
+    // Updates tab — automatic update schedule
+    _renderAutoUpdateDays(data.auto_update_days || "0,1,2,3,4,5,6");
+    const _auEnabled = document.getElementById("autoUpdateEnabled");
+    if (_auEnabled) _auEnabled.checked = data.auto_update_enabled === "1";
+    const _auTime = document.getElementById("autoUpdateTime");
+    if (_auTime && data.auto_update_time) _auTime.value = data.auto_update_time;
+    const _auBlock = document.getElementById("autoUpdateBlock");
+    if (_auBlock) _auBlock.style.display = (data.auto_update_enabled === "1") ? "" : "none";
+
+    const isLangSep = data.lang_separation === "1";
+    let currentSyncLang = data.sync_language;
+    if (currentSyncLang === "All Languages" && !isLangSep) currentSyncLang = "German Dub";
+    updateSyncLanguageDropdown(isLangSep, currentSyncLang);
+    if (syncProviderSelect && data.sync_provider) syncProviderSelect.value = data.sync_provider;
+    if (syncPathUnavailableSelect && data.sync_path_unavailable_action) syncPathUnavailableSelect.value = data.sync_path_unavailable_action;
+    const syncErrorRetriesEl = document.getElementById("syncErrorRetries");
+    if (syncErrorRetriesEl && data.sync_error_retries !== undefined) syncErrorRetriesEl.value = data.sync_error_retries;
+    const syncErrorRetryTimeEl = document.getElementById("syncErrorRetryTime");
+    if (syncErrorRetryTimeEl && data.sync_error_retry_time) syncErrorRetryTimeEl.value = data.sync_error_retry_time;
+    const syncAdaptiveEnabledEl = document.getElementById("syncAdaptiveEnabled");
+    if (syncAdaptiveEnabledEl) syncAdaptiveEnabledEl.checked = data.sync_adaptive_enabled === "1";
+    const syncAdaptivePauseEl = document.getElementById("syncAdaptivePauseAfter");
+    if (syncAdaptivePauseEl && data.sync_adaptive_pause_after) syncAdaptivePauseEl.value = data.sync_adaptive_pause_after;
+    const syncAdaptiveRetryValueEl = document.getElementById("syncAdaptiveRetryValue");
+    if (syncAdaptiveRetryValueEl && data.sync_adaptive_retry_value !== undefined) syncAdaptiveRetryValueEl.value = data.sync_adaptive_retry_value;
+    const syncAdaptiveRetryUnitEl = document.getElementById("syncAdaptiveRetryUnit");
+    if (syncAdaptiveRetryUnitEl && data.sync_adaptive_retry_unit) syncAdaptiveRetryUnitEl.value = data.sync_adaptive_retry_unit;
+    updateAdaptiveSyncDisabledState();
+
+    // Netzwerk tab
+    const dnsModeEl = document.getElementById("dnsMode");
+    const dnsServerEl = document.getElementById("dnsServer");
+    if (dnsModeEl) { dnsModeEl.value = data.dns_mode || "system"; onDnsModeChange(); }
+    if (dnsServerEl) dnsServerEl.value = data.dns_server || "";
+
+    const webBaseUrlEl = document.getElementById("webBaseUrl");
+    if (webBaseUrlEl) webBaseUrlEl.value = data.web_base_url || "";
+
+    const debugModeEl = document.getElementById("debugMode");
+    if (debugModeEl) {
+      const forced = data.debug_forced === "1";
+      debugModeEl.checked = data.debug_mode === "1" || forced;
+      // When started with --debug the toggle is locked on (greyed out).
+      debugModeEl.disabled = forced;
+      const forcedHint = document.getElementById("debugForcedHint");
+      if (forcedHint) forcedHint.style.display = forced ? "block" : "none";
+      const row = debugModeEl.closest(".settings-checkbox-row");
+      if (row) row.style.opacity = forced ? "0.6" : "";
+    }
+    const mediaStatsEl = document.getElementById("mediaStatsEnabled");
+    if (mediaStatsEl) mediaStatsEl.checked = data.media_stats_enabled === "1";
+
+    const webConsoleEl = document.getElementById("webConsole");
+    if (webConsoleEl) {
+      const on = data.web_console === "1";
+      webConsoleEl.checked = on;
+      // If the Web Console was already enabled (e.g. during startup), show it immediately.
+      setWebConsoleVisible(on);
+      if (on) startWebConsole();
+    }
+
+
+    // Design tab - Extended Settings
+    _loadDesignCheckboxes();
+
+  } catch (e) {
+    showToast("Einstellungen konnten nicht geladen werden: " + e.message);
+  }
+  loadApiKey();
+  loadSsoSettings();
+}
+
+// ─── Downloads tab ──────────────────────────────────────────────────────────
+
+async function saveLangSeparation() {
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        download_path: downloadPathInput ? downloadPathInput.value.trim() : undefined,
+        lang_separation: langSeparationCb ? langSeparationCb.checked : false,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast("Sprachentrennung " + (langSeparationCb && langSeparationCb.checked ? t("aktiviert","activated") : t("deaktiviert","deactivated")));
+    const isLangSep = langSeparationCb ? langSeparationCb.checked : false;
+    let currentSyncLang = syncLanguageSelect ? syncLanguageSelect.value : null;
+    if (!isLangSep && currentSyncLang === "All Languages") {
+      currentSyncLang = "German Dub";
+      updateSyncLanguageDropdown(false, currentSyncLang);
+      saveSyncDefaults();
+    } else {
+      updateSyncLanguageDropdown(isLangSep, currentSyncLang);
+    }
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+function updateSyncLanguageDropdown(isLangSep, currentValue) {
+  if (!syncLanguageSelect) return;
+  syncLanguageSelect.innerHTML = "";
+  if (isLangSep) {
+    const opt = document.createElement("option");
+    opt.value = "All Languages";
+    opt.textContent = t("Alle Sprachen","All Languages");
+    syncLanguageSelect.appendChild(opt);
+  }
+  ["German Dub", "English Sub", "German Sub", "English Dub", "English Dub (German Sub)"].forEach(function (l) {
+    const opt = document.createElement("option");
+    opt.value = l;
+    opt.textContent = l;
+    syncLanguageSelect.appendChild(opt);
+  });
+  if (currentValue) syncLanguageSelect.value = currentValue;
+}
+
+async function saveDisableEnglishSub() {
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ disable_english_sub: disableEnglishSubCb ? disableEnglishSubCb.checked : false }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Englische Untertitel-Downloads ", "English subtitle downloads ") +
+      (disableEnglishSubCb && disableEnglishSubCb.checked ? t("deaktiviert","deactivated") : t("aktiviert","activated")));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveFilmpalastSubfolder() {
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filmpalast_movie_subfolder: filmpalastSubfolderCb ? filmpalastSubfolderCb.checked : false }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Film-Unterordner ", "Movie subfolder ") + (filmpalastSubfolderCb && filmpalastSubfolderCb.checked ? t("aktiviert","activated") : t("deaktiviert","deactivated")));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveDownloadPath() {
+  const download_path = downloadPathInput ? downloadPathInput.value.trim() : "";
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ download_path }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Download-Pfad gespeichert","Download path saved"));
+  } catch (e) {
+    showToast(t("Einstellungen konnten nicht gespeichert werden: ", "Settings could not be saved: ") + e.message);
+  }
+}
+
+async function saveDownloadLanguage() {
+  const el = document.getElementById("downloadLanguage");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ download_language: el.value }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Standardsprache gespeichert","Default language saved"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveDownloadProvider() {
+  const el = document.getElementById("downloadProvider");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ download_provider: el.value }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Standardanbieter gespeichert","Default provider saved"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveNamingTemplate() {
+  const el = document.getElementById("namingTemplate");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ naming_template: el.value.trim() }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Namens-Template gespeichert","Naming template saved"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+function resetNamingTemplate() {
+  const el = document.getElementById("namingTemplate");
+  if (el) el.value = "{title} - S{season:02d}E{episode:02d}";
+  saveNamingTemplate();
+}
+
+async function saveDownloadRateLimit() {
+  const el = document.getElementById("downloadRateLimit");
+  if (!el) return;
+  let val = parseInt(el.value, 10);
+  if (isNaN(val) || val < 0) val = 0;
+  el.value = val;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ download_rate_limit: val }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Bandbreiten-Limit gespeichert","Bandwidth limit saved"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+function updateDownloadWindowDisabledState() {
+  const enabledEl = document.getElementById("downloadWindowEnabled");
+  if (!enabledEl) return;
+  const off = !enabledEl.checked;
+  ["downloadWindowStart", "downloadWindowEnd"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.disabled = off;
+      if (el.customWrapper) {
+        el.customWrapper.querySelectorAll("select").forEach((sel) => {
+          sel.disabled = off;
+        });
+      }
+    }
+  });
+}
+
+async function saveDownloadWindow() {
+  const enabledEl = document.getElementById("downloadWindowEnabled");
+  const startEl = document.getElementById("downloadWindowStart");
+  const endEl = document.getElementById("downloadWindowEnd");
+  if (!enabledEl || !startEl || !endEl) return;
+  updateDownloadWindowDisabledState();
+  const payload = { download_window_enabled: enabledEl.checked };
+  if (startEl.value) payload.download_window_start = startEl.value;
+  if (endEl.value) payload.download_window_end = endEl.value;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Download-Zeitfenster gespeichert","Download time window saved"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+// ─── Auto-Sync tab ──────────────────────────────────────────────────────────
+
+async function saveSyncSchedule() {
+  if (!syncScheduleSelect) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_schedule: syncScheduleSelect.value }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Auto-Sync-Zeitplan gespeichert","Auto-sync schedule saved"));
+    else showToast(t("Zeitplan konnte nicht gespeichert werden","Could not save schedule"));
+  } catch (e) {
+    showToast(t("Zeitplan konnte nicht gespeichert werden: ", "Could not save schedule: ") + e.message);
+  }
+}
+
+async function saveHistoryRetention() {
+  if (!historyRetentionSelect) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ history_retention_days: parseInt(historyRetentionSelect.value, 10) }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Aufbewahrung gespeichert", "Retention saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden", "Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden", "Could not save"));
+  }
+}
+
+// ─── Auto-Sync weekly schedule ───────────────────────────────────────────────
+function _weekdayLabels() {
+  return [
+    t("Mo", "Mon"), t("Di", "Tue"), t("Mi", "Wed"), t("Do", "Thu"),
+    t("Fr", "Fri"), t("Sa", "Sat"), t("So", "Sun"),
+  ];
+}
+
+function _renderSyncDays(csv) {
+  if (!syncDaysToggles) return;
+  const active = new Set(
+    String(csv || "").split(",").map((x) => parseInt(x.trim(), 10)).filter((x) => !isNaN(x)),
+  );
+  const labels = _weekdayLabels();
+  syncDaysToggles.innerHTML = "";
+  labels.forEach((lbl, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "weekday-toggle" + (active.has(i) ? " active" : "");
+    b.dataset.day = i;
+    b.textContent = lbl;
+    b.addEventListener("click", () => {
+      b.classList.toggle("active");
+      saveSyncWeekly();
+    });
+    syncDaysToggles.appendChild(b);
+  });
+}
+
+function _getSelectedDays() {
+  if (!syncDaysToggles) return "";
+  return Array.from(syncDaysToggles.querySelectorAll(".weekday-toggle.active"))
+    .map((b) => b.dataset.day)
+    .join(",");
+}
+
+function _addTimeRow(value) {
+  const row = document.createElement("div");
+  row.className = "sync-time-row";
+  const input = document.createElement("input");
+  input.type = "time";
+  input.value = value || "06:00";
+  input.addEventListener("change", saveSyncWeekly);
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "sync-time-remove";
+  rm.textContent = "✕";
+  rm.title = t("Entfernen", "Remove");
+  rm.addEventListener("click", () => {
+    row.remove();
+    if (syncTimesList && !syncTimesList.children.length) _addTimeRow("06:00");
+    saveSyncWeekly();
+  });
+  row.appendChild(input);
+  row.appendChild(rm);
+  syncTimesList.appendChild(row);
+  if (typeof createCustomTimePicker === "function") {
+    createCustomTimePicker(input);
+  }
+}
+
+function _renderSyncTimes(csv) {
+  if (!syncTimesList) return;
+  syncTimesList.innerHTML = "";
+  const times = String(csv || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (!times.length) times.push("06:00");
+  times.forEach((tm) => _addTimeRow(tm));
+}
+
+function addSyncTime() {
+  _addTimeRow("12:00");
+  saveSyncWeekly();
+}
+
+function _getTimes() {
+  if (!syncTimesList) return "";
+  return Array.from(syncTimesList.querySelectorAll("input[type=time]"))
+    .map((i) => i.value)
+    .filter(Boolean)
+    .join(",");
+}
+
+function _applySyncModeUI() {
+  const weekly = syncModeSelect && syncModeSelect.value === "weekly";
+  if (syncIntervalField) syncIntervalField.style.display = weekly ? "none" : "";
+  if (syncWeeklyBlock) syncWeeklyBlock.style.display = weekly ? "" : "none";
+}
+
+async function onSyncModeChange() {
+  _applySyncModeUI();
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_mode: syncModeSelect.value }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Modus gespeichert", "Mode saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden", "Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden", "Could not save"));
+  }
+}
+
+async function saveSyncWeekly() {
+  const days = _getSelectedDays();
+  const times = _getTimes();
+  if (!days) { showToast(t("Mindestens einen Wochentag wählen", "Select at least one weekday")); return; }
+  if (!times) { showToast(t("Mindestens eine Uhrzeit angeben", "Provide at least one time")); return; }
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_days: days, sync_times: times }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Wochenplan gespeichert", "Weekly schedule saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden", "Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden", "Could not save"));
+  }
+}
+
+async function saveSyncDefaults() {
+  const body = {};
+  if (syncLanguageSelect) body.sync_language = syncLanguageSelect.value;
+  if (syncProviderSelect) body.sync_provider = syncProviderSelect.value;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Auto-Sync-Standards gespeichert","Auto-sync defaults saved"));
+    else showToast(t("Standards konnten nicht gespeichert werden","Could not save defaults"));
+  } catch (e) {
+    showToast(t("Standards konnten nicht gespeichert werden: ", "Could not save defaults: ") + e.message);
+  }
+}
+
+async function saveSyncPathAction() {
+  if (!syncPathUnavailableSelect) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_path_unavailable_action: syncPathUnavailableSelect.value }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Pfad-offline-Verhalten gespeichert","Path-offline-behavior saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+async function saveSyncErrorRetries() {
+  const el = document.getElementById("syncErrorRetries");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_error_retries: parseInt(el.value, 10) }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Fehler-Wiederholungen gespeichert","Error retries saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+async function saveSyncErrorRetryTime() {
+  const el = document.getElementById("syncErrorRetryTime");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_error_retry_time: el.value }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Wiederholungs-Zeit gespeichert","Retry time saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+function updateAdaptiveSyncDisabledState() {
+  const enabledEl = document.getElementById("syncAdaptiveEnabled");
+  if (!enabledEl) return;
+  const off = !enabledEl.checked;
+  ["syncAdaptivePauseAfter", "syncAdaptiveRetryValue", "syncAdaptiveRetryUnit"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = off;
+  });
+}
+
+async function saveSyncAdaptiveEnabled() {
+  const el = document.getElementById("syncAdaptiveEnabled");
+  if (!el) return;
+  updateAdaptiveSyncDisabledState();
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_adaptive_enabled: el.checked }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Adaptive Auto-Sync gespeichert","Adaptive Auto-Sync saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+async function saveSyncAdaptivePauseAfter() {
+  const el = document.getElementById("syncAdaptivePauseAfter");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_adaptive_pause_after: el.value }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Pause-Intervall gespeichert","Pause interval saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+async function saveSyncAdaptiveRetry() {
+  const valEl = document.getElementById("syncAdaptiveRetryValue");
+  const unitEl = document.getElementById("syncAdaptiveRetryUnit");
+  if (!valEl || !unitEl) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sync_adaptive_retry_value: parseInt(valEl.value, 10),
+        sync_adaptive_retry_unit: unitEl.value,
+      }),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Wiederholungs-Intervall gespeichert","Retry interval saved"));
+    else showToast(data.error || t("Konnte nicht gespeichert werden","Could not save"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not save: ") + e.message);
+  }
+}
+
+// ─── Netzwerk tab ───────────────────────────────────────────────────────────
+
+async function saveWebBaseUrl() {
+  const el = document.getElementById("webBaseUrl");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ web_base_url: el.value.trim() }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Basis-URL gespeichert — Neustart erforderlich","Base URL saved — restart required"));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveMediaStatsEnabled() {
+  const el = document.getElementById("mediaStatsEnabled");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ media_stats_enabled: el.checked }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Medien-Statistik " + (el.checked ? "aktiviert" : "deaktiviert"), "Media statistics " + (el.checked ? "enabled" : "disabled")));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveDebugMode() {
+  const el = document.getElementById("debugMode");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ debug_mode: el.checked }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Debug-Modus " + (el.checked ? "aktiviert" : "deaktiviert"), "Debug mode " + (el.checked ? "enabled" : "disabled")));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+async function saveWebConsole() {
+  const el = document.getElementById("webConsole");
+  if (!el) return;
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ web_console: el.checked }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    setWebConsoleVisible(el.checked);
+    if (el.checked) startWebConsole();
+    else stopWebConsole();
+    showToast(t("Web-Konsole " + (el.checked ? "aktiviert" : "deaktiviert"), "Web-Console " + (el.checked ? "enabled" : "disabled")));
+  } catch (e) {
+    showToast(t("Einstellung konnte nicht gespeichert werden: ", "Setting could not be saved: ") + e.message);
+  }
+}
+
+
+// ─── Web Console (read-only live console mirror) ──────────────────────────────
+
+let _webConsoleTimer = null;
+let _webConsoleSeq = 0;
+let _webConsolePolling = false;
+
+function setWebConsoleVisible(visible) {
+  const wrap = document.getElementById("webConsoleWrap");
+  if (wrap) wrap.style.display = visible ? "block" : "none";
+}
+
+// Escape HTML so console text can never inject markup.
+function _wcEscape(s) {
+  return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+// Convert a single line containing ANSI SGR escape codes to safe HTML.
+function _wcAnsiToHtml(line) {
+  // Strip non-color escape sequences (cursor moves etc.), keep SGR (m).
+  let out = "";
+  let open = 0;
+  const classes = [];
+  const re = /\x1b\[([0-9;]*)m/g;
+  let last = 0;
+  let m;
+  const applyText = (txt) => {
+    if (!txt) return;
+    out += _wcEscape(txt);
+  };
+  const closeSpans = () => { while (open > 0) { out += "</span>"; open--; } };
+  while ((m = re.exec(line)) !== null) {
+    applyText(line.slice(last, m.index));
+    last = re.lastIndex;
+    const codes = m[1].split(";").filter((x) => x !== "");
+    if (codes.length === 0 || codes.includes("0")) {
+      closeSpans();
+      continue;
+    }
+    const cls = [];
+    for (const code of codes) {
+      if (code === "1") cls.push("ansi-bold");
+      else if (code === "41") cls.push("ansi-bg-41");
+      else if (/^(3[0-7]|9[0-7])$/.test(code)) cls.push("ansi-" + code);
+    }
+    if (cls.length) { out += '<span class="' + cls.join(" ") + '">'; open++; }
+  }
+  applyText(line.slice(last));
+  closeSpans();
+  // Remove any remaining/unsupported escape sequences.
+  return out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+}
+
+function _wcRenderLine(text) {
+  const div = document.createElement("div");
+  div.className = "web-console-line";
+  div.innerHTML = _wcAnsiToHtml(text) || "&nbsp;";
+  return div;
+}
+
+function _wcAtBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+}
+
+async function _webConsolePoll() {
+  const out = document.getElementById("webConsoleOutput");
+  const statusEl = document.getElementById("webConsoleStatus");
+  if (!out) return;
+  try {
+    const resp = await fetch("/api/console?after=" + _webConsoleSeq);
+    const data = await resp.json();
+    if (data.enabled === false) { stopWebConsole(); setWebConsoleVisible(false); return; }
+
+    // Detect a server-side buffer reset/restart (our cursor is ahead of buffer).
+    if (typeof data.first_seq === "number" && _webConsoleSeq > data.seq) {
+      out.innerHTML = "";
+      _webConsoleSeq = 0;
+    }
+
+    const autoEl = document.getElementById("webConsoleAutoscroll");
+    const autoscroll = !autoEl || autoEl.checked;
+    const stick = autoscroll && _wcAtBottom(out);
+
+    // Remove any previously rendered partial (transient) line.
+    const oldPartial = out.querySelector(".web-console-partial");
+    if (oldPartial) oldPartial.remove();
+
+    if (Array.isArray(data.lines) && data.lines.length) {
+      const frag = document.createDocumentFragment();
+      for (const ln of data.lines) {
+        frag.appendChild(_wcRenderLine(ln.text));
+        if (typeof ln.seq === "number") _webConsoleSeq = ln.seq;
+      }
+      out.appendChild(frag);
+    }
+    if (data.partial) {
+      const p = _wcRenderLine(data.partial);
+      p.classList.add("web-console-partial");
+      out.appendChild(p);
+    }
+    if (stick || autoscroll) out.scrollTop = out.scrollHeight;
+    if (statusEl) statusEl.textContent = "";
+  } catch (e) {
+    if (statusEl) statusEl.textContent = t("Verbindung verloren …", "Connection lost …");
+  }
+}
+
+function startWebConsole() {
+  if (_webConsolePolling) return;
+  _webConsolePolling = true;
+  const out = document.getElementById("webConsoleOutput");
+  if (out) { out.innerHTML = ""; }
+  _webConsoleSeq = 0;
+  _webConsolePoll();
+  _webConsoleTimer = setInterval(_webConsolePoll, 1500);
+}
+
+function stopWebConsole() {
+  _webConsolePolling = false;
+  if (_webConsoleTimer) { clearInterval(_webConsoleTimer); _webConsoleTimer = null; }
+}
+
+// ─── DNS ────────────────────────────────────────────────────────────────────
+
+function dnsTestAppendErrorBtn(container, errorText) {
+  const btn = document.createElement("button");
+  btn.className = "dns-test-err-btn";
+  btn.textContent = t("Fehler anzeigen","Show error");
+  btn.onclick = function () {
+    const existing = container.querySelector(".dns-test-err-detail");
+    if (existing) {
+      existing.remove();
+      btn.textContent = t("Fehler anzeigen","Show error");
+    } else {
+      const detail = document.createElement("div");
+      detail.className = "dns-test-err-detail";
+      detail.textContent = errorText;
+      container.appendChild(detail);
+      btn.textContent = t("Fehler ausblenden","Hide error");
+    }
+  };
+  container.appendChild(btn);
+}
+
+function toggleDnsTestPanel() {
+  const panel = document.getElementById("dnsTestPanel");
+  if (!panel) return;
+  const opening = panel.style.display === "none";
+  panel.style.display = opening ? "block" : "none";
+  if (opening) runDnsTest();
+}
+
+async function runDnsTest() {
+  const btn = document.getElementById("dnsTestRunBtn");
+  const statusEl = document.getElementById("dnsTestStatus");
+  if (btn) { btn.disabled = true; btn.textContent = t("⏳ Teste…","⏳ Testing..."); }
+  if (statusEl) statusEl.innerHTML = t('<span class="dns-test-loading">⏳ Lädt…</span>','<span class="dns-test-loading">⏳ Loading...</span>');
+  for (const id of ["dnsTestRowAniWorld", "dnsTestRowSTO", "dnsTestRowFilmpalast"]) {
+    const row = document.getElementById(id);
+    if (row) {
+      const res = row.querySelector(".dns-test-site-result");
+      if (res) { res.className = "dns-test-site-result dns-test-loading"; res.textContent = t("⏳ Teste…","⏳ Testing..."); }
+    }
+  }
+  try {
+    const resp = await fetch("/api/settings/dns/test");
+    const data = await resp.json();
+    if (statusEl) {
+      const mode = data.dns_mode || "system";
+      const active = data.dns_active_server;
+      const modeLabel = { system: "System-DNS", cloudflare: "Cloudflare (1.1.1.1)", google: "Google (8.8.8.8)", quad9: "Quad9 (9.9.9.9)", custom: t("Benutzerdefiniert","Custom") }[mode] || mode;
+      if (mode === "system") {
+        statusEl.innerHTML = t('<span class="dns-test-ok">✓ System-DNS aktiv (kein eigener DNS konfiguriert)</span>','<span class="dns-test-ok">✓ System DNS active (no own DNS configured)</span>');
+      } else if (active) {
+        statusEl.innerHTML = t('<span class="dns-test-ok">✓ ' + modeLabel + ' aktiv — Server: ' + active + '</span>','<span class="dns-test-ok">✓ ' + modeLabel + ' active — Server: ' + active + '</span>');
+      } else {
+        statusEl.innerHTML = t('<span class="dns-test-warn">⚠ Gespeicherter Modus: ' + modeLabel + ' — aber kein Server aktiv. Einstellungen erneut speichern?</span>','<span class="dns-test-warn">⚠ Saved mode: ' + modeLabel + ' — but no server active. Save settings again?</span>');
+      }
+    }
+    const siteMap = { AniWorld: "dnsTestRowAniWorld", "S.TO": "dnsTestRowSTO", FilmPalast: "dnsTestRowFilmpalast" };
+    for (const [label, rowId] of Object.entries(siteMap)) {
+      const row = document.getElementById(rowId);
+      if (!row) continue;
+      const resEl = row.querySelector(".dns-test-site-result");
+      if (!resEl) continue;
+      const site = data.sites?.[label];
+      if (!site) { resEl.className = "dns-test-site-result dns-test-warn"; resEl.textContent = t("— Keine Daten","— No data"); continue; }
+      const ip = site.ip ? " (" + site.ip + ")" : "";
+      resEl.innerHTML = "";
+      const txt = document.createElement("span");
+      resEl.appendChild(txt);
+      if (site.http_ok && site.site_verified) {
+        resEl.className = "dns-test-site-result dns-test-ok";
+        txt.textContent = t("✓ Erreichbar & verifiziert","✓ Reachable & verified") + ip;
+      } else if (site.http_ok && !site.site_verified) {
+        resEl.className = "dns-test-site-result dns-test-warn";
+        txt.textContent = t("⚠ Erreichbar","⚠ Reachable") + ip + t(", aber Inhalt unbekannt — möglicherweise Sperr-Seite"," , but content unknown — possibly blocking page");
+      } else if (site.socket_ok) {
+        resEl.className = "dns-test-site-result dns-test-warn";
+        txt.textContent = t("⚠ DNS aufgelöst","⚠ DNS resolved") + ip + t(", aber HTTP fehlgeschlagen"," , but HTTP failed");
+        if (site.http_error) dnsTestAppendErrorBtn(resEl, site.http_error);
+      } else {
+        resEl.className = "dns-test-site-result dns-test-fail";
+        txt.textContent = t("✗ Nicht erreichbar","✗ Not reachable");
+        const errMsg = site.socket_error || site.http_error;
+        if (errMsg) dnsTestAppendErrorBtn(resEl, errMsg);
+      }
+    }
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = t('<span class="dns-test-fail">✗ Fehler: ' + e.message + '</span>','<span class="dns-test-fail">✗ Error: ' + e.message + '</span>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = t("↺ Erneut testen","↺ Test again"); }
+  }
+}
+
+function onDnsModeChange() {
+  const mode = document.getElementById("dnsMode")?.value;
+  const field = document.getElementById("dnsCustomField");
+  const statusEl = document.getElementById("dnsStatus");
+  if (field) field.style.display = mode === "custom" ? "" : "none";
+  if (statusEl) statusEl.style.display = "none";
+}
+
+async function saveDnsSettings() {
+  const mode = document.getElementById("dnsMode")?.value || "system";
+  const server = (document.getElementById("dnsServer")?.value || "").trim();
+  if (mode === "custom" && !server) { showToast(t("Bitte einen DNS-Server eingeben", "Please enter a DNS server"), "warning"); return; }
+  try {
+    const resp = await fetch("/api/settings/dns", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dns_mode: mode, dns_server: server }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      const modeLabel = { system: "System-DNS", cloudflare: "Cloudflare (1.1.1.1)", google: "Google (8.8.8.8)", quad9: "Quad9 (9.9.9.9)", custom: "Benutzerdefiniert" }[mode] || mode;
+      showToast(mode === "system" ? t("DNS zurückgesetzt — System-DNS aktiv","DNS reset — System DNS active") : t("DNS gespeichert — ", "DNS saved — ") + modeLabel + " aktiv", "success");
+    } else {
+      showToast(data.error || t("Fehler beim Speichern","Error saving"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message, "error");
+  }
+}
+
+// ─── SSO / Authentifizierung tab ────────────────────────────────────────────
+
+async function loadSsoSettings() {
+  try {
+    const resp = await fetch("/api/settings/sso");
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    const ssoEl = document.getElementById("ssoEnabled");
+    const forceSsoEl = document.getElementById("forceSso");
+    const issuerEl = document.getElementById("oidcIssuerUrl");
+    const clientIdEl = document.getElementById("oidcClientId");
+    const secretEl = document.getElementById("oidcClientSecret");
+    const displayEl = document.getElementById("oidcDisplayName");
+    const adminUsEl = document.getElementById("oidcAdminUser");
+    const adminSubEl = document.getElementById("oidcAdminSubject");
+
+    if (ssoEl) ssoEl.checked = data.sso_enabled === true || data.sso_enabled === "1";
+    if (forceSsoEl) forceSsoEl.checked = data.force_sso === true || data.force_sso === "1";
+    if (issuerEl) issuerEl.value = data.oidc_issuer_url || "";
+    if (clientIdEl) clientIdEl.value = data.oidc_client_id || "";
+    if (secretEl) secretEl.value = data.oidc_client_secret || "";
+    if (displayEl) displayEl.value = data.oidc_display_name || "";
+    if (adminUsEl) adminUsEl.value = data.oidc_admin_user || "";
+    if (adminSubEl) adminSubEl.value = data.oidc_admin_subject || "";
+
+    onSsoToggle();
+  } catch (e) {
+    // non-critical, SSO may not be configured
+  }
+}
+
+function onSsoToggle() {
+  const ssoEl = document.getElementById("ssoEnabled");
+  const ssoFields = document.getElementById("ssoFields");
+  if (!ssoFields) return;
+  ssoFields.style.display = (ssoEl && ssoEl.checked) ? "" : "none";
+}
+
+async function saveSsoSettings() {
+  const ssoEl = document.getElementById("ssoEnabled");
+  const forceSsoEl = document.getElementById("forceSso");
+  const issuerEl = document.getElementById("oidcIssuerUrl");
+  const clientIdEl = document.getElementById("oidcClientId");
+  const secretEl = document.getElementById("oidcClientSecret");
+  const displayEl = document.getElementById("oidcDisplayName");
+  const adminUsEl = document.getElementById("oidcAdminUser");
+  const adminSubEl = document.getElementById("oidcAdminSubject");
+
+  const body = {
+    sso_enabled: ssoEl ? ssoEl.checked : false,
+    force_sso: forceSsoEl ? forceSsoEl.checked : false,
+    oidc_issuer_url: issuerEl ? issuerEl.value.trim() : "",
+    oidc_client_id: clientIdEl ? clientIdEl.value.trim() : "",
+    oidc_display_name: displayEl ? displayEl.value.trim() : "",
+    oidc_admin_user: adminUsEl ? adminUsEl.value.trim() : "",
+    oidc_admin_subject: adminSubEl ? adminSubEl.value.trim() : "",
+  };
+  // Only include secret if user actually typed something (not the masked placeholder)
+  if (secretEl && secretEl.value && secretEl.value !== "***") {
+    body.oidc_client_secret = secretEl.value;
+  }
+
+  try {
+    const resp = await fetch("/api/settings/sso", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, "error"); return; }
+    showToast(t("SSO-Einstellungen gespeichert — Neustart erforderlich", "SSO settings saved — restart required"), "success");
+  } catch (e) {
+    showToast(t("SSO-Einstellungen konnten nicht gespeichert werden: " + e.message, "SSO settings could not be saved: " + e.message), "error");
+  }
+}
+
+// ─── Custom paths ────────────────────────────────────────────────────────────
+
+const customPathsBody = document.getElementById("customPathsBody");
+const customPathsTable = document.getElementById("customPathsTable");
+
+if (customPathsBody) loadCustomPaths();
+
+async function loadCustomPaths() {
+  if (!customPathsBody) return;
+  try {
+    const resp = await fetch("/api/custom-paths");
+    const data = await resp.json();
+    renderCustomPaths(data.paths || []);
+  } catch (e) {
+    showToast(t("Benutzerdefinierte Pfade konnten nicht geladen werden: " + e.message, "Custom paths could not be loaded: " + e.message));
+  }
+}
+
+function renderCustomPaths(paths) {
+  customPathsBody.innerHTML = "";
+  if (!paths.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = t('<td colspan="3" style="color:#6b7280;text-align:center">Keine benutzerdefinierten Pfade</td>','<td colspan="3" style="color:#6b7280;text-align:center">No custom paths</td>');
+    customPathsBody.appendChild(tr);
+    return;
+  }
+  paths.forEach(function (p) {
+    const tr = document.createElement("tr");
+    const delCell = (typeof settingsCanEdit !== "undefined" && settingsCanEdit)
+      ? '<td><button class="btn-del" onclick="deleteCustomPath(' + p.id + ')">'+t("Löschen","Delete")+'</button></td>'
+      : '<td></td>';
+    tr.innerHTML =
+      "<td>" + esc(p.name) + "</td>" +
+      "<td style=\"font-family:'SF Mono','Fira Code',monospace;font-size:.82rem\">" + esc(p.path) + "</td>" +
+      delCell;
+    customPathsBody.appendChild(tr);
+  });
+}
+
+async function addCustomPath() {
+  const name = document.getElementById("newPathName").value.trim();
+  const path = document.getElementById("newPathValue").value.trim();
+  if (!name || !path) { showToast(t("Name und Pfad sind erforderlich", "Name and path required")); return; }
+  try {
+    const resp = await fetch("/api/custom-paths", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, path }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    document.getElementById("newPathName").value = "";
+    document.getElementById("newPathValue").value = "";
+    showToast(t("Benutzerdefinierter Pfad hinzugefügt","Custom path added"));
+    loadCustomPaths();
+  } catch (e) {
+    showToast(t("Benutzerdefinierter Pfad konnte nicht hinzugefügt werden: " + e.message, "Custom path could not be added: " + e.message));
+  }
+}
+
+async function deleteCustomPath(id) {
+  if (!await showConfirm(t("Diesen benutzerdefinierten Pfad löschen?","Delete this custom path?"))) return;
+  try {
+    const resp = await fetch("/api/custom-paths/" + id, { method: "DELETE" });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Benutzerdefinierter Pfad gelöscht","Custom path deleted"));
+    loadCustomPaths();
+  } catch (e) {
+    showToast(t("Benutzerdefinierter Pfad konnte nicht gelöscht werden: " + e.message, "Custom path could not be deleted: " + e.message));
+  }
+}
+
+// ─── User management ─────────────────────────────────────────────────────────
+
+const userTableBody = document.getElementById("userTableBody");
+if (userTableBody) loadUsers();
+
+async function loadUsers() {
+  if (!userTableBody) return;
+  try {
+    const resp = await fetch("/admin/api/users");
+    const data = await resp.json();
+    renderUsers(data.users || []);
+  } catch (e) {
+    showToast(t("Benutzer konnten nicht geladen werden: " + e.message, "Users could not be loaded: " + e.message));
+  }
+}
+
+function renderUsers(users) {
+  const adminCount = users.filter(function (u) { return u.role === "admin"; }).length;
+  userTableBody.innerHTML = "";
+  users.forEach(function (u) {
+    const isLastAdmin = u.role === "admin" && adminCount <= 1;
+    const tr = document.createElement("tr");
+    const authMethod = u.auth_method || "local";
+    const authBadge = authMethod === "oidc"
+      ? '<span class="auth-badge auth-sso">SSO</span>'
+      : '<span class="auth-badge auth-local">'+t("Lokal","Local")+'</span>';
+    tr.innerHTML =
+      "<td>" + u.id + "</td>" +
+      "<td>" + esc(u.username) + "</td>" +
+      "<td><select onchange=\"changeRole(" + u.id + ", this.value)\" " + (isLastAdmin ? "disabled" : "") + ">" +
+      "<option value=\"user\" " + (u.role === "user" ? "selected" : "") + ">" + t("Benutzer","User") + "</option>" +
+      "<option value=\"admin\" " + (u.role === "admin" ? "selected" : "") + ">" + t("Administrator","Administrator") + "</option>" +
+      "</select></td>" +
+      "<td>" + authBadge + "</td>" +
+      "<td>" + esc(u.created_at) + "</td>" +
+      "<td>" + (isLastAdmin
+        ? '<span style="color:#555">'+t("geschützt","protected")+'</span>'
+        : '<button class="btn-del" onclick="deleteUser(' + u.id + ')">'+t("Löschen","Delete")+'</button>') + "</td>";
+    userTableBody.appendChild(tr);
+  });
+}
+
+async function addUser() {
+  const username = document.getElementById("newUsername").value.trim();
+  const password = document.getElementById("newPassword").value;
+  const role = document.getElementById("newRole").value;
+  if (!username || !password) { showToast(t("Benutzername und Passwort sind erforderlich", "Username and password required")); return; }
+  try {
+    const resp = await fetch("/admin/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, role }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newPassword").value = "";
+    showToast(t("Benutzer erstellt","User created"));
+    loadUsers();
+  } catch (e) {
+    showToast(t("Benutzer konnte nicht erstellt werden: " + e.message, "User could not be created: " + e.message));
+  }
+}
+
+async function deleteUser(id) {
+  if (!await showConfirm(t("Diesen Benutzer löschen?", "Delete this user?"))) return;
+  try {
+    const resp = await fetch("/admin/api/users/" + id, { method: "DELETE" });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    showToast(t("Benutzer gelöscht","User deleted"));
+    loadUsers();
+  } catch (e) {
+    showToast(t("Benutzer konnte nicht gelöscht werden: " + e.message, "User could not be deleted: " + e.message));
+  }
+}
+
+async function changeRole(id, newRole) {
+  try {
+    const resp = await fetch("/admin/api/users/" + id + "/role", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); loadUsers(); return; }
+    showToast(t("Rolle aktualisiert", "Role updated"));
+    loadUsers();
+  } catch (e) {
+    showToast(t("Rolle konnte nicht aktualisiert werden: " + e.message, "Role could not be updated: " + e.message));
+  }
+}
+
+// ─── External API key ─────────────────────────────────────────────────────────
+
+async function loadApiKey() {
+  try {
+    const resp = await fetch("/api/settings/api-key");
+    const data = await resp.json();
+    const el = document.getElementById("externalApiKeyDisplay");
+    if (el) el.value = data.key || "";
+    const baseUrl = window.location.origin;
+    const baseEl = document.getElementById("apiBaseUrlDisplay");
+    const exEl = document.getElementById("apiExampleUrl");
+    if (baseEl) baseEl.textContent = baseUrl;
+    if (exEl) exEl.textContent = baseUrl + "/api/v1/status?apikey=****";
+  } catch (e) { /* non-critical */ }
+}
+
+function toggleApiKeyVisibility() {
+  const el = document.getElementById("externalApiKeyDisplay");
+  const btn = document.getElementById("apiKeyToggleBtn");
+  if (!el) return;
+  const visible = el.type === "text";
+  el.type = visible ? "password" : "text";
+  btn.textContent = visible ? t("Anzeigen","Show") : t("Verbergen","Hide");
+}
+
+async function copyApiKey() {
+  const el = document.getElementById("externalApiKeyDisplay");
+  if (!el || !el.value) return;
+  try {
+    await navigator.clipboard.writeText(el.value);
+    showToast(t("API-Key kopiert","API key copied"), "success");
+  } catch (e) {
+    showToast(t("Kopieren fehlgeschlagen: " + e.message, "Copying failed: " + e.message), "error");
+  }
+}
+
+async function regenerateApiKey() {
+  if (!await showConfirm(t("API-Key neu generieren? Der alte Key wird sofort ungültig.","Regenerate API key? The old key will become invalid immediately."))) return;
+  try {
+    const resp = await fetch("/api/settings/api-key/regenerate", { method: "POST" });
+    const data = await resp.json();
+    if (data.ok) {
+      const el = document.getElementById("externalApiKeyDisplay");
+      if (el) el.value = data.key;
+      const exEl = document.getElementById("apiExampleUrl");
+      if (exEl) exEl.textContent = window.location.origin + "/api/v1/status?apikey=****";
+      showToast(t("Neuer API-Key generiert","New API key generated"), "success");
+    } else {
+      showToast(t("Fehler beim Generieren","Error generating"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: " + e.message, "Error: " + e.message), "error");
+  }
+}
+
+// ─── Update checker ───────────────────────────────────────────────────────────
+
+function _applyUpdateData(data) {
+  const latestEl        = document.getElementById("latestVersion");
+  const banner          = document.getElementById("updateBanner");
+  const bannerText      = document.getElementById("updateBannerText");
+  const changelog       = document.getElementById("updateChangelog");
+  const releaseLink     = document.getElementById("updateReleaseLink");
+  const status          = document.getElementById("updateStatus");
+  const pipCmd          = document.getElementById("updatePipCmd");
+  const devHint         = document.getElementById("devChannelHint");
+
+  const isDevInstall = !!data.is_dev_install;
+  const canSelfUpdate = !!data.can_self_update;
+  _selfUpdateCanUpdate = canSelfUpdate;
+  if (data.channel) _selfUpdateChannel = data.channel;
+
+  // "Verfügbar" field
+  if (latestEl) latestEl.textContent = data.latest_version || "—";
+
+  // Channel switch (pip/pipx only)
+  const channelRow = document.getElementById("updateChannelRow");
+  if (channelRow) channelRow.style.display = canSelfUpdate ? "" : "none";
+  _renderChannelSwitch(_selfUpdateChannel);
+
+  // Auto-update section only makes sense when we can self-update
+  const autoSec = document.getElementById("autoUpdateSection");
+  if (autoSec) autoSec.style.display = canSelfUpdate ? "" : "none";
+
+  // Manual pip command + dev copy-hint only when we cannot self-update
+  const pipEl = document.getElementById("updatePipCmd");
+  const pipBlock = (pipEl && pipEl.closest("div")) ? pipEl.closest("div").parentElement : null;
+  if (pipBlock) pipBlock.style.display = canSelfUpdate ? "none" : "";
+  if (devHint) devHint.style.display = (!canSelfUpdate && !isDevInstall) ? "" : "none";
+
+  if (data.error) {
+    if (status) status.textContent = "⚠️ " + data.error;
+    if (banner) banner.style.display = "none";
+  } else if (data.update_available) {
+    if (status) status.textContent = "";
+    if (banner) banner.style.display = "";
+
+    if (isDevInstall) {
+      // Dev install: neuere Commits auf models branch
+      if (bannerText) bannerText.textContent =
+        t("Neuere Commits verfügbar (aktueller Commit: " + data.latest_version + ")","Newer commits available (current commit: " + data.latest_version + ")");
+      if (releaseLink && data.release_url) {
+        releaseLink.href = data.release_url;
+        releaseLink.textContent = t("Commits ansehen","View commits");
+      }
+      if (changelog) changelog.style.display = "none";
+      if (pipCmd) pipCmd.textContent =
+        'pip install --upgrade "git+https://github.com/PD-Codes/MediaForge.git@models"';
+    } else {
+      // Release install: neue Version verfügbar
+      if (bannerText) bannerText.textContent =t("Version " + data.latest_version + " verfügbar (installiert: " + data.local_version + ")","Version " + data.latest_version + " available (installed: " + data.local_version + ")");
+      if (releaseLink && data.release_url) {
+        releaseLink.href = data.release_url;
+        releaseLink.textContent = t("Release öffnen","Open Release");
+      }
+      if (changelog) {
+        changelog.style.display = "";
+        changelog.textContent = data.release_notes || "";
+      }
+      if (pipCmd) pipCmd.textContent =
+        'pip install --upgrade mediaforge';
+    }
+  } else {
+    if (status) status.textContent = t("✓ Bereits aktuell.","✓ Already up to date.");
+    if (banner) banner.style.display = "none";
+  }
+
+  const installRow = document.getElementById("updateInstallRow");
+  if (installRow) installRow.style.display = (canSelfUpdate && data.update_available) ? "" : "none";
+}
+
+let _selfUpdateChannel = null;
+let _selfUpdateCanUpdate = false;
+
+function _renderChannelSwitch(channel) {
+  const sw = document.getElementById("updateChannelSwitch");
+  if (!sw) return;
+  sw.querySelectorAll(".update-channel-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.channel === channel);
+  });
+}
+
+function installUpdateNow() {
+  if (window.AniUpdate) window.AniUpdate.startInstall();
+}
+
+async function switchChannel(target) {
+  if (!target || target === _selfUpdateChannel) return;
+  const msg = target === "dev"
+    ? t("Die neueste (evtl. instabile) Version aus dem models-Branch wird jetzt installiert.",
+        "The latest (possibly unstable) version from the models branch will be installed now.")
+    : t("Die stabile Version wird jetzt installiert.",
+        "The stable release will be installed now.");
+  const title = target === "dev"
+    ? t("Zum Dev-Channel wechseln?", "Switch to the dev channel?")
+    : t("Zur stabilen Version wechseln?", "Switch to stable?");
+  const okLabel = t("Wechseln & installieren", "Switch & install");
+  let confirmed = false;
+  if (typeof showConfirm === "function") {
+    confirmed = await showConfirm(msg, okLabel, title, "btn-primary");
+  } else {
+    confirmed = window.confirm(msg);
+  }
+  if (!confirmed) return;
+  if (window.AniUpdate) window.AniUpdate.startInstall(target);
+}
+
+function _renderAutoUpdateDays(csv) {
+  const cont = document.getElementById("autoUpdateDays");
+  if (!cont) return;
+  const active = new Set(
+    String(csv || "").split(",").map((x) => parseInt(x.trim(), 10)).filter((x) => !isNaN(x)),
+  );
+  const labels = (typeof _weekdayLabels === "function")
+    ? _weekdayLabels()
+    : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  cont.innerHTML = "";
+  labels.forEach((lbl, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "weekday-toggle" + (active.has(i) ? " active" : "");
+    b.dataset.day = i;
+    b.textContent = lbl;
+    b.addEventListener("click", () => { b.classList.toggle("active"); saveAutoUpdate(); });
+    cont.appendChild(b);
+  });
+}
+
+function _getAutoUpdateDays() {
+  const cont = document.getElementById("autoUpdateDays");
+  if (!cont) return "";
+  return Array.from(cont.querySelectorAll(".weekday-toggle.active"))
+    .map((b) => b.dataset.day).join(",");
+}
+
+async function saveAutoUpdate() {
+  const enabled = document.getElementById("autoUpdateEnabled");
+  const timeEl = document.getElementById("autoUpdateTime");
+  const block = document.getElementById("autoUpdateBlock");
+  const isOn = !!(enabled && enabled.checked);
+  if (block) block.style.display = isOn ? "" : "none";
+  const days = _getAutoUpdateDays() || "0,1,2,3,4,5,6";
+  const payload = {
+    auto_update_enabled: isOn,
+    auto_update_days: days,
+    auto_update_time: (timeEl && timeEl.value) ? timeEl.value : "03:00",
+  };
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) showToast(t("Gespeichert", "Saved"), "success");
+    else showToast(data.error || t("Konnte nicht gespeichert werden", "Could not save"), "error");
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden", "Could not save"), "error");
+  }
+}
+
+async function copyUpdateCmd() {
+  const el = document.getElementById("updatePipCmd");
+  if (!el) return;
+  try {
+    await navigator.clipboard.writeText(el.textContent.trim());
+    showToast("Befehl kopiert", "success");
+  } catch (e) {
+    showToast(t("Kopieren fehlgeschlagen","failed to copy"), "error");
+  }
+}
+
+async function copyDevChannelCmd() {
+  const el = document.getElementById("devChannelCmd");
+  if (!el) return;
+  try {
+    await navigator.clipboard.writeText(el.textContent.trim());
+    showToast(t("Befehl kopiert", "Command Copied"), "success");
+  } catch (e) {
+    showToast(t("Kopieren fehlgeschlagen", "failed to copy"), "error");
+  }
+}
+
+async function checkForUpdates(force = false) {
+  const btn = document.getElementById("updateCheckBtn");
+  const status = document.getElementById("updateStatus");
+  if (btn) { btn.disabled = true; btn.textContent = "Prüfe…"; }
+  if (status) status.textContent = "";
+  try {
+    const resp = await fetch("/api/update-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force }),
+    });
+    _applyUpdateData(await resp.json());
+  } catch (e) {
+    if (status) status.textContent = t("⚠️ Fehler: ", "⚠️ Error:") + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = t("Jetzt prüfen", "check now"); }
+  }
+}
+
+(function initUpdateSection() {
+  fetch("/api/update-check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force: false }),
+  }).then(function (r) { return r.json(); }).then(_applyUpdateData).catch(function () { });
+})();
+
+// ─── Toast / helpers ──────────────────────────────────────────────────────────
+
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.className = "toast" + (type ? " toast-" + type : "");
+  t.style.display = "";
+  t.classList.remove("show");
+  void t.offsetWidth;
+  t.classList.add("show");
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(function () { t.classList.remove("show"); }, 4000);
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+
+// ─── Kick off ─────────────────────────────────────────────────────────────────
+loadSettings();
+
+// ─── .env migration banner ───────────────────────────────────────────────────
+
+(function checkEnvFileBanner() {
+  var banner = document.getElementById("envFileBanner");
+  if (!banner) return;
+  fetch("/api/settings/env-file")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.exists && data.migrated) {
+        banner.style.display = "flex";
+      }
+    })
+    .catch(function () { });
+})();
+
+async function deleteEnvFile() {
+  const banner = document.getElementById("envFileBanner");
+  if (!await showConfirm(t("~/.mediaforge/.env jetzt löschen? Diese Aktion kann nicht rückgängig gemacht werden.","Delete ~/.mediaforge/.env now? This action cannot be undone."))) return;
+  try {
+    const resp = await fetch("/api/settings/env-file", { method: "DELETE" });
+    const data = await resp.json();
+    if (data.ok) {
+      if (banner) banner.style.display = "none";
+      showToast(t(".env erfolgreich gelöscht", "env deleted successfully"), "success");
+    } else {
+      showToast(data.error || t("Fehler beim Löschen", "Error deleting env"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message, "error");
+  }
+}
+
+// ─── Design / Appearance ───────────────────────────────────────────────────
+
+function _loadDesignCheckboxes() {
+  const settings = [
+    { id: 'glowEffect', key: 'aw-glow-effect' },
+    { id: 'headerColor', key: 'aw-header-color' },
+    { id: 'skeletonLoader', key: 'aw-skeleton-loader' },
+    { id: 'chooseBorder', key: 'aw-choose-border' },
+    { id: 'activeDownloadGlow', key: 'aw-active-download-glow' },
+    { id: 'clickEffect', key: 'aw-click-effect' },
+    { id: 'iconMove', key: 'aw-icon-move' }
+  ];
+  settings.forEach(s => {
+    const el = document.getElementById(s.id);
+    if (el) el.checked = localStorage.getItem(s.key) === 'true';
+  });
+}
+
+function _toggleDesignSetting(key, id, className, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const active = el.checked;
+  localStorage.setItem(key, active);
+  document.body.classList.toggle(className, active);
+  showToast(label + (active ? t(" aktiviert", " enabled") : t(" deaktiviert", " disabled")));
+}
+
+function saveGlowEffect() {
+  _toggleDesignSetting('aw-glow-effect', 'glowEffect', 'glow-effect', t('Glow-Effekt','Glow Effect'));
+}
+
+function saveHeaderColor() {
+  _toggleDesignSetting('aw-header-color', 'headerColor', 'header-color', t  ('Header-Farbe','Header Color'));
+}
+
+function saveHeaderColorHelp() {
+  _toggleDesignSetting('aw-header-color-help', 'headerColorHelp', 'header-color-help', t('Header-Farbe umgestellt','Header Color Changed'));
+}
+
+function saveSkeletonLoader() {
+  _toggleDesignSetting('aw-skeleton-loader', 'skeletonLoader', 'skeleton-loader', t('Skeleton Loader','Skeleton Loader'));
+}
+
+function saveBorder() {
+  _toggleDesignSetting('aw-choose-border', 'chooseBorder', 'choose-border', t('Farbliche Markierung','Color marking'));
+}
+
+function saveActiveDownloadGlow() {
+  _toggleDesignSetting('aw-active-download-glow', 'activeDownloadGlow', 'active-download-glow', t('Download-Markierung','Download marking'));
+}
+
+function saveClickEffect() {
+  _toggleDesignSetting('aw-click-effect', 'clickEffect', 'click-effect', t('Klick-Effekt','Click Effect'));
+}
+
+function saveIconMove() {
+  _toggleDesignSetting('aw-icon-move', 'iconMove', 'icon-move', t('Icon Movement','Icon Movement'));
+}
+
+// ─── Drag to Scroll for Settings Tabs ─────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", () => {
+  const tabs = document.getElementById("settingsTabs");
+  if (!tabs) return;
+
+  let isDown = false;
+  let startX;
+  let scrollLeft;
+  let dragged = false;
+
+  tabs.addEventListener("mousedown", (e) => {
+    isDown = true;
+    dragged = false;
+    tabs.style.cursor = "grabbing";
+    startX = e.pageX - tabs.offsetLeft;
+    scrollLeft = tabs.scrollLeft;
+  });
+
+  tabs.addEventListener("mouseleave", () => {
+    isDown = false;
+    tabs.style.cursor = "grab";
+  });
+
+  tabs.addEventListener("mouseup", () => {
+    isDown = false;
+    tabs.style.cursor = "grab";
+  });
+
+  tabs.addEventListener("mousemove", (e) => {
+    if (!isDown) return;
+    const x = e.pageX - tabs.offsetLeft;
+    const walk = (x - startX) * 1.5; // scroll speed multiplier
+    if (Math.abs(walk) > 5) {
+      dragged = true;
+    }
+    tabs.scrollLeft = scrollLeft - walk;
+  });
+
+  // Intercept click event in capture phase to prevent switching tab when dragging
+  tabs.addEventListener("click", (e) => {
+    if (dragged) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+});
+
+// ─── Custom Time Picker ──────────────────────────────────────────────────────
+
+function createCustomTimePicker(inputEl) {
+  if (inputEl.customPickerCreated) return;
+  inputEl.customPickerCreated = true;
+
+  inputEl.style.display = "none";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "asf-custom-time-picker";
+  wrapper.style.display = "inline-flex";
+  wrapper.style.alignItems = "center";
+  wrapper.style.gap = "4px";
+
+  const selectHour = document.createElement("select");
+  selectHour.style.minWidth = "55px";
+  const selectHourWrap = document.createElement("div");
+  selectHourWrap.className = "asf-select-wrap";
+  selectHourWrap.appendChild(selectHour);
+  
+  const separator = document.createElement("span");
+  separator.textContent = ":";
+  separator.style.fontWeight = "bold";
+  separator.style.color = "var(--text-secondary)";
+
+  const selectMinute = document.createElement("select");
+  selectMinute.style.minWidth = "55px";
+  const selectMinuteWrap = document.createElement("div");
+  selectMinuteWrap.className = "asf-select-wrap";
+  selectMinuteWrap.appendChild(selectMinute);
+
+  const selectAmpm = document.createElement("select");
+  selectAmpm.style.minWidth = "60px";
+  const optAm = document.createElement("option");
+  optAm.value = "AM"; optAm.textContent = "AM";
+  const optPm = document.createElement("option");
+  optPm.value = "PM"; optPm.textContent = "PM";
+  selectAmpm.appendChild(optAm);
+  selectAmpm.appendChild(optPm);
+  const selectAmpmWrap = document.createElement("div");
+  selectAmpmWrap.className = "asf-select-wrap";
+  selectAmpmWrap.appendChild(selectAmpm);
+
+  inputEl.parentNode.insertBefore(wrapper, inputEl.nextSibling);
+  inputEl.customWrapper = wrapper;
+
+  function populateHours(is12h) {
+    const prevVal = selectHour.value;
+    selectHour.innerHTML = "";
+    if (is12h) {
+      for (let h = 1; h <= 12; h++) {
+        const opt = document.createElement("option");
+        opt.value = String(h).padStart(2, "0");
+        opt.textContent = String(h).padStart(2, "0");
+        selectHour.appendChild(opt);
+      }
+    } else {
+      for (let h = 0; h < 24; h++) {
+        const opt = document.createElement("option");
+        opt.value = String(h).padStart(2, "0");
+        opt.textContent = String(h).padStart(2, "0");
+        selectHour.appendChild(opt);
+      }
+    }
+    if (prevVal) {
+      selectHour.value = prevVal;
+    }
+  }
+
+  for (let m = 0; m < 60; m++) {
+    const opt = document.createElement("option");
+    opt.value = String(m).padStart(2, "0");
+    opt.textContent = String(m).padStart(2, "0");
+    selectMinute.appendChild(opt);
+  }
+
+  function syncPickerUI() {
+    const format = localStorage.getItem("timeFormatSetting") || "24h";
+    const is12h = format === "12h";
+
+    populateHours(is12h);
+
+    let [hh, mm] = (inputEl.value || "06:00").split(":");
+    let hVal = parseInt(hh, 10);
+    let mVal = parseInt(mm, 10);
+    if (isNaN(hVal)) hVal = 6;
+    if (isNaN(mVal)) mVal = 0;
+
+    if (is12h) {
+      let ampm = "AM";
+      if (hVal >= 12) {
+        ampm = "PM";
+        if (hVal > 12) hVal -= 12;
+      } else if (hVal === 0) {
+        hVal = 12;
+      }
+      selectHour.value = String(hVal).padStart(2, "0");
+      selectAmpm.value = ampm;
+      if (!selectAmpmWrap.parentNode) {
+        wrapper.appendChild(selectAmpmWrap);
+      }
+    } else {
+      selectHour.value = String(hVal).padStart(2, "0");
+      if (selectAmpmWrap.parentNode) {
+        wrapper.removeChild(selectAmpmWrap);
+      }
+    }
+    selectMinute.value = String(mVal).padStart(2, "0");
+  }
+
+  wrapper.appendChild(selectHourWrap);
+  wrapper.appendChild(separator);
+  wrapper.appendChild(selectMinuteWrap);
+
+  function updateInputValue() {
+    const format = localStorage.getItem("timeFormatSetting") || "24h";
+    const is12h = format === "12h";
+
+    let hVal = parseInt(selectHour.value, 10);
+    let mVal = parseInt(selectMinute.value, 10);
+
+    if (is12h) {
+      const ampm = selectAmpm.value;
+      if (ampm === "PM" && hVal < 12) hVal += 12;
+      else if (ampm === "AM" && hVal === 12) hVal = 0;
+    }
+
+    const hh = String(hVal).padStart(2, "0");
+    const mm = String(mVal).padStart(2, "0");
+    const newVal = hh + ":" + mm;
+
+    if (inputEl.value !== newVal) {
+      inputEl.value = newVal;
+      inputEl.dispatchEvent(new Event("change"));
+    }
+  }
+
+  selectHour.addEventListener("change", updateInputValue);
+  selectMinute.addEventListener("change", updateInputValue);
+  selectAmpm.addEventListener("change", updateInputValue);
+
+  inputEl.syncCustomPicker = syncPickerUI;
+  syncPickerUI();
+}
+
+function changeTimeFormatSetting() {
+  const select = document.getElementById("timeFormatSetting");
+  if (!select) return;
+  const val = select.value;
+  localStorage.setItem("timeFormatSetting", val);
+  
+  document.querySelectorAll("#downloadWindowStart, #downloadWindowEnd, .sync-time-row input").forEach((input) => {
+    if (input.syncCustomPicker) {
+      input.syncCustomPicker();
+    }
+  });
+}

@@ -1,0 +1,123 @@
+/* ============================================================
+   Auto-Sync schedule settings — weekday + time picker
+   Scoped to the settings Auto-Sync tab. Responsive / mobile friendly.
+   ============================================================ */
+
+/* Aligns with .settings-row / .settings-hint horizontal padding (22px) so the
+   block does not stick to the card edge. */
+.sync-weekly-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 22px 18px;
+}
+
+.sync-weekly-field { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+
+.weekday-toggles { display: flex; flex-wrap: wrap; gap: 7px; }
+.weekday-toggle {
+  min-width: 44px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--input-border, #3a3a4a);
+  background: var(--input-bg, #14141f);
+  color: var(--text-secondary, #c4c4d4);
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.weekday-toggle:hover { border-color: var(--accent, #6c8ef7); }
+.weekday-toggle.active {
+  background: var(--accent, #6c8ef7);
+  border-color: var(--accent, #6c8ef7);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sync-times-list { display: flex; flex-direction: column; gap: 8px; }
+.sync-time-row { display: flex; align-items: center; gap: 8px; }
+.sync-time-row input[type="time"] {
+  height: 34px;
+  padding: 0 10px;
+  background: var(--input-bg, #14141f);
+  border: 1px solid var(--input-border, #3a3a4a);
+  border-radius: 9px;
+  color: var(--text-primary, #fff);
+  font-size: 0.86rem;
+  font-family: inherit;
+}
+.sync-time-remove {
+  background: transparent;
+  border: 1px solid var(--input-border, #3a3a4a);
+  color: var(--text-muted, #9aa);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  line-height: 1;
+}
+.sync-time-remove:hover { border-color: #e05a5a; color: #e05a5a; }
+
+.sync-add-time {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  padding: 6px 14px;
+}
+
+@media (max-width: 640px) {
+  .sync-weekly-block { padding: 4px 14px 14px; }
+  .weekday-toggle { flex: 1 1 auto; min-width: 40px; text-align: center; }
+  .sync-time-row { flex-wrap: wrap; }
+  .sync-time-row input[type="time"] { flex: 1; min-width: 0; }
+  .sync-time-row .asf-custom-time-picker { flex: 1; display: flex; }
+  .sync-time-row .asf-custom-time-picker select { flex: 1; min-width: 0; }
+  .sync-add-time { width: 100%; text-align: center; }
+}
+
+.asf-custom-time-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width:30%;
+}
+.asf-select-wrap {
+  position: relative;
+  display: inline-block;
+}
+.asf-select-wrap select {
+  height: 34px !important;
+  padding: 0 24px 0 8px !important;
+  border-radius: 9px !important;
+  font-size: 0.84rem !important;
+  -moz-appearance: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  border: 1px solid var(--input-border, #3a3a4a) !important;
+  background: var(--input-bg, #14141f) !important;
+  color: var(--text-secondary, #c4c4d4) !important;
+  cursor: pointer;
+}
+.asf-select-wrap select:hover {
+  border-color: var(--accent, #6c8ef7) !important;
+}
+.asf-select-wrap select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.asf-select-wrap::after {
+  content: "";
+  font-size: 14px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, #9aa);
+  pointer-events: none;
+  border-color: var(--text-secondary, #c4c4d4) transparent transparent transparent;
+  border-style: solid;
+}
+.asf-select-wrap:has(select:disabled)::after {
+  opacity: 0.4;
+}

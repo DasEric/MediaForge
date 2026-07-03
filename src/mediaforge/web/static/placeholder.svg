@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="100%" height="100%">
+  <rect width="1920" height="1080" fill="#111216"/>
+
+  <g transform="translate(960, 310)">
+    <polygon 
+      points="-40,-70 -40,70 60,0"
+      fill="none"
+      stroke="#7c3aed"
+      stroke-width="16"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+  </g>
+
+  <text 
+    x="960" 
+    y="460"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="42"
+    font-weight="600"
+    fill="#4b5563"
+    text-anchor="middle"
+    letter-spacing="6">
+    NO IMAGE AVAILABLE
+  </text>
+</svg>

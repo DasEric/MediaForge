@@ -1,0 +1,292 @@
+/* ============================================================
+   AutoSync Episode Filter — shared dialog & picker styles
+   Used by the search modal (create) and the Auto-Sync page (edit).
+   Page-scoped under .asf-* classes, responsive + mobile friendly.
+   ============================================================ */
+
+.asf-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(3px);
+  padding: 16px;
+  overflow-y: auto;
+}
+.asf-overlay.asf-open { display: flex; align-items: flex-start; justify-content: center; }
+
+.asf-modal {
+  background: var(--bg-elevated, #1a1a28);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-md, 14px);
+  width: 100%;
+  max-width: 560px;
+  margin: auto;
+  padding: 22px 22px 18px;
+  position: relative;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.asf-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #aaa);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  line-height: 0;
+}
+.asf-close:hover { background: rgba(255, 255, 255, 0.07); color: var(--text-primary, #fff); }
+
+.asf-title { margin: 0 28px 2px 0; font-size: 1.12rem; font-weight: 600; color: var(--text-primary, #fff); }
+.asf-sub { margin: 0 0 16px; font-size: 0.82rem; color: var(--text-muted, #9aa); word-break: break-word; }
+
+.asf-section { margin-bottom: 16px; }
+.asf-section-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #9aa);
+  margin-bottom: 7px;
+}
+
+/* Mode segmented control */
+.asf-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.asf-mode {
+  flex: 1 1 0;
+  min-width: 140px;
+  border: 1px solid var(--input-border, #3a3a4a);
+  background: var(--input-bg, #14141f);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.asf-mode:hover { border-color: var(--accent, #6c8ef7); }
+.asf-mode.asf-active {
+  border-color: var(--accent, #6c8ef7);
+  background: color-mix(in srgb, var(--accent, #6c8ef7) 14%, transparent);
+}
+.asf-mode-title { font-size: 0.86rem; font-weight: 600; color: var(--text-primary, #fff); }
+.asf-mode-desc { font-size: 0.74rem; color: var(--text-muted, #9aa); margin-top: 2px; line-height: 1.35; }
+
+/* Inline selects (language / provider / path) */
+.asf-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.asf-row label { min-width: 92px; font-size: 0.82rem; color: var(--text-secondary, #c4c4d4); }
+.asf-select {
+  flex: 1;
+  height: 34px;
+  padding: 0 9px;
+  background: var(--input-bg, #14141f);
+  border: 1px solid var(--input-border, #3a3a4a);
+  border-radius: 9px;
+  color: var(--text-primary, #fff);
+  font-size: 0.84rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Season list */
+.asf-seasons {
+  border: 1px solid var(--border, #333);
+  border-radius: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.14);
+}
+.asf-season-block { border-bottom: 1px solid var(--border, #2a2a38); }
+.asf-season-block:last-child { border-bottom: none; }
+.asf-season {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  flex-wrap: wrap;
+}
+.asf-season.asf-movies { background: rgba(108, 142, 247, 0.06); }
+.asf-season-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent, #6c8ef7); flex-shrink: 0; }
+.asf-season-cb.asf-cb-checked {
+  background-color: var(--accent, #6c8ef7) !important;
+  border-color: var(--accent, #6c8ef7) !important;
+}
+.asf-season-cb.asf-cb-checked::before {
+  transform: translate(-50%, -50%) scale(3.5) !important;
+  opacity: 0 !important;
+}
+.asf-season-cb.asf-cb-checked::after {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%) !important;
+}
+.asf-season-cb.asf-cb-indet {
+  background-color: var(--accent, #6c8ef7) !important;
+  border-color: var(--accent, #6c8ef7) !important;
+}
+.asf-season-cb.asf-cb-indet::before {
+  transform: translate(-50%, -50%) scale(3.5) !important;
+  opacity: 0 !important;
+}
+.asf-season-cb.asf-cb-indet::after {
+  content: '' !important;
+  width: 10px !important;
+  height: 2px !important;
+  background-color: white !important;
+  opacity: 1 !important;
+  clip-path: none !important;
+  margin-top: 40%;
+  margin-left: 10%;
+}
+.asf-season-name { font-size: 0.85rem; color: var(--text-primary, #fff); font-weight: 500; }
+.asf-season-count { font-size: 0.74rem; color: var(--text-muted, #9aa); }
+.asf-season-spacer { flex: 1; min-width: 8px; }
+.asf-ep-input {
+  width: 120px;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--input-bg, #14141f);
+  border: 1px solid var(--input-border, #3a3a4a);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.asf-ep-input:disabled { opacity: 0.4; cursor: not-allowed; }
+.asf-ep-input.asf-invalid { border-color: #e05a5a; }
+
+.asf-movie-path-row { display: none; align-items: center; gap: 10px; margin-top: 10px; }
+.asf-movie-path-row.asf-show { display: flex; }
+
+.asf-hint {
+  font-size: 0.74rem;
+  color: var(--text-muted, #9aa);
+  line-height: 1.45;
+  margin: 8px 2px 0;
+}
+.asf-spinner { font-size: 0.84rem; color: var(--text-muted, #9aa); padding: 18px 4px; text-align: center; }
+.asf-warn {
+  font-size: 0.78rem;
+  color: #e0b15a;
+  background: rgba(224, 177, 90, 0.1);
+  border: 1px solid rgba(224, 177, 90, 0.25);
+  border-radius: 8px;
+  padding: 8px 11px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.asf-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+/* Filter pill on job cards / search button */
+.asf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 540px) {
+  .asf-modal { padding: 18px 15px 14px; }
+  .asf-row { flex-wrap: wrap; }
+  .asf-row label { min-width: 0; flex-basis: 100%; }
+  .asf-ep-input { width: 100%; }
+  .asf-season-spacer { flex-basis: 100%; }
+}
+
+
+/* expandable season + episode chips */
+.asf-season-sel {
+  font-size: 0.74rem;
+  color: var(--accent, #6c8ef7);
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asf-expand {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #9aa);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 0;
+  flex-shrink: 0;
+  transition: transform 0.15s, color 0.15s;
+}
+.asf-expand:hover { color: var(--text-primary, #fff); background: rgba(255,255,255,0.06); }
+.asf-expand.asf-open { transform: rotate(180deg); color: var(--text-primary, #fff) !important; }
+
+.asf-episodes { padding: 4px 12px 12px 38px; }
+.asf-chip-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+.asf-mini {
+  font-size: 0.76rem !important;
+  padding: 5px 12px !important;
+  border-radius: 7px !important;
+  border: 1px solid var(--input-border, #3a3a4a) !important;
+  background: var(--input-bg, #14141f) !important;
+  color: var(--text-secondary, #c4c4d4) !important;
+  cursor: pointer;
+  text-align: center;
+  transition: opacity 0.15s, background 0.12s, border-color 0.12s, color 0.12s;
+}
+.asf-mini:hover { border-color: var(--accent, #6c8ef7) !important; color: var(--text-primary, #fff) !important; opacity: 1; }
+.asf-mini.asf-mini-on {
+  background: var(--accent, #6c8ef7) !important;
+  border-color: var(--accent, #6c8ef7) !important;
+  color: #fff !important;
+  font-weight: 600;
+  opacity: 1;
+}
+.asf-mini.asf-mini-off {
+  opacity: 0.45;
+}
+
+.asf-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 6px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+.asf-chip {
+  font-size: 0.76rem !important;
+  border-radius: 7px !important;
+  border: 1px solid var(--input-border, #3a3a4a) !important;
+  background: var(--input-bg, #14141f) !important;
+  color: var(--text-secondary, #c4c4d4) !important;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  padding: unset !important;
+}
+
+.asf-chip:hover { border-color: var(--accent, #6c8ef7); }
+.asf-chip-on {
+  background: var(--accent, #6c8ef7) !important;
+  border-color: var(--accent, #6c8ef7) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+@media (max-width: 540px) {
+  .asf-episodes { padding-left: 14px; }
+  .asf-chip-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
+}
+
+/* movies / specials toggle (own section) */
+.asf-movies-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.86rem;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+.asf-movies-toggle .asf-season-cb { width: 16px; height: 16px; }

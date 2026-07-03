@@ -1,0 +1,255 @@
+/* Auto-Sync grouping / view controls — page-specific styles */
+
+/* ===== Controls row (view dropdown, auto-grouping, search) ===== */
+.autosync-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.autosync-control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.autosync-control-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+.autosync-search-field {
+  flex: 1 1 220px;
+}
+.autosync-search-input {
+  height: 38px;
+  width: 100%;
+  padding: 0 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.autosync-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.autosync-controls .sync-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.autosync-rename-btn {
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+/* ===== Bulk action toolbar ===== */
+.batch-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.batch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.batch-selinfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.batch-clear {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+}
+.batch-clear:hover { color: var(--text-primary); }
+.batch-clear svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.batch-actions {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 16px 24px;
+  align-items: end;
+}
+.bg-status { grid-column: 1; grid-row: 1; }
+.bg-path   { grid-column: 2; grid-row: 1; }
+.bg-delete { grid-column: 3; grid-row: 1; justify-self: end; }
+.bg-group  { grid-column: 1 / -1; grid-row: 2; }
+.batch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.batch-group-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  min-height: 0.95rem;
+  line-height: 0.95rem;
+}
+.batch-group-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.batch-btn {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+.batch-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.batch-toolbar .batch-input,
+.batch-toolbar .batch-select {
+  height: 34px;
+  padding: 0 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.batch-toolbar .batch-input { width: 150px; }
+.batch-toolbar .bg-group .batch-input { width: 220px; }
+.batch-toolbar .batch-select { width: 150px; cursor: pointer; }
+.batch-toolbar .batch-input:focus,
+.batch-toolbar .batch-select:focus { outline: none; border-color: var(--accent); }
+
+/* ===== Auto-grouping accordion sections ===== */
+.autosync-group {
+  margin-bottom: 18px;
+}
+.autosync-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease;
+}
+.autosync-group-header:hover {
+  border-color: var(--accent);
+}
+.autosync-group-chevron {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+.autosync-group.collapsed .autosync-group-chevron {
+  transform: rotate(0deg);
+}
+.autosync-group-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.autosync-group-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  flex-shrink: 0;
+}
+.autosync-group-body {
+  padding-top: 14px;
+}
+.autosync-group.collapsed .autosync-group-body {
+  display: none;
+}
+
+/* ===== Grayed (adaptive-captured) cards inside a group view ===== */
+.sync-card.sync-card-grayed {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+.sync-card.sync-card-grayed:hover {
+  opacity: 0.8;
+}
+
+/* Group pill on cards */
+.queue-meta-pill.queue-group-pill {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .autosync-controls {
+    gap: 10px;
+  }
+  .autosync-control-field {
+    flex: 1 1 100%;
+  }
+  .autosync-control-field .sync-select {
+    width: 100%;
+  }
+  .autosync-search-field {
+    flex: 1 1 100%;
+  }
+  .autosync-rename-btn {
+    flex: 1 1 100%;
+  }
+  .batch-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .batch-group { width: 100%; }
+  .batch-group-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .batch-group-controls .batch-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .batch-toolbar .batch-input,
+  .batch-toolbar .batch-select,
+  .batch-toolbar .bg-group .batch-input {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+}
