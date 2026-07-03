@@ -13,6 +13,7 @@ services:
       #       are stored in the database and configurable via the WebUI.
       #       Existing .env files are automatically imported on first start.
       - mediaforge-data:/home/mediaforge/.mediaforge
+      - aniworld-data:/home/mediaforge/.aniworld:ro # for the migration
 
     # NOTE: Create ./Downloads before running: mkdir -p Downloads
     # Docker creates missing bind-mount directories as root, causing permission errors.
