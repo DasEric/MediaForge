@@ -56,8 +56,14 @@ RUN apt-get update && apt-get install -y \
     ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime && \
     mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix && \
     useradd -m -d /home/mediaforge mediaforge && \
-    mkdir -p /app/Downloads /home/mediaforge/.mediaforge && \
+    mkdir -p /app/Downloads /home/mediaforge/.mediaforge /home/mediaforge/.aniworld && \
     chown -R mediaforge:mediaforge /app /home/mediaforge
+
+# .aniworld is only the mount point for legacy "AniWorld Downloader" volumes.
+# Pre-creating it with the right ownership means users migrating from the old
+# image can just add "- aniworld-data:/home/mediaforge/.aniworld:ro" to their
+# compose file — no manual chown needed. legacy_import.py picks it up and
+# copies the data on first boot; the folder stays empty and harmless otherwise.
 
 # Container-friendly Python defaults
 ENV PYTHONDONTWRITEBYTECODE=1 \

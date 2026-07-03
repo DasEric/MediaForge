@@ -15,6 +15,17 @@ services:
       - mediaforge-data:/home/mediaforge/.mediaforge
       - aniworld-data:/home/mediaforge/.aniworld:ro # for the migration
 
+      # --- One-time migration from the old "AniWorld Downloader" container ---
+      # Uncomment to import an existing ~/.aniworld install on first boot
+      # (settings, history, users, browser profile). The image already owns
+      # this mount point, so no manual chown is needed. Find your old volume
+      # name first with: docker volume ls | grep aniworld
+      # - <old-project>_aniworld-data:/home/mediaforge/.aniworld:ro
+      #
+      # Remove this line again once the WebUI confirms the import is done
+      # (Settings page shows a "legacy data imported" notice), then clean up
+      # the old volume with: docker volume rm <old-project>_aniworld-data
+
     # NOTE: Create ./Downloads before running: mkdir -p Downloads
     # Docker creates missing bind-mount directories as root, causing permission errors.
 
@@ -53,3 +64,8 @@ services:
 
 volumes:
   mediaforge-data:
+  # Only needed while the migration line above is uncommented — points Compose
+  # at the existing old volume instead of creating an empty new one.
+  # aniworld-data:
+  #   external: true
+  #   name: <old-project>_aniworld-data
