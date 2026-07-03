@@ -3934,3 +3934,23 @@ msgstr "Deine Daten wurden beim ersten Start bereits automatisch übernommen."
 
 msgid "Nothing left to import — everything is already here."
 msgstr "Nichts mehr zu importieren — es ist bereits alles da."
+
+# --- MediaForge: Quellen / Sources feature ---
+
+msgid "Sources"
+msgstr "Quellen"
+
+msgid "Source order"
+msgstr "Reihenfolge der Quellen"
+
+msgid "Set the order in which sources appear on the start page. Drag the rows or use the arrows. For each source you can also choose whether new or popular items are shown first."
+msgstr "Lege fest, in welcher Reihenfolge die Quellen auf der Startseite erscheinen. Ziehe die Zeilen oder nutze die Pfeile. Für jede Quelle kannst du außerdem wählen, ob neue oder beliebte Inhalte zuerst angezeigt werden."
+
+msgid "Enable or disable the available sources. Disabled sources are hidden on the start page and are no longer loaded there."
+msgstr "Aktiviere oder deaktiviere die verfügbaren Quellen. Deaktivierte Quellen werden auf der Startseite ausgeblendet und dort nicht mehr geladen."
+
+msgid "Also hide disabled sources from search results"
+msgstr "Deaktivierte Quellen auch aus den Suchergebnissen ausblenden"
+
+msgid "When enabled, disabled sources are also skipped in the search results."
+msgstr "Wenn aktiviert, werden deaktivierte Quellen auch in den Suchergebnissen übersprungen."

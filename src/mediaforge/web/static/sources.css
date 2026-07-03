@@ -1,0 +1,175 @@
+/* ============================================================================
+   sources.css — Quellen-Reihenfolge & An/Aus (Settings › Design / Quellen)
+   Eigenständige, responsive und mobil-taugliche Styles.
+   ========================================================================== */
+
+.source-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.source-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-elevated, var(--bg-card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  transition: border-color var(--transition, .15s ease),
+              box-shadow var(--transition, .15s ease),
+              opacity var(--transition, .15s ease),
+              transform var(--transition, .15s ease);
+  cursor: default;
+}
+
+.source-order-row.dragging {
+  opacity: 0.5;
+  border-color: var(--accent);
+}
+
+.source-order-row.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 -2px 0 0 var(--accent) inset;
+}
+
+.source-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.source-drag-handle:active {
+  cursor: grabbing;
+}
+
+.source-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.source-badge::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.source-order-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.source-section-toggle {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition, .15s ease),
+              color var(--transition, .15s ease),
+              border-color var(--transition, .15s ease);
+}
+
+.source-section-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.source-move-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition, .15s ease),
+              color var(--transition, .15s ease),
+              border-color var(--transition, .15s ease);
+}
+
+.source-move-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.source-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+
+.source-sec-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.source-sec-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+
+.source-section-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Mobil / schmale Viewports ─────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .source-order-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .source-badge {
+    flex: 1 1 auto;
+  }
+
+  .source-order-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .source-section-toggle {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}

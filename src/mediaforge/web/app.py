@@ -5246,7 +5246,30 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
 
                     "calendar_lists":     get_setting("crunchyroll_calendar_lists",     "0"),
                     "calendar_release":   get_setting("crunchyroll_calendar_release",   "0"),
-                }
+                },
+                "sources": {
+                    "order": get_setting("home_source_order", "aniworld,sto,filmpalast"),
+                    "section_order": {
+                        "aniworld": get_setting("home_section_order_aniworld", "new,popular"),
+                        "sto":      get_setting("home_section_order_sto",      "new,popular"),
+                    },
+                    "sections": {
+                        "aniworld": {
+                            "new":     get_setting("source_show_new_aniworld",     "1"),
+                            "popular": get_setting("source_show_popular_aniworld", "1"),
+                        },
+                        "sto": {
+                            "new":     get_setting("source_show_new_sto",     "1"),
+                            "popular": get_setting("source_show_popular_sto", "1"),
+                        },
+                    },
+                    "enabled": {
+                        "aniworld":   get_setting("source_enabled_aniworld",   "1"),
+                        "sto":        get_setting("source_enabled_sto",        "1"),
+                        "filmpalast": get_setting("source_enabled_filmpalast", "1"),
+                    },
+                    "hide_disabled_in_search": get_setting("sources_hide_in_search", "0"),
+                },
             }
         )
 
@@ -7152,6 +7175,41 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             t_norm = f"{_h:02d}:{_m:02d}"
             set_setting("auto_update_time", t_norm)
             os.environ["MEDIAFORGE_AUTO_UPDATE_TIME"] = t_norm
+        # -- Quellen / Sources: Reihenfolge & Aktivierung (admin only) --
+        _source_keys = (
+            "home_source_order", "home_section_order_aniworld", "home_section_order_sto",
+            "source_enabled_aniworld", "source_enabled_sto", "source_enabled_filmpalast",
+            "source_show_new_aniworld", "source_show_popular_aniworld",
+            "source_show_new_sto", "source_show_popular_sto",
+            "sources_hide_in_search",
+        )
+        if any(_sk in data for _sk in _source_keys):
+            _su, _sadmin = _get_current_user_info()
+            if not _sadmin:
+                return jsonify({"error": "forbidden"}), 403
+        if "home_source_order" in data:
+            _parts = [p.strip().lower() for p in str(data["home_source_order"]).split(",") if p.strip()]
+            if sorted(_parts) != ["aniworld", "filmpalast", "sto"]:
+                return jsonify({"error": "Invalid home_source_order: must be a permutation of aniworld,sto,filmpalast"}), 400
+            set_setting("home_source_order", ",".join(_parts))
+        for _prov in ("aniworld", "sto"):
+            _k = "home_section_order_" + _prov
+            if _k in data:
+                _parts = [p.strip().lower() for p in str(data[_k]).split(",") if p.strip()]
+                if sorted(_parts) != ["new", "popular"]:
+                    return jsonify({"error": "Invalid %s: must be a permutation of new,popular" % _k}), 400
+                set_setting(_k, ",".join(_parts))
+        for _prov in ("aniworld", "sto", "filmpalast"):
+            _k = "source_enabled_" + _prov
+            if _k in data:
+                set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
+        for _prov in ("aniworld", "sto"):
+            for _sec in ("new", "popular"):
+                _k = "source_show_" + _sec + "_" + _prov
+                if _k in data:
+                    set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
+        if "sources_hide_in_search" in data:
+            set_setting("sources_hide_in_search", "1" if str(data["sources_hide_in_search"]).lower() in ("true", "1") else "0")
         return jsonify({"ok": True})
 
     @app.route("/api/custom-paths")

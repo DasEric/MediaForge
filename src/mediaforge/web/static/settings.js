@@ -21,7 +21,7 @@ function switchTab(name) {
 (function restoreTab() {
   var hash = "";
   try { hash = (window.location.hash || "").replace("#", "").trim(); } catch (e) { }
-  var validTabs = ["general", "downloads", "autosync", "network", "auth", "api", "updates"];
+  var validTabs = ["general", "design", "sources", "downloads", "autosync", "network", "auth", "api", "updates"];
   var tab = (hash && validTabs.indexOf(hash) !== -1) ? hash : "";
   if (!tab) {
     try { tab = localStorage.getItem("settingsActiveTab") || "downloads"; } catch (e) { tab = "downloads"; }
@@ -163,6 +163,9 @@ async function loadSettings() {
 
     // Design tab - Extended Settings
     _loadDesignCheckboxes();
+
+    // Sources: order, section order, enabled state, search scope
+    _loadSourceSettings(data.sources || {});
 
   } catch (e) {
     showToast("Einstellungen konnten nicht geladen werden: " + e.message);
@@ -1823,4 +1826,222 @@ function changeTimeFormatSetting() {
       input.syncCustomPicker();
     }
   });
+}
+
+
+// ─── Quellen / Sources: Reihenfolge & Aktivierung ───────────────────────────
+
+const SOURCE_META = {
+  aniworld:   { label: "AniWorld",   cls: "browse-provider-aniworld",   hasSections: true },
+  sto:        { label: "S.TO",       cls: "browse-provider-sto",        hasSections: true },
+  filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false }
+};
+
+let _sourceState = {
+  order: ["aniworld", "sto", "filmpalast"],
+  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"] },
+  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true } },
+  enabled: { aniworld: true, sto: true, filmpalast: true },
+  hide_in_search: false
+};
+
+function _splitOrder(str, fallback) {
+  const parts = String(str || "").split(",").map(p => p.trim().toLowerCase()).filter(Boolean);
+  return parts.length ? parts : fallback.slice();
+}
+
+function _loadSourceSettings(sources) {
+  sources = sources || {};
+  const validProv = ["aniworld", "sto", "filmpalast"];
+  let order = _splitOrder(sources.order, ["aniworld", "sto", "filmpalast"]).filter(p => validProv.indexOf(p) !== -1);
+  // ensure every provider is present exactly once
+  validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
+  _sourceState.order = order;
+
+  const so = sources.section_order || {};
+  _sourceState.section_order.aniworld = _splitOrder(so.aniworld, ["new", "popular"]);
+  _sourceState.section_order.sto      = _splitOrder(so.sto,      ["new", "popular"]);
+
+  const secVis = sources.sections || {};
+  ["aniworld", "sto"].forEach(p => {
+    const sp = secVis[p] || {};
+    _sourceState.sections_visible[p] = { new: sp.new !== "0", popular: sp.popular !== "0" };
+  });
+
+  const en = sources.enabled || {};
+  _sourceState.enabled.aniworld   = en.aniworld   !== "0";
+  _sourceState.enabled.sto        = en.sto        !== "0";
+  _sourceState.enabled.filmpalast = en.filmpalast !== "0";
+  _sourceState.hide_in_search = sources.hide_disabled_in_search === "1";
+
+  // Reflect enabled toggles (Quellen tab)
+  const cbSto = document.getElementById("sourceEnabledSto");
+  const cbAni = document.getElementById("sourceEnabledAniworld");
+  const cbFp  = document.getElementById("sourceEnabledFilmpalast");
+  if (cbSto) cbSto.checked = _sourceState.enabled.sto;
+  if (cbAni) cbAni.checked = _sourceState.enabled.aniworld;
+  if (cbFp)  cbFp.checked  = _sourceState.enabled.filmpalast;
+  const cbHide = document.getElementById("sourcesHideInSearch");
+  if (cbHide) cbHide.checked = _sourceState.hide_in_search;
+
+  _renderSourceOrder();
+}
+
+function _sectionLabel(prov) {
+  const first = (_sourceState.section_order[prov] || ["new", "popular"])[0];
+  return first === "new" ? t("Neu zuerst", "New first") : t("Beliebt zuerst", "Popular first");
+}
+
+function _renderSourceOrder() {
+  const list = document.getElementById("sourceOrderList");
+  if (!list) return;
+  list.innerHTML = "";
+  _sourceState.order.forEach((prov, idx) => {
+    const meta = SOURCE_META[prov];
+    if (!meta) return;
+    const row = document.createElement("div");
+    row.className = "source-order-row";
+    row.setAttribute("draggable", "true");
+    row.dataset.provider = prov;
+
+    let sectionCtrls = "";
+    if (meta.hasSections) {
+      const vis = _sourceState.sections_visible[prov] || { new: true, popular: true };
+      const bothVisible = vis.new && vis.popular;
+      sectionCtrls =
+        '<label class="source-sec-check"><input type="checkbox" ' + (vis.new ? "checked" : "") +
+          ' onchange="toggleSourceSectionVisible(\'' + prov + '\',\'new\')"> ' + t("Neu", "New") + '</label>' +
+        '<label class="source-sec-check"><input type="checkbox" ' + (vis.popular ? "checked" : "") +
+          ' onchange="toggleSourceSectionVisible(\'' + prov + '\',\'popular\')"> ' + t("Beliebt", "Popular") + '</label>' +
+        '<button type="button" class="source-section-toggle" ' + (bothVisible ? "" : "disabled") +
+          ' title="' + t("Reihenfolge der Bereiche", "Order of the sections") + '"' +
+          ' onclick="toggleSourceSection(\'' + prov + '\')">' + _sectionLabel(prov) + '</button>';
+    }
+
+    row.innerHTML =
+      '<span class="source-drag-handle" title="' + t("Ziehen zum Sortieren", "Drag to reorder") + '" aria-hidden="true">' +
+        '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><circle cx="7" cy="5" r="1.5"/><circle cx="13" cy="5" r="1.5"/><circle cx="7" cy="10" r="1.5"/><circle cx="13" cy="10" r="1.5"/><circle cx="7" cy="15" r="1.5"/><circle cx="13" cy="15" r="1.5"/></svg>' +
+      '</span>' +
+      '<span class="source-badge ' + meta.cls + '">' + meta.label + '</span>' +
+      '<div class="source-order-actions">' +
+        sectionCtrls +
+        '<button type="button" class="source-move-btn" title="' + t("Nach oben", "Move up") + '" ' + (idx === 0 ? "disabled" : "") + ' onclick="moveSource(\'' + prov + '\',-1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</button>' +
+        '<button type="button" class="source-move-btn" title="' + t("Nach unten", "Move down") + '" ' + (idx === _sourceState.order.length - 1 ? "disabled" : "") + ' onclick="moveSource(\'' + prov + '\',1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</button>' +
+      '</div>';
+
+    _attachSourceDnd(row);
+    list.appendChild(row);
+  });
+}
+let _dragProv = null;
+function _attachSourceDnd(row) {
+  row.addEventListener("dragstart", (e) => {
+    _dragProv = row.dataset.provider;
+    row.classList.add("dragging");
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", _dragProv); } catch (err) {}
+  });
+  row.addEventListener("dragend", () => {
+    _dragProv = null;
+    row.classList.remove("dragging");
+    document.querySelectorAll(".source-order-row.drag-over").forEach(r => r.classList.remove("drag-over"));
+  });
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
+    if (row.dataset.provider !== _dragProv) row.classList.add("drag-over");
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+  row.addEventListener("drop", (e) => {
+    e.preventDefault();
+    row.classList.remove("drag-over");
+    const target = row.dataset.provider;
+    if (!_dragProv || _dragProv === target) return;
+    const order = _sourceState.order;
+    const from = order.indexOf(_dragProv);
+    const to = order.indexOf(target);
+    if (from === -1 || to === -1) return;
+    order.splice(from, 1);
+    order.splice(to, 0, _dragProv);
+    _renderSourceOrder();
+    _saveSourceOrder();
+  });
+}
+
+function moveSource(prov, dir) {
+  const order = _sourceState.order;
+  const i = order.indexOf(prov);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= order.length) return;
+  const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+  _renderSourceOrder();
+  _saveSourceOrder();
+}
+
+function toggleSourceSection(prov) {
+  const cur = _sourceState.section_order[prov] || ["new", "popular"];
+  _sourceState.section_order[prov] = [cur[1], cur[0]];
+  _renderSourceOrder();
+  _saveSectionOrder(prov);
+}
+
+function toggleSourceSectionVisible(prov, sec) {
+  const vis = _sourceState.sections_visible[prov] || { new: true, popular: true };
+  vis[sec] = !vis[sec];
+  _sourceState.sections_visible[prov] = vis;
+  _renderSourceOrder();
+  const payload = {};
+  payload["source_show_" + sec + "_" + prov] = vis[sec];
+  const secLabel = sec === "new" ? t("Neu", "New") : t("Beliebt", "Popular");
+  _putSettings(payload, secLabel + (vis[sec] ? t(" eingeblendet", " shown") : t(" ausgeblendet", " hidden")));
+}
+
+async function _putSettings(payload, okMsg) {
+  try {
+    const resp = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return false; }
+    if (okMsg) showToast(okMsg);
+    return true;
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not be saved: ") + e.message);
+    return false;
+  }
+}
+
+function _saveSourceOrder() {
+  _putSettings({ home_source_order: _sourceState.order.join(",") }, t("Reihenfolge gespeichert", "Order saved"));
+}
+
+function _saveSectionOrder(prov) {
+  const payload = {};
+  payload["home_section_order_" + prov] = (_sourceState.section_order[prov] || ["new", "popular"]).join(",");
+  _putSettings(payload, t("Reihenfolge gespeichert", "Order saved"));
+}
+
+function saveSourceEnabled(prov) {
+  const map = { sto: "sourceEnabledSto", aniworld: "sourceEnabledAniworld", filmpalast: "sourceEnabledFilmpalast" };
+  const el = document.getElementById(map[prov]);
+  if (!el) return;
+  _sourceState.enabled[prov] = el.checked;
+  const payload = {};
+  payload["source_enabled_" + prov] = el.checked;
+  const label = SOURCE_META[prov] ? SOURCE_META[prov].label : prov;
+  _putSettings(payload, label + (el.checked ? t(" aktiviert", " enabled") : t(" deaktiviert", " disabled")));
+}
+
+function saveSourcesHideInSearch() {
+  const el = document.getElementById("sourcesHideInSearch");
+  if (!el) return;
+  _sourceState.hide_in_search = el.checked;
+  _putSettings({ sources_hide_in_search: el.checked },
+    el.checked ? t("Deaktivierte Quellen aus Suche ausgeblendet", "Disabled sources hidden from search")
+               : t("Deaktivierte Quellen in Suche sichtbar", "Disabled sources shown in search"));
 }

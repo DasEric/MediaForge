@@ -8,7 +8,8 @@ function setUiLanguage(lang) {
 }
 </script>
 {% endblock %}
-{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sources.css') }}">{% endblock %}
 {% set is_admin = not auth_enabled or (current_user and current_user.role == 'admin') %}
 {% block content %}
 <div class="settings-container">
@@ -44,6 +45,9 @@ function setUiLanguage(lang) {
   <div class="settings-tabs" id="settingsTabs">
     <button class="settings-tab" data-tab="general" onclick="switchTab('general')">{{ _('General') }}</button>
     <button class="settings-tab active" data-tab="design" onclick="switchTab('design')">{{ _('Design') }}</button>
+    {% if is_admin %}
+    <button class="settings-tab" data-tab="sources" onclick="switchTab('sources')">{{ _('Sources') }}</button>
+    {% endif %}
     <button class="settings-tab" data-tab="downloads" onclick="switchTab('downloads')">{{ _('Downloads') }}</button>
     <button class="settings-tab" data-tab="autosync" onclick="switchTab('autosync')">Auto-Sync</button>
     <button class="settings-tab" data-tab="network" onclick="switchTab('network')">{{ _('Network') }}</button>
@@ -306,7 +310,46 @@ function setUiLanguage(lang) {
       </label>
       <div class="settings-hint">{{ _('Icons animate on hover in menus') }}</div>
     </div>
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Source order') }}</h2>
+      <div class="settings-hint">{{ _('Set the order in which sources appear on the start page. Drag the rows or use the arrows. For each source you can also choose whether new or popular items are shown first.') }}</div>
+      <div class="source-order-list" id="sourceOrderList"></div>
+    </div>
+    {% endif %}
   </div>
+
+  {% if is_admin %}
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Quellen / Sources
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-sources">
+    <div class="settings-section">
+      <h2>{{ _('Sources') }}</h2>
+      <div class="settings-hint">{{ _('Enable or disable the available sources. Disabled sources are hidden on the start page and are no longer loaded there.') }}</div>
+      <label class="settings-checkbox-row" for="sourceEnabledSto">
+        <input type="checkbox" class="chb-main" id="sourceEnabledSto" onchange="saveSourceEnabled('sto')" />
+        <span>S.TO</span>
+      </label>
+      <label class="settings-checkbox-row" for="sourceEnabledAniworld">
+        <input type="checkbox" class="chb-main" id="sourceEnabledAniworld" onchange="saveSourceEnabled('aniworld')" />
+        <span>AniWorld</span>
+      </label>
+      <label class="settings-checkbox-row" for="sourceEnabledFilmpalast">
+        <input type="checkbox" class="chb-main" id="sourceEnabledFilmpalast" onchange="saveSourceEnabled('filmpalast')" />
+        <span>FilmPalast</span>
+      </label>
+    </div>
+    <div class="settings-section">
+      <h2>{{ _('Search') }}</h2>
+      <label class="settings-checkbox-row" for="sourcesHideInSearch">
+        <input type="checkbox" class="chb-main" id="sourcesHideInSearch" onchange="saveSourcesHideInSearch()" />
+        <span>{{ _('Also hide disabled sources from search results') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('When enabled, disabled sources are also skipped in the search results.') }}</div>
+    </div>
+  </div>
+  {% endif %}
 
 
 

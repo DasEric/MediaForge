@@ -404,11 +404,52 @@ async function loadFilmPalastBrowse() {
   }
 }
 
-function showBrowseSections() {
+async function showBrowseSections() {
   browseDiv.style.display = "";
-  loadAniworldBrowse();
-  loadStoBrowse();
-  loadFilmPalastBrowse();
+  let settings = {};
+  try { settings = await loadGeneralSettings(); } catch (e) { settings = {}; }
+  const sources = (settings && settings.sources) || {};
+  _applySourceLayout(sources);
+
+  const enabled = sources.enabled || {};
+  if (enabled.aniworld !== "0") loadAniworldBrowse();
+  if (enabled.sto !== "0") loadStoBrowse();
+  if (enabled.filmpalast !== "0") loadFilmPalastBrowse();
+}
+
+// Reorder provider blocks + their new/popular sections on the start page and
+// hide disabled sources, based on the DB-backed source settings.
+function _applySourceLayout(sources) {
+  if (!browseDiv) return;
+  const validProv = ["aniworld", "sto", "filmpalast"];
+  let order = String((sources && sources.order) || "")
+    .split(",").map(p => p.trim().toLowerCase()).filter(p => validProv.indexOf(p) !== -1);
+  validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
+  const enabled = (sources && sources.enabled) || {};
+  const sectionOrder = (sources && sources.section_order) || {};
+  const sectionsVis = (sources && sources.sections) || {};
+
+  order.forEach(prov => {
+    const block = browseDiv.querySelector('.browse-provider-block[data-provider="' + prov + '"]');
+    if (!block) return;
+    browseDiv.appendChild(block); // reorder within #browse
+    const so = String(sectionOrder[prov] || "")
+      .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+    let anyVisible = false;
+    const provVis = sectionsVis[prov] || {};
+    so.forEach(secName => {
+      const sec = block.querySelector('.browse-section[data-section="' + secName + '"]');
+      if (!sec) return;
+      block.appendChild(sec); // reorder new/popular within block
+      const visible = provVis[secName] !== "0";
+      sec.style.display = visible ? "" : "none";
+      if (visible) anyVisible = true;
+    });
+    if (!so.length) anyVisible = true; // sources without configurable sections (e.g. FilmPalast)
+    const disabled = enabled[prov] === "0";
+    // Hide the whole block if the source is disabled or all its sections are hidden.
+    block.style.display = (disabled || !anyVisible) ? "none" : "";
+  });
 }
 
 function normalizeQuotes(s) {
@@ -874,10 +915,15 @@ async function doSearch() {
   };
 
   try {
+    let _srcSettings = {};
+    try { _srcSettings = ((await loadGeneralSettings()) || {}).sources || {}; } catch (e) { _srcSettings = {}; }
+    const _en = _srcSettings.enabled || {};
+    const _hide = _srcSettings.hide_disabled_in_search === "1";
+    const _active = (prov) => !(_hide && _en[prov] === "0");
     const [aniResults, stoResults, fpResults] = await Promise.all([
-      searchSite("aniworld").catch(() => []),
-      searchSite("sto").catch(() => []),
-      searchSite("filmpalast").catch(() => []),
+      _active("aniworld") ? searchSite("aniworld").catch(() => []) : Promise.resolve([]),
+      _active("sto") ? searchSite("sto").catch(() => []) : Promise.resolve([]),
+      _active("filmpalast") ? searchSite("filmpalast").catch(() => []) : Promise.resolve([]),
     ]);
     renderResultsBoth(aniResults, stoResults, fpResults);
   } catch (e) {
@@ -918,10 +964,20 @@ function renderResultsBoth(aniResults, stoResults, fpResults) {
   }
 
   const sections = [
-    { label: "AniWorld", cls: "browse-provider-aniworld", results: aniResults },
-    { label: "S.TO", cls: "browse-provider-sto", results: stoResults },
-    { label: "FilmPalast", cls: "browse-provider-filmpalast", results: fpResults },
+    { key: "aniworld", label: "AniWorld", cls: "browse-provider-aniworld", results: aniResults },
+    { key: "sto", label: "S.TO", cls: "browse-provider-sto", results: stoResults },
+    { key: "filmpalast", label: "FilmPalast", cls: "browse-provider-filmpalast", results: fpResults },
   ];
+  try {
+    const _ord = String(((generalSettings || {}).sources || {}).order || "")
+      .split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+    if (_ord.length) {
+      sections.sort((a, b) => {
+        const ia = _ord.indexOf(a.key), ib = _ord.indexOf(b.key);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+    }
+  } catch (e) { }
 
   sections.forEach(function (sec) {
     if (!sec.results.length) return;
