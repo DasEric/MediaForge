@@ -53,6 +53,10 @@
       title.textContent = tt("Update abgeschlossen", "Update complete");
       text.textContent = tt("Die App läuft jetzt in der neuen Version.",
                             "The app is now running the new version.");
+      if (st && st.restart_only) {
+        title.textContent = tt("Neustart abgeschlossen", "Restart complete");
+        text.textContent = tt("Die App wurde neu gestartet.", "The app has restarted.");
+      }
       if (st && st.to_version) { ver.style.display = ""; ver.textContent = "v" + st.to_version; }
       else ver.style.display = "none";
       logWrap.style.display = (st && st.log) ? "" : "none";
@@ -124,7 +128,24 @@
     });
   }
 
-  window.AniUpdate = { startInstall: startInstall, show: show, hide: hide };
+  function startRestart() {
+    render({ state: "restarting", restart_only: true });
+    show();
+    fetch("/api/restart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (e) { throw new Error(e.error || ("HTTP " + r.status)); });
+      return r.json();
+    }).then(function () {
+      startPoll();           // server will exit & relaunch shortly
+    }).catch(function (err) {
+      render({ state: "failed", error: (err && err.message) || String(err) });
+    });
+  }
+
+  window.AniUpdate = { startInstall: startInstall, startRestart: startRestart, show: show, hide: hide };
 
   document.addEventListener("DOMContentLoaded", function () {
     if (!overlay()) return;

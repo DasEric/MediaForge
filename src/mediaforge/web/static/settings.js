@@ -134,6 +134,9 @@ async function loadSettings() {
     if (dnsModeEl) { dnsModeEl.value = data.dns_mode || "system"; onDnsModeChange(); }
     if (dnsServerEl) dnsServerEl.value = data.dns_server || "";
 
+    const persistProfileEl = document.getElementById("browserPersistentProfile");
+    if (persistProfileEl) persistProfileEl.checked = data.browser_persistent_profile === "1";
+
     const webBaseUrlEl = document.getElementById("webBaseUrl");
     if (webBaseUrlEl) webBaseUrlEl.value = data.web_base_url || "";
 
@@ -991,6 +994,77 @@ async function saveDnsSettings() {
     }
   } catch (e) {
     showToast(t("Fehler: ", "Error: ") + e.message, "error");
+  }
+}
+
+// ─── Captcha / Browser tab ──────────────────────────────────────────────────
+
+async function saveBrowserProfile() {
+  const cb = document.getElementById("browserPersistentProfile");
+  const enabled = !!(cb && cb.checked);
+  try {
+    const resp = await fetch("/api/settings/browser", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ persistent_profile: enabled }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(enabled
+        ? t("Persistentes Profil aktiv — greift beim nächsten Captcha", "Persistent profile enabled — applies on the next captcha")
+        : t("Persistentes Profil deaktiviert", "Persistent profile disabled"), "success");
+    } else {
+      showToast(data.error || t("Fehler beim Speichern", "Error saving"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message, "error");
+  }
+}
+
+async function clearBrowserProfile() {
+  const ok = (typeof showConfirm === "function")
+    ? await showConfirm(
+        t("Das gespeicherte Browser-Profil (Cookies, cf_clearance, Fingerprint) wird gelöscht. Beim nächsten Captcha wird es neu angelegt.",
+          "The saved browser profile (cookies, cf_clearance, fingerprint) will be deleted. It is recreated on the next captcha."),
+        t("Profil löschen", "Delete profile"),
+        t("Browser-Profil löschen?", "Delete browser profile?"),
+        "btn-danger")
+    : window.confirm(t("Browser-Profil löschen?", "Delete browser profile?"));
+  if (!ok) return;
+  try {
+    const resp = await fetch("/api/browser/profile/clear", { method: "POST" });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(t("Browser-Profil gelöscht", "Browser profile deleted"), "success");
+    } else if (data.error === "captcha_running") {
+      showToast(t("Gerade läuft ein Captcha — bitte später erneut versuchen", "A captcha is running — please try again later"), "warning");
+    } else {
+      showToast(data.error || t("Fehler", "Error"), "error");
+    }
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message, "error");
+  }
+}
+
+async function restartApp() {
+  const ok = (typeof showConfirm === "function")
+    ? await showConfirm(
+        t("Die App wird mit denselben Startargumenten neu gestartet (ohne Update). Laufende Downloads werden pausiert und danach fortgesetzt.",
+          "The app restarts with the same startup arguments (no update). Running downloads pause and resume afterwards."),
+        t("Neu starten", "Restart"),
+        t("App neu starten?", "Restart app?"),
+        "btn-primary")
+    : window.confirm(t("App neu starten?", "Restart app?"));
+  if (!ok) return;
+  if (window.AniUpdate && window.AniUpdate.startRestart) {
+    window.AniUpdate.startRestart();
+  } else {
+    try {
+      await fetch("/api/restart", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      showToast(t("Neustart gestartet…", "Restart started…"), "success");
+    } catch (e) {
+      showToast(t("Fehler: ", "Error: ") + e.message, "error");
+    }
   }
 }
 

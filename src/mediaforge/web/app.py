@@ -3055,6 +3055,12 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     # Apply all persistent DB settings to os.environ on startup
     _sync_db_settings_to_env()
 
+    # Persistent captcha browser profile (opt-in) — keeps a warm cf_clearance
+    # across solves.  Read at each browser launch, so this also applies live
+    # after the setting is toggled in the WebUI.
+    if get_setting("browser_persistent_profile", "0") == "1":
+        os.environ["MEDIAFORGE_PERSISTENT_PROFILE"] = "1"
+
     # Start library file watcher (watchdog-based, event-driven rescans)
     from .library_watcher import get_watcher as _get_lib_watcher
     _lib_watcher = _get_lib_watcher()
@@ -5213,6 +5219,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 "seerr_configured":          bool(get_setting("seerr_url", "").strip() and get_setting("seerr_api_key", "").strip()),
                 "dns_mode":                  get_setting("dns_mode", "system"),
                 "dns_server":                get_setting("dns_server", ""),
+                "browser_persistent_profile": get_setting("browser_persistent_profile", "0"),
                 "cineinfo": {
                     "tmdb_api_key":   get_setting("cineinfo_tmdb_api_key",   ""),
                     "country":        get_setting("cineinfo_country",        "DE"),
@@ -6824,6 +6831,79 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             "dns_active_server": _active_dns_server,
             "sites":             results,
         })
+
+    @app.route("/api/settings/browser", methods=["PUT"])
+    def api_settings_browser():
+        _u, _is_admin = _get_current_user_info()
+        if not _is_admin:
+            return jsonify({"error": "forbidden"}), 403
+        data = request.get_json(silent=True) or {}
+        enabled = bool(data.get("persistent_profile"))
+        set_setting("browser_persistent_profile", "1" if enabled else "0")
+        if enabled:
+            os.environ["MEDIAFORGE_PERSISTENT_PROFILE"] = "1"
+            os.environ.pop("MEDIAFORGE_NO_PERSISTENT_PROFILE", None)
+        else:
+            os.environ.pop("MEDIAFORGE_PERSISTENT_PROFILE", None)
+        return jsonify({"ok": True, "persistent_profile": enabled})
+
+    @app.route("/api/browser/profile/clear", methods=["POST"])
+    def api_browser_profile_clear():
+        _u, _is_admin = _get_current_user_info()
+        if not _is_admin:
+            return jsonify({"error": "forbidden"}), 403
+        # Refuse while a captcha solve is active — Chromium holds the profile open.
+        try:
+            from ..playwright import captcha as _cap
+            with _cap._active_sessions_lock:
+                busy = bool(_cap._active_sessions)
+        except Exception:
+            busy = False
+        if busy:
+            return jsonify({"error": "captcha_running"}), 409
+        import shutil
+        from pathlib import Path as _P
+        prof = os.environ.get("MEDIAFORGE_BROWSER_PROFILE") or str(_P.home() / ".mediaforge" / "browser-profile")
+        try:
+            p = _P(prof)
+            if p.exists():
+                shutil.rmtree(p, ignore_errors=True)
+            return jsonify({"ok": True, "path": str(p)})
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/api/restart", methods=["POST"])
+    def api_restart():
+        _u, _is_admin = _get_current_user_info()
+        if not _is_admin:
+            return jsonify({"error": "forbidden"}), 403
+        try:
+            result = selfupdate.start_restart()
+        except selfupdate.UpdateError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except Exception as exc:
+            logger.exception("[Restart] start failed")
+            return jsonify({"error": str(exc)}), 500
+
+        # Requeue running downloads so they resume after the restart.
+        try:
+            from .db import get_db
+            _c = get_db()
+            try:
+                _c.execute("UPDATE download_queue SET status = 'queued' WHERE status = 'running'")
+                _c.commit()
+            finally:
+                _c.close()
+        except Exception:
+            logger.warning("[Restart] could not requeue download queue", exc_info=True)
+
+        def _exit_soon():
+            import time as _t
+            _t.sleep(1.5)
+            logger.info("[Restart] exiting for restart helper")
+            os._exit(0)
+        threading.Thread(target=_exit_soon, daemon=True, name="restart-exit").start()
+        return jsonify(result)
 
     @app.route("/api/seerr/requests")
     def api_seerr_requests():

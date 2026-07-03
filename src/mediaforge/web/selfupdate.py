@@ -239,6 +239,7 @@ def read_status() -> dict:
     meta = _read_meta()
     return {
         "state": _read_state(),
+        "restart_only": meta.get("restart_only"),
         "channel": meta.get("channel"),
         "target_channel": meta.get("target_channel"),
         "from_version": meta.get("from_version"),
@@ -470,6 +471,91 @@ def start_update(target_channel: str | None = None) -> dict:
         "target_channel": target,
         "command": " ".join(upgrade),
     }
+
+
+def _write_restart_script(relaunch: list[str], pid: int) -> Path:
+    """Write a detached helper that waits for *pid* to exit, then relaunches the
+    app with the same arguments (no upgrade -- pure restart)."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    is_windows = os.name == "nt"
+    log_path = str(LOG_FILE)
+
+    if is_windows:
+        script = CONFIG_DIR / "restart.ps1"
+        rl_exe = _ps_quote(relaunch[0])
+        rl_args = _ps_array(relaunch[1:])
+        log_q = _ps_quote(log_path)
+        cwd_q = _ps_quote(os.getcwd())
+        rl_argline = f" -ArgumentList {rl_args}" if relaunch[1:] else ""
+        content = f"""$ErrorActionPreference = 'SilentlyContinue'
+$pidToWait = {pid}
+try {{ Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue }} catch {{}}
+while (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}
+$log = {log_q}
+Add-Content -Path $log -Value ('[restart] relaunching ' + (Get-Date))
+Start-Process -FilePath {rl_exe}{rl_argline} -WorkingDirectory {cwd_q}
+"""
+        script.write_text(content, encoding="utf-8")
+        return script
+
+    # POSIX (Linux / macOS)
+    script = CONFIG_DIR / "restart.sh"
+    rl = " ".join(shlex.quote(c) for c in relaunch)
+    cwd = shlex.quote(os.getcwd())
+    log_q = shlex.quote(log_path)
+    content = f"""#!/bin/sh
+PID={pid}
+while kill -0 "$PID" 2>/dev/null; do
+    sleep 0.4
+done
+echo "[restart] relaunching $(date)" >> {log_q} 2>&1
+cd {cwd} || true
+if command -v setsid >/dev/null 2>&1; then
+    setsid {rl} >> {log_q} 2>&1 &
+else
+    nohup {rl} >> {log_q} 2>&1 &
+fi
+"""
+    script.write_text(content, encoding="utf-8")
+    os.chmod(script, 0o755)
+    return script
+
+
+def start_restart() -> dict:
+    """Restart the app with the same CLI args -- no update.
+
+    Writes the same state files the self-update flow uses (so the existing
+    restart overlay can follow along), spawns a detached wait+relaunch helper,
+    and returns.  The caller must exit the process shortly afterwards so the
+    helper can relaunch it.
+    """
+    info = detect_install()
+    if info["type"] in ("frozen", "docker"):
+        raise UpdateError(f"restart not supported for install type '{info['type']}'")
+    if _read_state() in ("installing", "restarting"):
+        raise UpdateError("an update or restart is already in progress")
+
+    meta = {
+        "channel": info.get("channel"),
+        "target_channel": None,
+        "from_version": _current_version(),
+        "to_version": None,
+        "error": None,
+        "started_at": time.time(),
+        "restart_only": True,
+    }
+    _write_meta(meta)
+    _write_state("restarting")
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_FILE.write_text("=== MediaForge restart ===\n", encoding="utf-8")
+    except Exception:
+        pass
+
+    relaunch = relaunch_cmd()
+    script = _write_restart_script(relaunch, os.getpid())
+    _spawn_detached(script)
+    return {"ok": True, "type": info["type"]}
 
 
 def finalize_after_restart() -> None:

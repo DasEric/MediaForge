@@ -734,6 +734,28 @@ function setUiLanguage(lang) {
 
     {% if is_admin %}
     <div class="settings-section">
+      <h2>{{ _('Captcha / Browser') }}</h2>
+      <div class="settings-row">
+        <label class="settings-checkbox-row" for="browserPersistentProfile">
+          <input type="checkbox" class="chb-main" id="browserPersistentProfile" onchange="saveBrowserProfile()" />
+          <span>{{ _('Persistent browser profile (keeps a warm Cloudflare trust for captcha solving)') }}</span>
+        </label>
+      </div>
+      <div class="settings-hint">
+        {{ _('Reuses one Chromium profile across captcha solves so a once-earned Cloudflare trust (cf_clearance) and browser fingerprint survive. This raises the Turnstile success rate. Applies on the next captcha; a restart guarantees a clean state.') }}
+      </div>
+      <div class="settings-row" style="gap:8px;flex-wrap:wrap">
+        <button type="button" onclick="clearBrowserProfile()">{{ _('Clear browser profile') }}</button>
+        <button type="button" onclick="restartApp()">{{ _('Restart app') }}</button>
+      </div>
+      <div class="settings-hint">
+        {{ _('If Turnstile keeps failing (red cross), delete the profile and solve one captcha manually in the web UI to seed a fresh trust.') }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if is_admin %}
+    <div class="settings-section">
       <h2>{{ _('Web Server') }}</h2>
       <h3 class="settings-subtitle">{{ _('Base URL (Reverse Proxy)') }}</h3>
       <div class="settings-row">
@@ -990,6 +1012,18 @@ function setUiLanguage(lang) {
         </div>
       </div>
     </div>
+
+    {% if is_admin %}
+    <div class="settings-section">
+      <h2>{{ _('Restart') }}</h2>
+      <div class="settings-row">
+        <button type="button" onclick="restartApp()">{{ _('Restart app now') }}</button>
+      </div>
+      <div class="settings-hint">
+        {{ _('Restarts MediaForge with the same startup arguments — without installing an update. Running downloads pause and resume afterwards.') }}
+      </div>
+    </div>
+    {% endif %}
 
     <div class="settings-section" id="autoUpdateSection" style="display:none">
       <h2>{{ _('Automatic updates') }}</h2>
