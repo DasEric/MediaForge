@@ -642,6 +642,30 @@ MEGAKINO_EPISODE_PATTERN = re.compile(
 )
 
 # -----------------------------
+# hanime.tv (adult / 18+)  -- DISABLED by default, gated in the UI
+# -----------------------------
+# Base + API endpoints are overridable via env because hanime occasionally
+# moves its search host.  Everything hanime-specific that touches the network
+# lives in models/hanime_tv/scraper.py -- these patterns only classify URLs.
+HANIME_BASE_URL = os.environ.get("HANIME_BASE_URL", "https://hanime.tv").rstrip("/")
+HANIME_API_BASE = os.environ.get("HANIME_API_BASE", "https://hanime.tv/api/v8").rstrip("/")
+HANIME_SEARCH_URL = os.environ.get("HANIME_SEARCH_URL", "https://search.htv-services.com/")
+
+# A "series" is a franchise, represented by one of its video slugs:
+#   https://hanime.tv/videos/hentai/<slug>
+HANIME_SERIES_PATTERN = re.compile(
+    r"^https?://hanime\.tv/videos/hentai/[a-zA-Z0-9._\-]+/?$",
+    re.IGNORECASE,
+)
+
+# Synthetic single-episode URL: <series-slug>?ep=<n>  (n = 1-based index into
+# the franchise's ordered video list).
+HANIME_EPISODE_PATTERN = re.compile(
+    r"^https?://hanime\.tv/videos/hentai/[a-zA-Z0-9._\-]+\?ep=\d+$",
+    re.IGNORECASE,
+)
+
+# -----------------------------
 # Directories
 # -----------------------------
 

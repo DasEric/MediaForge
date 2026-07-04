@@ -1,0 +1,137 @@
+/* hanime.tv (adult / 18+) — provider header, Censored/Uncensored pills and the
+   age-confirmation modal.  Self-contained: no hanime rules live in style.css. */
+
+/* --- Provider header accent + 18+ badge --- */
+.browse-provider-hanime {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.browse-provider-18 {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #e0356b, #b5179e);
+}
+
+/* --- Censored / Uncensored pills on the poster cards --- */
+.hanime-pill {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.hanime-pill-uncensored {
+  background: linear-gradient(135deg, #16a34a, #0d8a5f);
+}
+.hanime-pill-censored {
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
+/* --- Age (18+) confirmation modal --- */
+.hanime-age-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+.hanime-age-overlay.open {
+  display: flex;
+}
+.hanime-age-modal {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-elevated, #1b1b26);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-xl, 18px);
+  box-shadow: var(--shadow-modal, 0 20px 60px rgba(0, 0, 0, 0.5));
+  padding: 26px 24px 22px;
+  animation: hanime-age-in 0.18s ease;
+}
+@keyframes hanime-age-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.hanime-age-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  background: linear-gradient(135deg, #e0356b, #b5179e);
+  margin-bottom: 14px;
+}
+.hanime-age-title {
+  margin: 0 0 8px;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: var(--text-primary, #fff);
+}
+.hanime-age-text {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #b9b9c6);
+}
+.hanime-age-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hanime-age-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: filter 0.15s, background 0.15s, border-color 0.15s;
+}
+/* Deliberate: the SAFE answer ("No / under 18") is the prominent button,
+   the confirming answer ("Yes") is de-emphasised so the user has to read. */
+.hanime-age-no {
+  background: linear-gradient(135deg, #e0356b, #b5179e);
+  color: #fff;
+  order: 1;
+}
+.hanime-age-no:hover {
+  filter: brightness(1.08);
+}
+.hanime-age-yes {
+  background: transparent;
+  color: var(--text-muted, #8a8a97);
+  border-color: var(--border, #3a3a45);
+  order: 2;
+  font-weight: 600;
+}
+.hanime-age-yes:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  color: var(--text-secondary, #b9b9c6);
+}

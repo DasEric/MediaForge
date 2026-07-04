@@ -10,6 +10,8 @@ from .config import (
     MEDIAFORGE_EPISODE_PATTERN,
     MEDIAFORGE_SEASON_PATTERN,
     MEDIAFORGE_SERIES_PATTERN,
+    HANIME_EPISODE_PATTERN,
+    HANIME_SERIES_PATTERN,
     MEGAKINO_EPISODE_PATTERN,
     MEGAKINO_MOVIE_PATTERN,
     MEGAKINO_SERIES_PATTERN,
@@ -30,6 +32,9 @@ from .models.megakino_to.episode import MegakinoEpisode
 from .models.megakino_to.movie import MegakinoMovie
 from .models.megakino_to.season import MegakinoSeason
 from .models.megakino_to.series import MegakinoSeries
+from .models.hanime_tv.episode import HanimeEpisode
+from .models.hanime_tv.season import HanimeSeason
+from .models.hanime_tv.series import HanimeSeries
 
 # FilmPalast episode URLs: https://filmpalast.to/stream/<slug>
 FILMPALAST_EPISODE_PATTERN = _re.compile(
@@ -91,6 +96,17 @@ PROVIDERS = [
         name="MegakinoFilm",
         episode_pattern=MEGAKINO_MOVIE_PATTERN,
         episode_cls=MegakinoMovie,
+    ),
+    # hanime.tv (adult / 18+): a "series" is a franchise; episode URLs are
+    # synthetic (<series-slug>?ep=N).  Single season per franchise.
+    Provider(
+        name="Hanime",
+        series_pattern=HANIME_SERIES_PATTERN,
+        season_pattern=HANIME_SERIES_PATTERN,
+        episode_pattern=HANIME_EPISODE_PATTERN,
+        series_cls=HanimeSeries,
+        season_cls=HanimeSeason,
+        episode_cls=HanimeEpisode,
     ),
 ]
 

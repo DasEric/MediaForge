@@ -461,17 +461,19 @@ async function seerrDoSearch() {
       .map(r => Object.assign({}, r, { _source: "MegaKino" }));
     combined = fpList.concat(mkList);
   } else {
-    // Series: search AniWorld + S.TO + MegaKino (series only), interleave results
-    const [aniRes, stoRes, mkRes] = await Promise.allSettled([
+    // Series: search AniWorld + S.TO + MegaKino (+ hanime if enabled), interleave results
+    const [aniRes, stoRes, mkRes, hanRes] = await Promise.allSettled([
       seerrFetchSearch(q, "aniworld"),
       seerrFetchSearch(q, "sto"),
       seerrFetchSearch(q, "megakino"),
+      seerrFetchSearch(q, "hanime"),
     ]);
     const aniList = (aniRes.status === "fulfilled" ? aniRes.value : []).map(r => Object.assign({}, r, { _source: "AniWorld" }));
     const stoList = (stoRes.status === "fulfilled" ? stoRes.value : []).map(r => Object.assign({}, r, { _source: "S.TO" }));
     const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
       .filter(r => /\/serials\//.test(r.url))
       .map(r => Object.assign({}, r, { _source: "MegaKino" }));
+    const hanList = (hanRes.status === "fulfilled" ? hanRes.value : []).map(r => Object.assign({}, r, { _source: "hanime 18+" }));
     // Interleave: alternate aniworld/sto so both appear near the top
     const maxLen = Math.max(aniList.length, stoList.length);
     for (let i = 0; i < maxLen; i++) {
@@ -480,6 +482,8 @@ async function seerrDoSearch() {
     }
     // Append MegaKino series after the interleaved AniWorld/S.TO block
     combined = combined.concat(mkList);
+    // hanime (adult) last; empty unless the source is enabled server-side.
+    combined = combined.concat(hanList);
   }
 
   seerrRenderSearchResults(combined);
@@ -590,7 +594,8 @@ async function openSeerrSeries(url) {
   const isSto = url.includes("s.to") || url.includes("serienstream.to");
   const isFp = url.includes("filmpalast.to");
   const isMk = url.includes("megakino");
-  seerrUpdateLangDropdown(isSto, isFp || isMk);
+  const isHan = url.includes("hanime.tv");
+  seerrUpdateLangDropdown(isSto, isFp || isMk, null, isHan);
 
   try {
     const [seriesResp, seasonsResp] = await Promise.all([
@@ -649,9 +654,16 @@ function closeSeerrSeries() {
   document.body.style.overflow = "";
 }
 
-function seerrUpdateLangDropdown(isSto, isFp, foundLangs = null) {
+function seerrUpdateLangDropdown(isSto, isFp, foundLangs = null, isHanime = false) {
   const sel = document.getElementById("seerrLangSelect");
   sel.innerHTML = "";
+  if (isHanime) {
+    const opt = document.createElement("option");
+    opt.value = "Japanese Dub";
+    opt.textContent = t("Japanisch (Sub)", "Japanese (Sub)");
+    sel.appendChild(opt);
+    return;
+  }
   if (isFp) {
     const opt = document.createElement("option");
     opt.value = opt.textContent = "German Dub";
@@ -778,7 +790,8 @@ function seerrBuildAccordion(seasons) {
       const isSto = (_seerrSeriesUrl || "").includes("s.to") || (_seerrSeriesUrl || "").includes("serienstream.to");
       const isFp = (_seerrSeriesUrl || "").includes("filmpalast.to");
       const isMk = (_seerrSeriesUrl || "").includes("megakino");
-      seerrUpdateLangDropdown(isSto, isFp || isMk, foundLangs);
+      const isHan = (_seerrSeriesUrl || "").includes("hanime.tv");
+      seerrUpdateLangDropdown(isSto, isFp || isMk, foundLangs, isHan);
       if (sel && Array.from(sel.options).some(o => o.value === prevVal)) {
         sel.value = prevVal;
       }
@@ -889,7 +902,7 @@ function seerrRenderLangBanner(results) {
   const banner = document.getElementById("seerrLangBanner");
   if (!banner) return;
   banner.classList.remove("skeleton");
-  if ((_seerrSeriesUrl || "").includes("filmpalast.to") || (_seerrSeriesUrl || "").includes("megakino")) { banner.style.display = "none"; return; }
+  if ((_seerrSeriesUrl || "").includes("filmpalast.to") || (_seerrSeriesUrl || "").includes("megakino") || (_seerrSeriesUrl || "").includes("hanime.tv")) { banner.style.display = "none"; return; }
   const isSto = (_seerrSeriesUrl || "").includes("s.to") || (_seerrSeriesUrl || "").includes("serienstream.to");
   const LANG_ORDER = ["German Dub", "English Sub", "German Sub", "English Dub"];
   if (isSto) {

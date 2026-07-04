@@ -4038,3 +4038,44 @@ msgstr "Wöchentlicher Zeitplan"
 
 msgid "days"
 msgstr "Tage"
+
+# ── hanime (18+) source ──
+msgid "New"
+msgstr "Neu"
+
+msgid "Trending"
+msgstr "Im Trend"
+
+msgid "Popular"
+msgstr "Beliebt"
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "No"
+msgstr "Nein"
+
+msgid "One more thing…"
+msgstr "Noch eine Sache …"
+
+msgid "Enable hanime (18+)"
+msgstr "hanime aktivieren (18+)"
+
+msgid "hanime.tv is a source for adult, sexually explicit animated content (hentai) and is only permitted for users aged 18 or older."
+msgstr "hanime.tv ist eine Quelle für nicht jugendfreie, sexuell explizite Zeichentrick-Inhalte (Hentai) und ist ausschließlich für Personen ab 18 Jahren erlaubt."
+
+msgid "Are you UNDER 18 years old?"
+msgstr "Bist du UNTER 18 Jahre alt?"
+
+msgid "Yes, I am under 18"
+msgstr "Ja, ich bin unter 18"
+
+msgid "No, I am 18 or older"
+msgstr "Nein, ich bin 18 oder älter"
+
+msgid "Should we really believe you are at least 18?"
+msgstr "Sollen wir dir jetzt wirklich glauben, dass du mindestens 18 bist?"
+
+msgid "hanime.tv is an adult source (18+) for sexually explicit animated content (hentai). Disabled by default; enabling requires an age confirmation."
+msgstr "hanime.tv ist eine nicht jugendfreie Quelle (18+) für sexuell explizite Zeichentrick-Inhalte (Hentai). Standardmäßig deaktiviert; zum Aktivieren ist eine Altersbestätigung erforderlich."
+

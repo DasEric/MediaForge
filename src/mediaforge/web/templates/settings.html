@@ -9,7 +9,8 @@ function setUiLanguage(lang) {
 </script>
 {% endblock %}
 {% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='sources.css') }}">{% endblock %}
+<link rel="stylesheet" href="{{ url_for('static', filename='sources.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hanime.css') }}">{% endblock %}
 {% set is_admin = not auth_enabled or (current_user and current_user.role == 'admin') %}
 {% block content %}
 <div class="settings-container">
@@ -351,6 +352,11 @@ function setUiLanguage(lang) {
         <input type="checkbox" class="chb-main" id="sourceEnabledMegakino" onchange="saveSourceEnabled('megakino')" />
         <span>MegaKino</span>
       </label>
+      <label class="settings-checkbox-row" for="sourceEnabledHanime">
+        <input type="checkbox" class="chb-main" id="sourceEnabledHanime" onchange="saveSourceEnabled('hanime')" />
+        <span>hanime <span class="browse-provider-18">18+</span></span>
+      </label>
+      <div class="settings-hint">{{ _('hanime.tv is an adult source (18+) for sexually explicit animated content (hentai). Disabled by default; enabling requires an age confirmation.') }}</div>
     </div>
     <div class="settings-section">
       <h2>{{ _('Search') }}</h2>
@@ -1084,6 +1090,40 @@ function setUiLanguage(lang) {
   </div><!-- /tab-updates -->
 
 </div><!-- /settings-container -->
+
+<!-- hanime 18+ age confirmation (two-step; read carefully!) -->
+<div class="hanime-age-overlay" id="hanimeAgeOverlay">
+  <div class="hanime-age-modal">
+    <!-- Variant A: shown on the first activation attempt -->
+    <div class="hanime-age-step" id="hanimeAgeStep1">
+      <span class="hanime-age-badge">18+</span>
+      <h3 class="hanime-age-title">{{ _('Enable hanime (18+)') }}</h3>
+      <p class="hanime-age-text">
+        {{ _('hanime.tv is a source for adult, sexually explicit animated content (hentai) and is only permitted for users aged 18 or older.') }}
+        <br><br>
+        <strong>{{ _('Are you UNDER 18 years old?') }}</strong>
+      </p>
+      <div class="hanime-age-actions">
+        <button type="button" class="hanime-age-btn hanime-age-no" onclick="hanimeAgeUnder18()">{{ _('Yes, I am under 18') }}</button>
+        <button type="button" class="hanime-age-btn hanime-age-yes" onclick="hanimeAgeConfirm()">{{ _('No, I am 18 or older') }}</button>
+      </div>
+    </div>
+    <!-- Variant B: shown when the user already bailed once and tries again -->
+    <div class="hanime-age-step" id="hanimeAgeStep2" style="display:none">
+      <span class="hanime-age-badge">18+</span>
+      <h3 class="hanime-age-title">{{ _('Enable hanime (18+)') }}</h3>
+      <p class="hanime-age-text">
+        {{ _('hanime.tv is a source for adult, sexually explicit animated content (hentai) and is only permitted for users aged 18 or older.') }}
+        <br><br>
+        <strong>{{ _('Should we really believe you are at least 18?') }}</strong>
+      </p>
+      <div class="hanime-age-actions">
+        <button type="button" class="hanime-age-btn hanime-age-no" onclick="hanimeAgeConfirm()">{{ _('Yes') }}</button>
+        <button type="button" class="hanime-age-btn hanime-age-yes" onclick="hanimeAgeDecline()">{{ _('No') }}</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>var settingsCanEdit = {{ 'true' if is_admin else 'false' }};</script>

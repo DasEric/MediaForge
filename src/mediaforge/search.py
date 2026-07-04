@@ -636,6 +636,27 @@ def fetch_megakino_popular():
     return _megakino_scraper().fetch_popular()
 
 
+# ---------------------------------------------------------------------------
+# hanime.tv (adult / 18+) — thin wrappers around the model-package scraper
+# ---------------------------------------------------------------------------
+def _hanime_scraper():
+    from .models.hanime_tv import scraper
+    return scraper
+
+
+def hanime_search(keyword):
+    """Search hanime and return a list of franchise cards."""
+    return _hanime_scraper().search(keyword)
+
+
+def fetch_hanime_new():
+    return _hanime_scraper().fetch_new()
+
+
+def fetch_hanime_trending():
+    return _hanime_scraper().fetch_trending()
+
+
 if __name__ == "__main__":
     print("New series:", fetch_new_series())
     print("Popular series:", fetch_popular_series())

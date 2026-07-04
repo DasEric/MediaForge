@@ -1927,14 +1927,15 @@ const SOURCE_META = {
   aniworld:   { label: "AniWorld",   cls: "browse-provider-aniworld",   hasSections: true },
   sto:        { label: "S.TO",       cls: "browse-provider-sto",        hasSections: true },
   filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false },
-  megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false }
+  megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false },
+  hanime:     { label: "hanime 18+",  cls: "browse-provider-hanime",     hasSections: false }
 };
 
 let _sourceState = {
-  order: ["aniworld", "sto", "filmpalast", "megakino"],
-  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new", "series", "popular"] },
-  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new: true, series: true, popular: true } },
-  enabled: { aniworld: true, sto: true, filmpalast: true, megakino: true },
+  order: ["aniworld", "sto", "filmpalast", "megakino", "hanime"],
+  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new", "series", "popular"], hanime: ["new", "trending"] },
+  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new: true, series: true, popular: true }, hanime: { new: true, trending: true } },
+  enabled: { aniworld: true, sto: true, filmpalast: true, megakino: true, hanime: false },
   hide_in_search: false
 };
 
@@ -1945,8 +1946,8 @@ function _splitOrder(str, fallback) {
 
 function _loadSourceSettings(sources) {
   sources = sources || {};
-  const validProv = ["aniworld", "sto", "filmpalast", "megakino"];
-  let order = _splitOrder(sources.order, ["aniworld", "sto", "filmpalast", "megakino"]).filter(p => validProv.indexOf(p) !== -1);
+  const validProv = ["aniworld", "sto", "filmpalast", "megakino", "hanime"];
+  let order = _splitOrder(sources.order, ["aniworld", "sto", "filmpalast", "megakino", "hanime"]).filter(p => validProv.indexOf(p) !== -1);
   // ensure every provider is present exactly once
   validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
   _sourceState.order = order;
@@ -1966,6 +1967,7 @@ function _loadSourceSettings(sources) {
   _sourceState.enabled.sto        = en.sto        !== "0";
   _sourceState.enabled.filmpalast = en.filmpalast !== "0";
   _sourceState.enabled.megakino   = en.megakino   !== "0";
+  _sourceState.enabled.hanime     = en.hanime     === "1";  // adult source: default OFF
   _sourceState.hide_in_search = sources.hide_disabled_in_search === "1";
 
   // Reflect enabled toggles (Quellen tab)
@@ -1973,10 +1975,12 @@ function _loadSourceSettings(sources) {
   const cbAni = document.getElementById("sourceEnabledAniworld");
   const cbFp  = document.getElementById("sourceEnabledFilmpalast");
   const cbMk  = document.getElementById("sourceEnabledMegakino");
+  const cbHan = document.getElementById("sourceEnabledHanime");
   if (cbSto) cbSto.checked = _sourceState.enabled.sto;
   if (cbAni) cbAni.checked = _sourceState.enabled.aniworld;
   if (cbFp)  cbFp.checked  = _sourceState.enabled.filmpalast;
   if (cbMk)  cbMk.checked  = _sourceState.enabled.megakino;
+  if (cbHan) cbHan.checked = _sourceState.enabled.hanime;
   const cbHide = document.getElementById("sourcesHideInSearch");
   if (cbHide) cbHide.checked = _sourceState.hide_in_search;
 
@@ -2122,15 +2126,67 @@ function _saveSectionOrder(prov) {
   _putSettings(payload, t("Reihenfolge gespeichert", "Order saved"));
 }
 
+function _commitSourceEnabled(prov, enabled) {
+  _sourceState.enabled[prov] = enabled;
+  const payload = {};
+  payload["source_enabled_" + prov] = enabled;
+  const label = SOURCE_META[prov] ? SOURCE_META[prov].label : prov;
+  _putSettings(payload, label + (enabled ? t(" aktiviert", " enabled") : t(" deaktiviert", " disabled")));
+}
+
 function saveSourceEnabled(prov) {
-  const map = { sto: "sourceEnabledSto", aniworld: "sourceEnabledAniworld", filmpalast: "sourceEnabledFilmpalast", megakino: "sourceEnabledMegakino" };
+  const map = { sto: "sourceEnabledSto", aniworld: "sourceEnabledAniworld", filmpalast: "sourceEnabledFilmpalast", megakino: "sourceEnabledMegakino", hanime: "sourceEnabledHanime" };
   const el = document.getElementById(map[prov]);
   if (!el) return;
-  _sourceState.enabled[prov] = el.checked;
-  const payload = {};
-  payload["source_enabled_" + prov] = el.checked;
-  const label = SOURCE_META[prov] ? SOURCE_META[prov].label : prov;
-  _putSettings(payload, label + (el.checked ? t(" aktiviert", " enabled") : t(" deaktiviert", " disabled")));
+  // hanime is an adult source: turning it ON requires an explicit 18+ confirmation.
+  if (prov === "hanime" && el.checked) {
+    el.checked = false;              // stays off until the user confirms
+    _openHanimeAgeModal();
+    return;
+  }
+  _commitSourceEnabled(prov, el.checked);
+}
+
+// --- hanime 18+ age gate --------------------------------------------------
+// The "No" button is the highlighted one and "Yes" is de-emphasised on purpose,
+// so the user has to actually read the question instead of clicking the
+// prominent button by reflex.
+// True once the user clicked "Yes, I am under 18" and bailed out at least once.
+// The NEXT activation attempt then shows the sharper "should we really believe
+// you?" variant instead of the normal question.
+let _hanimeBailedOnce = false;
+
+function _openHanimeAgeModal() {
+  const s1 = document.getElementById("hanimeAgeStep1"); // variant A (first try)
+  const s2 = document.getElementById("hanimeAgeStep2"); // variant B (retry after bailing)
+  if (s1) s1.style.display = _hanimeBailedOnce ? "none" : "";
+  if (s2) s2.style.display = _hanimeBailedOnce ? "" : "none";
+  const ov = document.getElementById("hanimeAgeOverlay");
+  if (ov) ov.classList.add("open");
+}
+function _closeHanimeAgeModal() {
+  const ov = document.getElementById("hanimeAgeOverlay");
+  if (ov) ov.classList.remove("open");
+}
+function _hanimeAgeClose() {
+  _closeHanimeAgeModal();
+  const el = document.getElementById("sourceEnabledHanime");
+  if (el) el.checked = false;
+}
+// Variant A, highlighted button "Yes, I am under 18": do NOT enable, and
+// remember it so the next attempt shows variant B.
+function hanimeAgeUnder18() {
+  _hanimeBailedOnce = true;
+  _hanimeAgeClose();
+}
+// Variant B, "No": just close (stays not enabled, stays "bailed").
+function hanimeAgeDecline() { _hanimeAgeClose(); }
+// Variant A "No, I am 18 or older"  AND  variant B "Yes": actually enable.
+function hanimeAgeConfirm() {
+  _closeHanimeAgeModal();
+  const el = document.getElementById("sourceEnabledHanime");
+  if (el) el.checked = true;
+  _commitSourceEnabled("hanime", true);
 }
 
 function saveSourcesHideInSearch() {

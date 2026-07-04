@@ -31,6 +31,8 @@ const newMoviesSection = document.getElementById("newMoviesSection");
 const megakinoNewMoviesGrid = document.getElementById("megakinoNewMoviesGrid");
 const megakinoNewSeriesGrid = document.getElementById("megakinoNewSeriesGrid");
 const megakinoPopularGrid = document.getElementById("megakinoPopularGrid");
+const hanimeNewGrid = document.getElementById("hanimeNewGrid");
+const hanimeTrendingGrid = document.getElementById("hanimeTrendingGrid");
 
 let currentSeasons = [];
 let currentSeriesTitle = "";
@@ -437,6 +439,31 @@ async function loadMegakinoBrowse() {
   }
 }
 
+let hanimeLoadedAt = 0;
+async function loadHanimeBrowse() {
+  if (hanimeLoadedAt && Date.now() - hanimeLoadedAt < 3600000) return;
+  hanimeLoadedAt = Date.now();
+  if (hanimeNewGrid) renderSkeletons(hanimeNewGrid);
+  if (hanimeTrendingGrid) renderSkeletons(hanimeTrendingGrid);
+  try {
+    const [newResp, trendResp] = await Promise.all([
+      fetch("/api/hanime/new"),
+      fetch("/api/hanime/trending"),
+    ]);
+    await Promise.all([loadDownloadedFolders(), loadAutoSyncJobs(), loadCineinfoSettings(), loadGeneralSettings()]);
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    const newData = await newResp.json();
+    const trendData = await trendResp.json();
+    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results) : (hanimeNewGrid.innerHTML = errHtml));
+    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results) : (hanimeTrendingGrid.innerHTML = errHtml));
+  } catch (e) {
+    hanimeLoadedAt = 0;
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    if (hanimeNewGrid) hanimeNewGrid.innerHTML = errHtml;
+    if (hanimeTrendingGrid) hanimeTrendingGrid.innerHTML = errHtml;
+  }
+}
+
 async function showBrowseSections() {
   browseDiv.style.display = "";
   let settings = {};
@@ -449,13 +476,14 @@ async function showBrowseSections() {
   if (enabled.sto !== "0") loadStoBrowse();
   if (enabled.filmpalast !== "0") loadFilmPalastBrowse();
   if (enabled.megakino !== "0") loadMegakinoBrowse();
+  if (enabled.hanime === "1") loadHanimeBrowse();
 }
 
 // Reorder provider blocks + their new/popular sections on the start page and
 // hide disabled sources, based on the DB-backed source settings.
 function _applySourceLayout(sources) {
   if (!browseDiv) return;
-  const validProv = ["aniworld", "sto", "filmpalast", "megakino"];
+  const validProv = ["aniworld", "sto", "filmpalast", "megakino", "hanime"];
   let order = String((sources && sources.order) || "")
     .split(",").map(p => p.trim().toLowerCase()).filter(p => validProv.indexOf(p) !== -1);
   validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
@@ -737,6 +765,15 @@ function rebuildLanguageSelect(foundLangs = null) {
     return;
   }
 
+  if (url.includes("hanime.tv")) {
+    // hanime: single Japanese audio track with burned-in subtitles.
+    const opt = document.createElement("option");
+    opt.value = "Japanese Dub";
+    opt.textContent = t("Japanisch (Sub)", "Japanese (Sub)");
+    languageSelect.appendChild(opt);
+    return;
+  }
+
   const isSto = url.includes("s.to") || url.includes("serienstream.to");
   const langs = isSto ? window.STO_LANGS || {} : window.ANIWORLD_LANGS || {};
 
@@ -774,6 +811,13 @@ if (languageSelect) {
   languageSelect.addEventListener("change", updateProviderDropdown);
 }
 
+function _hanimeCensLabel(c) {
+  const v = String(c || "").toLowerCase();
+  if (v === "uncensored") return t("Unzensiert", "Uncensored");
+  if (v === "censored") return t("Zensiert", "Censored");
+  return c || "";
+}
+
 function renderBrowseCards(grid, items) {
   grid.innerHTML = "";
   items.forEach((item) => {
@@ -782,6 +826,7 @@ function renderBrowseCards(grid, items) {
     card.dataset.url = item.url;
     card.onclick = () => openSeries(item.url);
     card.innerHTML =
+      (item.censored ? `<div class="hanime-pill hanime-pill-${esc(String(item.censored).toLowerCase())}">${esc(_hanimeCensLabel(item.censored))}</div>` : ``) +
       `<img src="${esc(proxyImg(item.poster_url))}" alt="" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded'); this.style.display='none'">` +
       `<div class="browse-info">` +
       `<div class="browse-title">${esc(item.title)}</div>` +
@@ -954,13 +999,15 @@ async function doSearch() {
     const _en = _srcSettings.enabled || {};
     const _hide = _srcSettings.hide_disabled_in_search === "1";
     const _active = (prov) => !(_hide && _en[prov] === "0");
-    const [aniResults, stoResults, fpResults, mkResults] = await Promise.all([
+    const _hanActive = _en.hanime === "1";
+    const [aniResults, stoResults, fpResults, mkResults, hanResults] = await Promise.all([
       _active("aniworld") ? searchSite("aniworld").catch(() => []) : Promise.resolve([]),
       _active("sto") ? searchSite("sto").catch(() => []) : Promise.resolve([]),
       _active("filmpalast") ? searchSite("filmpalast").catch(() => []) : Promise.resolve([]),
       _active("megakino") ? searchSite("megakino").catch(() => []) : Promise.resolve([]),
+      _hanActive ? searchSite("hanime").catch(() => []) : Promise.resolve([]),
     ]);
-    renderResultsBoth(aniResults, stoResults, fpResults, mkResults);
+    renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResults);
   } catch (e) {
     showToast(t("Suche fehlgeschlagen: ", "Search failed: " + e.message));
   } finally {
@@ -989,11 +1036,12 @@ function renderResults(results) {
   });
 }
 
-function renderResultsBoth(aniResults, stoResults, fpResults, mkResults) {
+function renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResults) {
   fpResults = fpResults || [];
   mkResults = mkResults || [];
+  hanResults = hanResults || [];
   resultsDiv.innerHTML = "";
-  if (!aniResults.length && !stoResults.length && !fpResults.length && !mkResults.length) {
+  if (!aniResults.length && !stoResults.length && !fpResults.length && !mkResults.length && !hanResults.length) {
     resultsDiv.innerHTML =
       '<div style="width:100%;text-align:center;color:#888;padding:40px">Keine Ergebnisse gefunden.</div>';
     return;
@@ -1004,6 +1052,7 @@ function renderResultsBoth(aniResults, stoResults, fpResults, mkResults) {
     { key: "sto", label: "S.TO", cls: "browse-provider-sto", results: stoResults },
     { key: "filmpalast", label: "FilmPalast", cls: "browse-provider-filmpalast", results: fpResults },
     { key: "megakino", label: "MegaKino", cls: "browse-provider-megakino", results: mkResults },
+    { key: "hanime", label: "hanime 18+", cls: "browse-provider-hanime", results: hanResults },
   ];
   try {
     const _ord = String(((generalSettings || {}).sources || {}).order || "")
@@ -1036,8 +1085,9 @@ function renderResultsBoth(aniResults, stoResults, fpResults, mkResults) {
       card.dataset.url = r.url;
       card.onclick = () => openSeries(r.url);
       card.innerHTML =
+        (r.censored ? '<div class="hanime-pill hanime-pill-' + esc(String(r.censored).toLowerCase()) + '">' + esc(_hanimeCensLabel(r.censored)) + '</div>' : '') +
         '<img src="" alt="" style="width:100%;aspect-ratio:2/3;object-fit:cover;background:var(--bg-elevated);display:block">' +
-        '<div class="browse-info"><div class="browse-title">' + esc(r.title) + '</div><div class="browse-genre"></div></div>';
+        '<div class="browse-info"><div class="browse-title">' + esc(r.title) + '</div><div class="browse-genre">' + esc(r.genre || '') + '</div></div>';
       addDownloadedBadge(card, r.title);
       addSyncBadge(card, r.url);
       grid.appendChild(card);
@@ -2426,12 +2476,24 @@ function submitDirectLink() {
   const isSto = /s\.to\/serie\/[^\/]+/.test(url);
   const isAniworld = /aniworld\.to\/anime\/stream\/[^\/]+/.test(url);
   const isMegakino = /megakino[^/]*\/(?:films|serials|kinofilme|multfilm|documentary)\/\d+-[^/]+\.html/.test(url);
+  const isHanime = /hanime\.tv\/videos\/hentai\/[^/?#]+/.test(url);
 
-  if (!isSto && !isAniworld && !isMegakino) {
-    error.textContent = t("Ungültige URL. Bitte eine s.to, aniworld.to oder megakino Serien-/Film-URL eingeben.", "Invalid URL. Please enter an s.to, aniworld.to or megakino series/movie URL.");
+  if (!isSto && !isAniworld && !isMegakino && !isHanime) {
+    error.textContent = t("Ungültige URL. Bitte eine s.to, aniworld.to, megakino oder hanime.tv Serien-/Film-URL eingeben.", "Invalid URL. Please enter an s.to, aniworld.to, megakino or hanime.tv series/movie URL.");
     error.style.display = "block";
     input.focus();
     return;
+  }
+
+  // hanime is an adult source: a direct link must not bypass the 18+ gate.
+  if (isHanime) {
+    const _hanOn = ((((generalSettings || {}).sources || {}).enabled || {}).hanime === "1");
+    if (!_hanOn) {
+      error.textContent = t("hanime ist deaktiviert. Bitte zuerst in den Einstellungen aktivieren (18+).", "hanime is disabled. Please enable it in Settings first (18+).");
+      error.style.display = "block";
+      input.focus();
+      return;
+    }
   }
 
   // Extract base series URL (strip staffel/episode sub-paths)
@@ -2445,6 +2507,9 @@ function submitDirectLink() {
   } else if (isMegakino) {
     // megakino: the post URL itself is the series/movie; drop any ?episode=N
     seriesUrl = url.split("?")[0];
+  } else if (isHanime) {
+    // hanime: strip any ?ep=N / query -> canonical franchise (series) URL
+    seriesUrl = url.split("?")[0].split("#")[0];
   }
 
   closeDirectLinkModal();

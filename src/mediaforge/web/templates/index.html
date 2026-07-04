@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='hanime.css') }}">
 <style>
   #directLinkBtn {
     height: 46px;
@@ -221,6 +222,17 @@
       <div class="browse-section" id="megakinoPopularSection" data-section="popular">
         <h2 class="browse-heading">{{ _('Popular') }}</h2>
         <div class="browse-grid" id="megakinoPopularGrid"></div>
+      </div>
+    </div>
+    <div class="browse-provider-block" data-provider="hanime" style="display:none">
+      <div class="browse-provider-header browse-provider-hanime">hanime <span class="browse-provider-18">18+</span></div>
+      <div class="browse-section" id="hanimeNewSection" data-section="new">
+        <h2 class="browse-heading">{{ _('New') }}</h2>
+        <div class="browse-grid" id="hanimeNewGrid"></div>
+      </div>
+      <div class="browse-section" id="hanimeTrendingSection" data-section="trending">
+        <h2 class="browse-heading">{{ _('Trending') }}</h2>
+        <div class="browse-grid" id="hanimeTrendingGrid"></div>
       </div>
     </div>
   </div>

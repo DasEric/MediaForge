@@ -52,6 +52,11 @@ from ..search import (
     fetch_megakino_popular,
     megakino_search,
 )
+from ..search import (
+    fetch_hanime_new,
+    fetch_hanime_trending,
+    hanime_search,
+)
 from .db import (
     add_autosync_job,
     add_custom_path,
@@ -992,6 +997,14 @@ def _is_megakino_movie_url(url: str) -> bool:
 def _is_megakino_series_url(url: str) -> bool:
     from ..config import MEGAKINO_SERIES_PATTERN
     return bool(MEGAKINO_SERIES_PATTERN.match(url or ""))
+
+
+def _is_hanime_url(url: str) -> bool:
+    return "hanime.tv/videos/hentai/" in (url or "")
+
+
+def _hanime_enabled() -> bool:
+    return get_setting("source_enabled_hanime", "0") == "1"
 
 
 def _parse_season_episode(url):
@@ -3433,6 +3446,9 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             results = _filmpalast_search(keyword)
         elif site == "megakino":
             results = megakino_search(keyword) or []
+        elif site == "hanime":
+            # Adult source: only search when explicitly enabled.
+            results = (hanime_search(keyword) or []) if _hanime_enabled() else []
         else:
             results = _get_site_results(keyword, site)
             
@@ -3959,6 +3975,56 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 logger.error(f"MegaKino episodes fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
+        # hanime: list the franchise's episodes (single "Japanese Dub" language)
+        if _is_hanime_url(url):
+            try:
+                from pathlib import Path as _P
+                from ..models.hanime_tv.series import HanimeSeries
+                series = HanimeSeries(url=url)
+                season = series.seasons[0]
+                sn = season.season_number
+                downloaded_eps = set()
+                try:
+                    title_clean = (series.title_cleaned or "").lower()
+                    if title_clean:
+                        raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+                        dl_base = _P(raw).expanduser() if raw else (_P.home() / "Downloads")
+                        if not dl_base.is_absolute():
+                            dl_base = _P.home() / dl_base
+                        roots = [dl_base]
+                        for cp in get_custom_paths():
+                            cpp = _P(cp["path"]).expanduser()
+                            if not cpp.is_absolute():
+                                cpp = _P.home() / cpp
+                            roots.append(cpp)
+                        ep_re = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
+                        for base in roots:
+                            if not base.is_dir():
+                                continue
+                            for folder in base.iterdir():
+                                if folder.is_dir() and folder.name.lower().startswith(title_clean):
+                                    for f in folder.rglob("*"):
+                                        if f.is_file():
+                                            mm = ep_re.search(f.name)
+                                            if mm:
+                                                downloaded_eps.add((int(mm.group(1)), int(mm.group(2))))
+                except Exception:
+                    pass
+                episodes_data = []
+                for ep in season.episodes:
+                    episodes_data.append({
+                        "url": ep.url,
+                        "episode_number": ep.episode_number,
+                        "title_de": ep.title_de or "",
+                        "title_en": ep.title_en or "",
+                        "downloaded": (sn, ep.episode_number) in downloaded_eps,
+                        "languages": ["Japanese Dub"],
+                    })
+                return jsonify({"episodes": episodes_data})
+            except Exception as e:
+                logger.error(f"hanime episodes fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
         try:
             prov = resolve_provider(url)
             # Pass series to avoid broken series URL reconstruction in s.to
@@ -4134,6 +4200,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         url = request.args.get("url", "").strip()
         if not url:
             return jsonify({"error": "url is required"}), 400
+
+        # hanime: no third-party hoster and one stream -> a single pseudo provider.
+        if _is_hanime_url(url):
+            return jsonify({"providers": {"Japanese Dub": ["hanime"]}})
 
         # MegaKino: single German language, direct hoster embeds (VOE etc.)
         if _is_megakino_url(url):
@@ -5277,6 +5347,25 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return jsonify({"error": "Failed to fetch megakino popular"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
+    @app.route("/api/hanime/new")
+    def api_hanime_new():
+        # Adult source: only serve data when the user has explicitly enabled it.
+        if not _hanime_enabled():
+            return jsonify({"results": []})
+        results = _cached_browse("hanime_new", fetch_hanime_new)
+        if results is None:
+            return jsonify({"error": "Failed to fetch hanime new"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
+    @app.route("/api/hanime/trending")
+    def api_hanime_trending():
+        if not _hanime_enabled():
+            return jsonify({"results": []})
+        results = _cached_browse("hanime_trending", fetch_hanime_trending)
+        if results is None:
+            return jsonify({"error": "Failed to fetch hanime trending"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
     @app.route("/api/downloaded-folders")
     def api_downloaded_folders():
         from pathlib import Path
@@ -5538,11 +5627,12 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     "calendar_release":   get_setting("crunchyroll_calendar_release",   "0"),
                 },
                 "sources": {
-                    "order": get_setting("home_source_order", "aniworld,sto,filmpalast,megakino"),
+                    "order": get_setting("home_source_order", "aniworld,sto,filmpalast,megakino,hanime"),
                     "section_order": {
                         "aniworld": get_setting("home_section_order_aniworld", "new,popular"),
                         "sto":      get_setting("home_section_order_sto",      "new,popular"),
                         "megakino": get_setting("home_section_order_megakino", "new,series,popular"),
+                        "hanime":   get_setting("home_section_order_hanime",   "new,trending"),
                     },
                     "sections": {
                         "aniworld": {
@@ -5558,12 +5648,17 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                             "series":  get_setting("source_show_series_megakino",  "1"),
                             "popular": get_setting("source_show_popular_megakino", "1"),
                         },
+                        "hanime": {
+                            "new":      get_setting("source_show_new_hanime",      "1"),
+                            "trending": get_setting("source_show_trending_hanime", "1"),
+                        },
                     },
                     "enabled": {
                         "aniworld":   get_setting("source_enabled_aniworld",   "1"),
                         "sto":        get_setting("source_enabled_sto",        "1"),
                         "filmpalast": get_setting("source_enabled_filmpalast", "1"),
                         "megakino":   get_setting("source_enabled_megakino",   "1"),
+                        "hanime":     get_setting("source_enabled_hanime",     "0"),
                     },
                     "hide_disabled_in_search": get_setting("sources_hide_in_search", "0"),
                 },
@@ -7575,10 +7670,13 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             os.environ["MEDIAFORGE_AUTO_UPDATE_TIME"] = t_norm
         # -- Quellen / Sources: Reihenfolge & Aktivierung (admin only) --
         _source_keys = (
-            "home_source_order", "home_section_order_aniworld", "home_section_order_sto",
+            "home_source_order",
+            "home_section_order_aniworld", "home_section_order_sto", "home_section_order_hanime",
             "source_enabled_aniworld", "source_enabled_sto", "source_enabled_filmpalast",
+            "source_enabled_megakino", "source_enabled_hanime",
             "source_show_new_aniworld", "source_show_popular_aniworld",
             "source_show_new_sto", "source_show_popular_sto",
+            "source_show_new_hanime", "source_show_trending_hanime",
             "sources_hide_in_search",
         )
         if any(_sk in data for _sk in _source_keys):
@@ -7586,10 +7684,16 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             if not _sadmin:
                 return jsonify({"error": "forbidden"}), 403
         if "home_source_order" in data:
+            _valid_provs = {"aniworld", "sto", "filmpalast", "megakino", "hanime"}
             _parts = [p.strip().lower() for p in str(data["home_source_order"]).split(",") if p.strip()]
-            if sorted(_parts) != ["aniworld", "filmpalast", "sto"]:
-                return jsonify({"error": "Invalid home_source_order: must be a permutation of aniworld,sto,filmpalast"}), 400
+            if not _parts or any(p not in _valid_provs for p in _parts) or len(set(_parts)) != len(_parts):
+                return jsonify({"error": "Invalid home_source_order"}), 400
             set_setting("home_source_order", ",".join(_parts))
+        if "home_section_order_hanime" in data:
+            _parts = [p.strip().lower() for p in str(data["home_section_order_hanime"]).split(",") if p.strip()]
+            if sorted(_parts) != ["new", "trending"]:
+                return jsonify({"error": "Invalid home_section_order_hanime: must be a permutation of new,trending"}), 400
+            set_setting("home_section_order_hanime", ",".join(_parts))
         for _prov in ("aniworld", "sto"):
             _k = "home_section_order_" + _prov
             if _k in data:
@@ -7597,7 +7701,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 if sorted(_parts) != ["new", "popular"]:
                     return jsonify({"error": "Invalid %s: must be a permutation of new,popular" % _k}), 400
                 set_setting(_k, ",".join(_parts))
-        for _prov in ("aniworld", "sto", "filmpalast"):
+        for _prov in ("aniworld", "sto", "filmpalast", "megakino", "hanime"):
             _k = "source_enabled_" + _prov
             if _k in data:
                 set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
@@ -7606,6 +7710,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 _k = "source_show_" + _sec + "_" + _prov
                 if _k in data:
                     set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
+        for _sec in ("new", "trending"):
+            _k = "source_show_" + _sec + "_hanime"
+            if _k in data:
+                set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
         if "sources_hide_in_search" in data:
             set_setting("sources_hide_in_search", "1" if str(data["sources_hide_in_search"]).lower() in ("true", "1") else "0")
         return jsonify({"ok": True})
@@ -8313,6 +8421,21 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 })
         except Exception as e:
             logger.debug("[AutosyncSearch] MegaKino search failed: %s", e)
+        if _hanime_enabled():
+            try:
+                for item in (hanime_search(title) or []):
+                    url = item.get("url", "")
+                    if not url or url in seen:
+                        continue
+                    seen.add(url)
+                    name = _html_unescape(item.get("title") or "Unknown")
+                    score = difflib.SequenceMatcher(None, target, _norm(name)).ratio()
+                    candidates.append({
+                        "site": "hanime", "site_label": "hanime 18+",
+                        "title": name, "url": url, "score": round(score, 3),
+                    })
+            except Exception as e:
+                logger.debug("[AutosyncSearch] hanime search failed: %s", e)
 
         candidates.sort(key=lambda c: c["score"], reverse=True)
         return jsonify({"results": candidates[:12]})
@@ -8820,7 +8943,9 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         host_stripped = netloc.removeprefix("www.")
         if (netloc not in _ALLOWED_IMAGE_HOSTS
                 and host_stripped not in _ALLOWED_IMAGE_HOSTS
-                and "megakino" not in host_stripped):
+                and "megakino" not in host_stripped
+                and "hanime" not in host_stripped
+                and "htv-services" not in host_stripped):
             return ("Forbidden host", 403)
 
         # --- Serve from disk cache if available ---
