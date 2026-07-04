@@ -10,6 +10,9 @@ from .config import (
     MEDIAFORGE_EPISODE_PATTERN,
     MEDIAFORGE_SEASON_PATTERN,
     MEDIAFORGE_SERIES_PATTERN,
+    MEGAKINO_EPISODE_PATTERN,
+    MEGAKINO_MOVIE_PATTERN,
+    MEGAKINO_SERIES_PATTERN,
     SERIENSTREAM_EPISODE_PATTERN,
     SERIENSTREAM_SEASON_PATTERN,
     SERIENSTREAM_SERIES_PATTERN,
@@ -23,6 +26,10 @@ from .models import (
     SerienstreamSeries,
 )
 from .models.filmpalast_to.episode import FilmPalastEpisode
+from .models.megakino_to.episode import MegakinoEpisode
+from .models.megakino_to.movie import MegakinoMovie
+from .models.megakino_to.season import MegakinoSeason
+from .models.megakino_to.series import MegakinoSeries
 
 # FilmPalast episode URLs: https://filmpalast.to/stream/<slug>
 FILMPALAST_EPISODE_PATTERN = _re.compile(
@@ -67,6 +74,23 @@ PROVIDERS = [
         name="FilmPalast",
         episode_pattern=FILMPALAST_EPISODE_PATTERN,
         episode_cls=FilmPalastEpisode,
+    ),
+    # MegaKino series: one post == one season. Episode URLs are synthetic
+    # (<post>.html?episode=N).
+    Provider(
+        name="Megakino",
+        series_pattern=MEGAKINO_SERIES_PATTERN,
+        season_pattern=MEGAKINO_SERIES_PATTERN,
+        episode_pattern=MEGAKINO_EPISODE_PATTERN,
+        series_cls=MegakinoSeries,
+        season_cls=MegakinoSeason,
+        episode_cls=MegakinoEpisode,
+    ),
+    # MegaKino movies: standalone films (the movie page is the "episode").
+    Provider(
+        name="MegakinoFilm",
+        episode_pattern=MEGAKINO_MOVIE_PATTERN,
+        episode_cls=MegakinoMovie,
     ),
 ]
 

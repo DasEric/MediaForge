@@ -1926,14 +1926,15 @@ function changeTimeFormatSetting() {
 const SOURCE_META = {
   aniworld:   { label: "AniWorld",   cls: "browse-provider-aniworld",   hasSections: true },
   sto:        { label: "S.TO",       cls: "browse-provider-sto",        hasSections: true },
-  filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false }
+  filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false },
+  megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false }
 };
 
 let _sourceState = {
-  order: ["aniworld", "sto", "filmpalast"],
-  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"] },
-  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true } },
-  enabled: { aniworld: true, sto: true, filmpalast: true },
+  order: ["aniworld", "sto", "filmpalast", "megakino"],
+  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new", "series", "popular"] },
+  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new: true, series: true, popular: true } },
+  enabled: { aniworld: true, sto: true, filmpalast: true, megakino: true },
   hide_in_search: false
 };
 
@@ -1944,8 +1945,8 @@ function _splitOrder(str, fallback) {
 
 function _loadSourceSettings(sources) {
   sources = sources || {};
-  const validProv = ["aniworld", "sto", "filmpalast"];
-  let order = _splitOrder(sources.order, ["aniworld", "sto", "filmpalast"]).filter(p => validProv.indexOf(p) !== -1);
+  const validProv = ["aniworld", "sto", "filmpalast", "megakino"];
+  let order = _splitOrder(sources.order, ["aniworld", "sto", "filmpalast", "megakino"]).filter(p => validProv.indexOf(p) !== -1);
   // ensure every provider is present exactly once
   validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
   _sourceState.order = order;
@@ -1964,15 +1965,18 @@ function _loadSourceSettings(sources) {
   _sourceState.enabled.aniworld   = en.aniworld   !== "0";
   _sourceState.enabled.sto        = en.sto        !== "0";
   _sourceState.enabled.filmpalast = en.filmpalast !== "0";
+  _sourceState.enabled.megakino   = en.megakino   !== "0";
   _sourceState.hide_in_search = sources.hide_disabled_in_search === "1";
 
   // Reflect enabled toggles (Quellen tab)
   const cbSto = document.getElementById("sourceEnabledSto");
   const cbAni = document.getElementById("sourceEnabledAniworld");
   const cbFp  = document.getElementById("sourceEnabledFilmpalast");
+  const cbMk  = document.getElementById("sourceEnabledMegakino");
   if (cbSto) cbSto.checked = _sourceState.enabled.sto;
   if (cbAni) cbAni.checked = _sourceState.enabled.aniworld;
   if (cbFp)  cbFp.checked  = _sourceState.enabled.filmpalast;
+  if (cbMk)  cbMk.checked  = _sourceState.enabled.megakino;
   const cbHide = document.getElementById("sourcesHideInSearch");
   if (cbHide) cbHide.checked = _sourceState.hide_in_search;
 
@@ -2119,7 +2123,7 @@ function _saveSectionOrder(prov) {
 }
 
 function saveSourceEnabled(prov) {
-  const map = { sto: "sourceEnabledSto", aniworld: "sourceEnabledAniworld", filmpalast: "sourceEnabledFilmpalast" };
+  const map = { sto: "sourceEnabledSto", aniworld: "sourceEnabledAniworld", filmpalast: "sourceEnabledFilmpalast", megakino: "sourceEnabledMegakino" };
   const el = document.getElementById(map[prov]);
   if (!el) return;
   _sourceState.enabled[prov] = el.checked;

@@ -28,6 +28,9 @@ const newSeriesSection = document.getElementById("newSeriesSection");
 const popularSeriesSection = document.getElementById("popularSeriesSection");
 const newMoviesGrid = document.getElementById("newMoviesGrid");
 const newMoviesSection = document.getElementById("newMoviesSection");
+const megakinoNewMoviesGrid = document.getElementById("megakinoNewMoviesGrid");
+const megakinoNewSeriesGrid = document.getElementById("megakinoNewSeriesGrid");
+const megakinoPopularGrid = document.getElementById("megakinoPopularGrid");
 
 let currentSeasons = [];
 let currentSeriesTitle = "";
@@ -404,6 +407,36 @@ async function loadFilmPalastBrowse() {
   }
 }
 
+let megakinoLoadedAt = 0;
+async function loadMegakinoBrowse() {
+  if (megakinoLoadedAt && Date.now() - megakinoLoadedAt < 3600000) return;
+  megakinoLoadedAt = Date.now();
+  if (megakinoNewMoviesGrid) renderSkeletons(megakinoNewMoviesGrid);
+  if (megakinoNewSeriesGrid) renderSkeletons(megakinoNewSeriesGrid);
+  if (megakinoPopularGrid) renderSkeletons(megakinoPopularGrid);
+  try {
+    const [mvResp, seResp, popResp] = await Promise.all([
+      fetch("/api/megakino/new-movies"),
+      fetch("/api/megakino/new-series"),
+      fetch("/api/megakino/popular"),
+    ]);
+    await Promise.all([loadDownloadedFolders(), loadAutoSyncJobs(), loadCineinfoSettings(), loadGeneralSettings()]);
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    const mvData = await mvResp.json();
+    const seData = await seResp.json();
+    const popData = await popResp.json();
+    if (megakinoNewMoviesGrid) megakinoNewMoviesGrid.innerHTML = "", (mvData.results ? renderBrowseCards(megakinoNewMoviesGrid, mvData.results) : (megakinoNewMoviesGrid.innerHTML = errHtml));
+    if (megakinoNewSeriesGrid) (seData.results ? renderBrowseCards(megakinoNewSeriesGrid, seData.results) : (megakinoNewSeriesGrid.innerHTML = errHtml));
+    if (megakinoPopularGrid) (popData.results ? renderBrowseCards(megakinoPopularGrid, popData.results) : (megakinoPopularGrid.innerHTML = errHtml));
+  } catch (e) {
+    megakinoLoadedAt = 0;
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    if (megakinoNewMoviesGrid) megakinoNewMoviesGrid.innerHTML = errHtml;
+    if (megakinoNewSeriesGrid) megakinoNewSeriesGrid.innerHTML = errHtml;
+    if (megakinoPopularGrid) megakinoPopularGrid.innerHTML = errHtml;
+  }
+}
+
 async function showBrowseSections() {
   browseDiv.style.display = "";
   let settings = {};
@@ -415,13 +448,14 @@ async function showBrowseSections() {
   if (enabled.aniworld !== "0") loadAniworldBrowse();
   if (enabled.sto !== "0") loadStoBrowse();
   if (enabled.filmpalast !== "0") loadFilmPalastBrowse();
+  if (enabled.megakino !== "0") loadMegakinoBrowse();
 }
 
 // Reorder provider blocks + their new/popular sections on the start page and
 // hide disabled sources, based on the DB-backed source settings.
 function _applySourceLayout(sources) {
   if (!browseDiv) return;
-  const validProv = ["aniworld", "sto", "filmpalast"];
+  const validProv = ["aniworld", "sto", "filmpalast", "megakino"];
   let order = String((sources && sources.order) || "")
     .split(",").map(p => p.trim().toLowerCase()).filter(p => validProv.indexOf(p) !== -1);
   validProv.forEach(p => { if (order.indexOf(p) === -1) order.push(p); });
@@ -920,12 +954,13 @@ async function doSearch() {
     const _en = _srcSettings.enabled || {};
     const _hide = _srcSettings.hide_disabled_in_search === "1";
     const _active = (prov) => !(_hide && _en[prov] === "0");
-    const [aniResults, stoResults, fpResults] = await Promise.all([
+    const [aniResults, stoResults, fpResults, mkResults] = await Promise.all([
       _active("aniworld") ? searchSite("aniworld").catch(() => []) : Promise.resolve([]),
       _active("sto") ? searchSite("sto").catch(() => []) : Promise.resolve([]),
       _active("filmpalast") ? searchSite("filmpalast").catch(() => []) : Promise.resolve([]),
+      _active("megakino") ? searchSite("megakino").catch(() => []) : Promise.resolve([]),
     ]);
-    renderResultsBoth(aniResults, stoResults, fpResults);
+    renderResultsBoth(aniResults, stoResults, fpResults, mkResults);
   } catch (e) {
     showToast(t("Suche fehlgeschlagen: ", "Search failed: " + e.message));
   } finally {
@@ -954,10 +989,11 @@ function renderResults(results) {
   });
 }
 
-function renderResultsBoth(aniResults, stoResults, fpResults) {
+function renderResultsBoth(aniResults, stoResults, fpResults, mkResults) {
   fpResults = fpResults || [];
+  mkResults = mkResults || [];
   resultsDiv.innerHTML = "";
-  if (!aniResults.length && !stoResults.length && !fpResults.length) {
+  if (!aniResults.length && !stoResults.length && !fpResults.length && !mkResults.length) {
     resultsDiv.innerHTML =
       '<div style="width:100%;text-align:center;color:#888;padding:40px">Keine Ergebnisse gefunden.</div>';
     return;
@@ -967,6 +1003,7 @@ function renderResultsBoth(aniResults, stoResults, fpResults) {
     { key: "aniworld", label: "AniWorld", cls: "browse-provider-aniworld", results: aniResults },
     { key: "sto", label: "S.TO", cls: "browse-provider-sto", results: stoResults },
     { key: "filmpalast", label: "FilmPalast", cls: "browse-provider-filmpalast", results: fpResults },
+    { key: "megakino", label: "MegaKino", cls: "browse-provider-megakino", results: mkResults },
   ];
   try {
     const _ord = String(((generalSettings || {}).sources || {}).order || "")
@@ -2388,9 +2425,10 @@ function submitDirectLink() {
 
   const isSto = /s\.to\/serie\/[^\/]+/.test(url);
   const isAniworld = /aniworld\.to\/anime\/stream\/[^\/]+/.test(url);
+  const isMegakino = /megakino[^/]*\/(?:films|serials|kinofilme|multfilm|documentary)\/\d+-[^/]+\.html/.test(url);
 
-  if (!isSto && !isAniworld) {
-    error.textContent = t("Ungültige URL. Bitte eine s.to oder aniworld.to Serien-URL eingeben.", "Invalid URL. Please enter an s.to or aniworld.to series URL.");
+  if (!isSto && !isAniworld && !isMegakino) {
+    error.textContent = t("Ungültige URL. Bitte eine s.to, aniworld.to oder megakino Serien-/Film-URL eingeben.", "Invalid URL. Please enter an s.to, aniworld.to or megakino series/movie URL.");
     error.style.display = "block";
     input.focus();
     return;
@@ -2401,9 +2439,12 @@ function submitDirectLink() {
   if (isSto) {
     const m = url.match(/(https?:\/\/[^/]*s\.to\/serie\/[^\/]+)/);
     if (m) seriesUrl = m[1];
-  } else {
+  } else if (isAniworld) {
     const m = url.match(/(https?:\/\/[^/]*aniworld\.to\/anime\/stream\/[^\/]+)/);
     if (m) seriesUrl = m[1];
+  } else if (isMegakino) {
+    // megakino: the post URL itself is the series/movie; drop any ?episode=N
+    seriesUrl = url.split("?")[0];
   }
 
   closeDirectLinkModal();
@@ -3496,6 +3537,7 @@ async function runAniSearch(primaryTitle, tmdbId, type, posterPath) {
       allPromises.push(searchSite("aniworld", kw));
       allPromises.push(searchSite("sto", kw));
       allPromises.push(searchSite("filmpalast", kw));
+      allPromises.push(searchSite("megakino", kw));
     });
 
     const resultsArrays = await Promise.all(allPromises.map(p => p.catch(() => [])));
@@ -3564,12 +3606,13 @@ async function runAniSearch(primaryTitle, tmdbId, type, posterPath) {
       if (r.url.includes('aniworld.to')) provClass = 'prov-ani';
       if (r.url.includes('s.to') || r.url.includes('serienstream.to')) provClass = 'prov-sto';
       if (r.url.includes('filmpalast.to')) provClass = 'prov-fp';
+      if (r.url.includes('megakino')) provClass = 'prov-mk';
 
       card.innerHTML = `
         <img src="" loading="lazy" alt="Cover" style="width:100%;aspect-ratio:2/3;object-fit:cover;background:var(--bg-elevated);display:block" />
         <div class="browse-info">
           <div class="browse-title" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</div>
-          <div class="browse-provider ${provClass}">${provClass === 'prov-ani' ? 'AniWorld' : provClass === 'prov-sto' ? 'S.to' : 'FilmPalast'}</div>
+          <div class="browse-provider ${provClass}">${provClass === 'prov-ani' ? 'AniWorld' : provClass === 'prov-sto' ? 'S.to' : provClass === 'prov-mk' ? 'MegaKino' : 'FilmPalast'}</div>
         </div>
       `;
 

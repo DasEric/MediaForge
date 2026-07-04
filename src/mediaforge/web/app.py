@@ -46,6 +46,12 @@ from ..search import (
     random_anime,
 )
 from ..search import query as aniworld_query
+from ..search import (
+    fetch_megakino_new_movies,
+    fetch_megakino_new_series,
+    fetch_megakino_popular,
+    megakino_search,
+)
 from .db import (
     add_autosync_job,
     add_custom_path,
@@ -972,6 +978,20 @@ def _trigger_mediaplayer_refresh(title: str | None = None, selected_path: str | 
 
 def _is_filmpalast_url(url: str) -> bool:
     return "filmpalast.to/stream/" in url
+
+
+def _is_megakino_url(url: str) -> bool:
+    return "megakino" in (url or "") and ".html" in url
+
+
+def _is_megakino_movie_url(url: str) -> bool:
+    from ..config import MEGAKINO_MOVIE_PATTERN
+    return bool(MEGAKINO_MOVIE_PATTERN.match(url or ""))
+
+
+def _is_megakino_series_url(url: str) -> bool:
+    from ..config import MEGAKINO_SERIES_PATTERN
+    return bool(MEGAKINO_SERIES_PATTERN.match(url or ""))
 
 
 def _parse_season_episode(url):
@@ -3411,6 +3431,8 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
 
         if site == "filmpalast":
             results = _filmpalast_search(keyword)
+        elif site == "megakino":
+            results = megakino_search(keyword) or []
         else:
             results = _get_site_results(keyword, site)
             
@@ -3665,6 +3687,79 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 logger.error(f"FilmPalast series fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
+        # MegaKino movie: use the movie object as metadata source (single film)
+        if _is_megakino_movie_url(url):
+            try:
+                from ..models.megakino_to.movie import MegakinoMovie
+                mv = MegakinoMovie(url=url)
+                title = mv.title_de or ""
+                description = mv.description or ""
+                genres = mv.genres or []
+                poster = mv.image_url
+                from .db import get_setting
+                api_key = get_setting("cineinfo_tmdb_api_key", "").strip()
+                if api_key:
+                    try:
+                        country = get_setting("cineinfo_country", "DE")
+                        ui_lang = session.get("ui_language", "de")
+                        tmdb_data = _tmdb_lookup_cached(title, None, api_key, country, ui_lang)
+                        if tmdb_data.get("found"):
+                            if tmdb_data.get("title_confident"):
+                                title = tmdb_data.get("title") or title
+                            description = tmdb_data.get("overview") or description
+                            if tmdb_data.get("genres"):
+                                genres = tmdb_data.get("genres")
+                    except Exception as _tmdb_exc:
+                        logger.debug("[api_series] TMDB localization failed for MegaKino movie: %s", _tmdb_exc)
+                return jsonify({
+                    "title": title,
+                    "poster_url": _poster_proxy(poster),
+                    "description": description,
+                    "genres": genres,
+                    "release_year": str(mv.release_year) if mv.release_year else "",
+                    "is_movie": True,
+                    "available_providers": mv.available_providers,
+                })
+            except Exception as e:
+                logger.error(f"MegaKino movie fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
+        # MegaKino series (one post == one season)
+        if _is_megakino_series_url(url):
+            try:
+                from ..models.megakino_to.series import MegakinoSeries
+                series = MegakinoSeries(url=url)
+                title = _html_unescape(series.title)
+                description = series.description or ""
+                genres = series.genres or []
+                poster = series.poster_url
+                from .db import get_setting
+                api_key = get_setting("cineinfo_tmdb_api_key", "").strip()
+                if api_key:
+                    try:
+                        country = get_setting("cineinfo_country", "DE")
+                        ui_lang = session.get("ui_language", "de")
+                        tmdb_data = _tmdb_lookup_cached(title, None, api_key, country, ui_lang)
+                        if tmdb_data.get("found"):
+                            if tmdb_data.get("title_confident"):
+                                title = tmdb_data.get("title") or title
+                            description = tmdb_data.get("overview") or description
+                            if tmdb_data.get("genres"):
+                                genres = tmdb_data.get("genres")
+                    except Exception as _tmdb_exc:
+                        logger.debug("[api_series] TMDB localization failed for MegaKino series: %s", _tmdb_exc)
+                return jsonify({
+                    "title": title,
+                    "poster_url": _poster_proxy(poster),
+                    "description": description,
+                    "genres": genres,
+                    "release_year": series.release_year or "",
+                    "imdb_id": None,
+                })
+            except Exception as e:
+                logger.error(f"MegaKino series fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
         try:
             prov = resolve_provider(url)
             series = prov.series_cls(url=url)
@@ -3724,6 +3819,28 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         if _is_filmpalast_url(url):
             return jsonify({"seasons": [{"url": url, "season_number": 1, "episode_count": 1, "are_movies": True, "is_single_movie": True}]})
 
+        # MegaKino movie: single fake season/episode = the film itself
+        if _is_megakino_movie_url(url):
+            return jsonify({"seasons": [{"url": url, "season_number": 1, "episode_count": 1, "are_movies": True, "is_single_movie": True}]})
+
+        # MegaKino series: one post == one season
+        if _is_megakino_series_url(url):
+            try:
+                from ..models.megakino_to.series import MegakinoSeries
+                series = MegakinoSeries(url=url)
+                seasons_data = []
+                for season in series.seasons:
+                    seasons_data.append({
+                        "url": season.url,
+                        "season_number": season.season_number,
+                        "episode_count": season.episode_count,
+                        "are_movies": False,
+                    })
+                return jsonify({"seasons": seasons_data})
+            except Exception as e:
+                logger.error(f"MegaKino seasons fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
         try:
             prov = resolve_provider(url)
             series = prov.series_cls(url=url)
@@ -3764,6 +3881,82 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 }]})
             except Exception as e:
                 logger.error(f"FilmPalast episodes fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
+        # MegaKino movie: the movie itself as a single episode
+        if _is_megakino_movie_url(url):
+            try:
+                from ..models.megakino_to.movie import MegakinoMovie
+                mv = MegakinoMovie(url=url)
+                return jsonify({"episodes": [{
+                    "url": url,
+                    "episode_number": 1,
+                    "season_number": 1,
+                    "title_de": mv.title_de or "",
+                    "title_en": mv.title_de or "",
+                    "downloaded": False,
+                    "languages": ["German Dub"],
+                }]})
+            except Exception as e:
+                logger.error(f"MegaKino movie episodes fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
+
+        # MegaKino series: list all episodes of the season post
+        if _is_megakino_series_url(url):
+            try:
+                from pathlib import Path as _P
+                from ..models.megakino_to.series import MegakinoSeries
+                series = MegakinoSeries(url=url)
+                season = series.seasons[0]
+                sn = season.season_number
+
+                # Downloaded detection via SxxExx filename scan
+                downloaded_eps = set()
+                try:
+                    title_clean = (series.title_cleaned or "").lower()
+                    if title_clean:
+                        raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+                        dl_base = _P(raw).expanduser() if raw else (_P.home() / "Downloads")
+                        if not dl_base.is_absolute():
+                            dl_base = _P.home() / dl_base
+                        roots = [dl_base]
+                        for cp in get_custom_paths():
+                            cpp = _P(cp["path"]).expanduser()
+                            if not cpp.is_absolute():
+                                cpp = _P.home() / cpp
+                            roots.append(cpp)
+                        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+                        lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+                        ep_re = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
+                        bases = []
+                        for root in roots:
+                            bases.extend([root / lf for lf in lang_folders] if lang_sep else [root])
+                        for base in bases:
+                            if not base.is_dir():
+                                continue
+                            for folder in base.iterdir():
+                                if folder.is_dir() and folder.name.lower().startswith(title_clean):
+                                    for f in folder.rglob("*"):
+                                        if f.is_file():
+                                            mm = ep_re.search(f.name)
+                                            if mm:
+                                                downloaded_eps.add((int(mm.group(1)), int(mm.group(2))))
+                except Exception:
+                    pass
+
+                episodes_data = []
+                for ep in season.episodes:
+                    episodes_data.append({
+                        "url": ep.url,
+                        "episode_number": ep.episode_number,
+                        "title_de": ep.title_de or "",
+                        "title_en": ep.title_en or "",
+                        "downloaded": (sn, ep.episode_number) in downloaded_eps,
+                        "languages": ["German Dub"],
+                    })
+                return jsonify({"episodes": episodes_data})
+            except Exception as e:
+                logger.error(f"MegaKino episodes fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
         try:
@@ -3941,6 +4134,22 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         url = request.args.get("url", "").strip()
         if not url:
             return jsonify({"error": "url is required"}), 400
+
+        # MegaKino: single German language, direct hoster embeds (VOE etc.)
+        if _is_megakino_url(url):
+            try:
+                prov = resolve_provider(url)
+                ep = prov.episode_cls(url=url)
+                pd = ep.provider_data  # {"German Dub": {hoster: embed_url}}
+                provider_info = {}
+                for label, hosters in pd.items():
+                    working = [h for h in hosters if h in WORKING_PROVIDERS]
+                    if working:
+                        provider_info[label] = working
+                return jsonify({"providers": provider_info})
+            except Exception as e:
+                logger.error(f"MegaKino providers fetch failed: {e}", exc_info=True)
+                return jsonify({"error": str(e)}), 500
 
         try:
             prov = resolve_provider(url)
@@ -5047,6 +5256,27 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return jsonify({"error": "Failed to fetch new movies"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
+    @app.route("/api/megakino/new-movies")
+    def api_megakino_new_movies():
+        results = _cached_browse("megakino_new_movies", fetch_megakino_new_movies)
+        if results is None:
+            return jsonify({"error": "Failed to fetch megakino movies"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
+    @app.route("/api/megakino/new-series")
+    def api_megakino_new_series():
+        results = _cached_browse("megakino_new_series", fetch_megakino_new_series)
+        if results is None:
+            return jsonify({"error": "Failed to fetch megakino series"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
+    @app.route("/api/megakino/popular")
+    def api_megakino_popular():
+        results = _cached_browse("megakino_popular", fetch_megakino_popular)
+        if results is None:
+            return jsonify({"error": "Failed to fetch megakino popular"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
     @app.route("/api/downloaded-folders")
     def api_downloaded_folders():
         from pathlib import Path
@@ -5308,10 +5538,11 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     "calendar_release":   get_setting("crunchyroll_calendar_release",   "0"),
                 },
                 "sources": {
-                    "order": get_setting("home_source_order", "aniworld,sto,filmpalast"),
+                    "order": get_setting("home_source_order", "aniworld,sto,filmpalast,megakino"),
                     "section_order": {
                         "aniworld": get_setting("home_section_order_aniworld", "new,popular"),
                         "sto":      get_setting("home_section_order_sto",      "new,popular"),
+                        "megakino": get_setting("home_section_order_megakino", "new,series,popular"),
                     },
                     "sections": {
                         "aniworld": {
@@ -5322,11 +5553,17 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                             "new":     get_setting("source_show_new_sto",     "1"),
                             "popular": get_setting("source_show_popular_sto", "1"),
                         },
+                        "megakino": {
+                            "new":     get_setting("source_show_new_megakino",     "1"),
+                            "series":  get_setting("source_show_series_megakino",  "1"),
+                            "popular": get_setting("source_show_popular_megakino", "1"),
+                        },
                     },
                     "enabled": {
                         "aniworld":   get_setting("source_enabled_aniworld",   "1"),
                         "sto":        get_setting("source_enabled_sto",        "1"),
                         "filmpalast": get_setting("source_enabled_filmpalast", "1"),
+                        "megakino":   get_setting("source_enabled_megakino",   "1"),
                     },
                     "hide_disabled_in_search": get_setting("sources_hide_in_search", "0"),
                 },
@@ -8060,6 +8297,22 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                      "https://s.to", _STO_SERIES_LINK_PATTERN)
         except Exception as e:
             logger.debug("[AutosyncSearch] S.TO search failed: %s", e)
+        try:
+            for item in (megakino_search(title) or []):
+                url = item.get("url", "")
+                if "/serials/" not in url:  # Auto-Sync tracks series only
+                    continue
+                if url in seen:
+                    continue
+                seen.add(url)
+                name = _html_unescape(item.get("title") or "Unknown")
+                score = difflib.SequenceMatcher(None, target, _norm(name)).ratio()
+                candidates.append({
+                    "site": "megakino", "site_label": "MegaKino",
+                    "title": name, "url": url, "score": round(score, 3),
+                })
+        except Exception as e:
+            logger.debug("[AutosyncSearch] MegaKino search failed: %s", e)
 
         candidates.sort(key=lambda c: c["score"], reverse=True)
         return jsonify({"results": candidates[:12]})
@@ -8565,7 +8818,9 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
 
         netloc = parsed.netloc.lower()
         host_stripped = netloc.removeprefix("www.")
-        if netloc not in _ALLOWED_IMAGE_HOSTS and host_stripped not in _ALLOWED_IMAGE_HOSTS:
+        if (netloc not in _ALLOWED_IMAGE_HOSTS
+                and host_stripped not in _ALLOWED_IMAGE_HOSTS
+                and "megakino" not in host_stripped):
             return ("Forbidden host", 403)
 
         # --- Serve from disk cache if available ---
@@ -10808,6 +11063,9 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             ("new_series",     fetch_new_series),
             ("popular_series", fetch_popular_series),
             ("new_movies",     _fetch_new_movies),
+            ("megakino_new_movies", fetch_megakino_new_movies),
+            ("megakino_new_series", fetch_megakino_new_series),
+            ("megakino_popular",    fetch_megakino_popular),
         ]
         all_entries = []
         for bkey, fn in browse_sources:

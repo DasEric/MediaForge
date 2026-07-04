@@ -614,6 +614,34 @@ SERIENSTREAM_EPISODE_PATTERN = re.compile(
 )
 
 # -----------------------------
+# MegaKino (megakino9.com / megakino.*)
+# -----------------------------
+# The domain occasionally bumps its number (megakino9, megakino10, ...), so the
+# base URL is overridable via env and the URL patterns match any host that
+# contains "megakino".
+MEGAKINO_BASE_URL = os.environ.get("MEGAKINO_BASE_URL", "https://megakino9.com").rstrip("/")
+
+# Movie post: /films/<id>-<slug>.html (also kinofilme / multfilm / documentary)
+MEGAKINO_MOVIE_PATTERN = re.compile(
+    r"^https?://[^/]*megakino[^/]*/"
+    r"(?:films|kinofilme|multfilm|documentary)/"
+    r"\d+-[^/?#]+\.html$",
+    re.IGNORECASE,
+)
+
+# Series post (one post == one season): /serials/<id>-<slug>.html
+MEGAKINO_SERIES_PATTERN = re.compile(
+    r"^https?://[^/]*megakino[^/]*/serials/\d+-[^/?#]+\.html$",
+    re.IGNORECASE,
+)
+
+# Synthetic single-episode URL: <series-post>.html?episode=<n>
+MEGAKINO_EPISODE_PATTERN = re.compile(
+    r"^https?://[^/]*megakino[^/]*/serials/\d+-[^/?#]+\.html\?episode=\d+$",
+    re.IGNORECASE,
+)
+
+# -----------------------------
 # Directories
 # -----------------------------
 

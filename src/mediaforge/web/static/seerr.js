@@ -450,23 +450,36 @@ async function seerrDoSearch() {
   let combined = [];
 
   if (_seerrIsMovie) {
-    // Movies: search FilmPalast only
-    const results = await seerrFetchSearch(q, "filmpalast").catch(() => []);
-    combined = results.map(r => Object.assign({}, r, { _source: "FilmPalast" }));
+    // Movies: search FilmPalast + MegaKino (movies only)
+    const [fpRes, mkRes] = await Promise.allSettled([
+      seerrFetchSearch(q, "filmpalast"),
+      seerrFetchSearch(q, "megakino"),
+    ]);
+    const fpList = (fpRes.status === "fulfilled" ? fpRes.value : []).map(r => Object.assign({}, r, { _source: "FilmPalast" }));
+    const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
+      .filter(r => !/\/serials\//.test(r.url))
+      .map(r => Object.assign({}, r, { _source: "MegaKino" }));
+    combined = fpList.concat(mkList);
   } else {
-    // Series: search AniWorld + S.TO in parallel, interleave results
-    const [aniRes, stoRes] = await Promise.allSettled([
+    // Series: search AniWorld + S.TO + MegaKino (series only), interleave results
+    const [aniRes, stoRes, mkRes] = await Promise.allSettled([
       seerrFetchSearch(q, "aniworld"),
       seerrFetchSearch(q, "sto"),
+      seerrFetchSearch(q, "megakino"),
     ]);
     const aniList = (aniRes.status === "fulfilled" ? aniRes.value : []).map(r => Object.assign({}, r, { _source: "AniWorld" }));
     const stoList = (stoRes.status === "fulfilled" ? stoRes.value : []).map(r => Object.assign({}, r, { _source: "S.TO" }));
+    const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
+      .filter(r => /\/serials\//.test(r.url))
+      .map(r => Object.assign({}, r, { _source: "MegaKino" }));
     // Interleave: alternate aniworld/sto so both appear near the top
     const maxLen = Math.max(aniList.length, stoList.length);
     for (let i = 0; i < maxLen; i++) {
       if (i < aniList.length) combined.push(aniList[i]);
       if (i < stoList.length) combined.push(stoList[i]);
     }
+    // Append MegaKino series after the interleaved AniWorld/S.TO block
+    combined = combined.concat(mkList);
   }
 
   seerrRenderSearchResults(combined);
@@ -576,7 +589,8 @@ async function openSeerrSeries(url) {
   // Update lang options based on site
   const isSto = url.includes("s.to") || url.includes("serienstream.to");
   const isFp = url.includes("filmpalast.to");
-  seerrUpdateLangDropdown(isSto, isFp);
+  const isMk = url.includes("megakino");
+  seerrUpdateLangDropdown(isSto, isFp || isMk);
 
   try {
     const [seriesResp, seasonsResp] = await Promise.all([
@@ -763,7 +777,8 @@ function seerrBuildAccordion(seasons) {
       const prevVal = sel ? sel.value : "";
       const isSto = (_seerrSeriesUrl || "").includes("s.to") || (_seerrSeriesUrl || "").includes("serienstream.to");
       const isFp = (_seerrSeriesUrl || "").includes("filmpalast.to");
-      seerrUpdateLangDropdown(isSto, isFp, foundLangs);
+      const isMk = (_seerrSeriesUrl || "").includes("megakino");
+      seerrUpdateLangDropdown(isSto, isFp || isMk, foundLangs);
       if (sel && Array.from(sel.options).some(o => o.value === prevVal)) {
         sel.value = prevVal;
       }
@@ -874,7 +889,7 @@ function seerrRenderLangBanner(results) {
   const banner = document.getElementById("seerrLangBanner");
   if (!banner) return;
   banner.classList.remove("skeleton");
-  if ((_seerrSeriesUrl || "").includes("filmpalast.to")) { banner.style.display = "none"; return; }
+  if ((_seerrSeriesUrl || "").includes("filmpalast.to") || (_seerrSeriesUrl || "").includes("megakino")) { banner.style.display = "none"; return; }
   const isSto = (_seerrSeriesUrl || "").includes("s.to") || (_seerrSeriesUrl || "").includes("serienstream.to");
   const LANG_ORDER = ["German Dub", "English Sub", "German Sub", "English Dub"];
   if (isSto) {

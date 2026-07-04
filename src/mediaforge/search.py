@@ -610,6 +610,32 @@ def search(is_aniworld=None):
         return curses.wrapper(menu_wrapper)
 
 
+
+# ---------------------------------------------------------------------------
+# MegaKino (megakino9.com) — thin wrappers around the model-package scraper
+# ---------------------------------------------------------------------------
+def _megakino_scraper():
+    from .models.megakino_to import scraper
+    return scraper
+
+
+def megakino_search(keyword):
+    """Search megakino and return a list of {title, url, poster_url, ...}."""
+    return _megakino_scraper().search(keyword)
+
+
+def fetch_megakino_new_movies():
+    return _megakino_scraper().fetch_new_movies()
+
+
+def fetch_megakino_new_series():
+    return _megakino_scraper().fetch_new_series()
+
+
+def fetch_megakino_popular():
+    return _megakino_scraper().fetch_popular()
+
+
 if __name__ == "__main__":
     print("New series:", fetch_new_series())
     print("Popular series:", fetch_popular_series())
