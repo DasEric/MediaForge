@@ -78,6 +78,12 @@
     return I.pending;
   }
 
+  function barsSig(bars) {
+    return (bars || []).map(function (b) {
+      return (b.ts || 0) + ":" + (b.status || "") + ":" + (b.response_ms == null ? "" : b.response_ms);
+    }).join(",");
+  }
+
   function barsHtml(bars) {
     if (!bars || !bars.length) return '<span class="uc-bars-empty"></span>';
     return bars.map(function (b) {
@@ -85,13 +91,83 @@
       if (b.status === "up") c = "hb-up";
       else if (b.status === "degraded") c = "hb-degraded";
       else if (b.status === "down") c = "hb-down";
-      // Hover tooltip: when it was + what state + response time.
-      let tip = "";
-      if (b.ts) tip += new Date(b.ts * 1000).toLocaleString();
-      tip += (tip ? " · " : "") + barStatusLabel(b.status);
-      if (b.response_ms != null) tip += " · " + b.response_ms + " ms";
-      return '<i class="hb ' + c + '" title="' + esc(tip) + '"></i>';
+      return '<i class="hb ' + c + '" tabindex="0"' +
+        ' data-ts="' + (b.ts || "") + '"' +
+        ' data-status="' + esc(b.status || "") + '"' +
+        ' data-ms="' + (b.response_ms == null ? "" : b.response_ms) + '"' +
+        ' data-msg="' + esc(b.message || "") + '"></i>';
     }).join("");
+  }
+
+  function barMessage(status, msg) {
+    if (status === "degraded") return I.degradedMsg;
+    if (status === "down") {
+      if (msg === "blocked_page") return I.blockedMsg;
+      if (!msg || msg === "unreachable") return I.unreachableMsg;
+      return msg;
+    }
+    return "";
+  }
+
+  // ── Custom heartbeat tooltip (works on hover AND tap/click, mobile too) ──
+  let _tipEl = null, _pinnedBar = null;
+  function _ensureTip() {
+    if (!_tipEl) {
+      _tipEl = document.createElement("div");
+      _tipEl.className = "hb-tip";
+      _tipEl.style.display = "none";
+      document.body.appendChild(_tipEl);
+    }
+    return _tipEl;
+  }
+  function showTip(hb) {
+    if (!hb || !document.body.contains(hb)) { hideTip(); return; }
+    const tip = _ensureTip();
+    const status = hb.getAttribute("data-status");
+    const ts = parseInt(hb.getAttribute("data-ts") || "0", 10);
+    const ms = hb.getAttribute("data-ms");
+    const msg = hb.getAttribute("data-msg");
+    const stCls = status === "up" ? "st-up" : status === "degraded" ? "st-degraded" : status === "down" ? "st-down" : "st-pending";
+    let html = '<div class="hb-tip-status ' + stCls + '">' + esc(barStatusLabel(status)) + "</div>";
+    if (ts) html += '<div class="hb-tip-time">' + esc(new Date(ts * 1000).toLocaleString()) + "</div>";
+    const em = barMessage(status, msg);
+    if (em) html += '<div class="hb-tip-msg">' + esc(em) + "</div>";
+    if (ms !== "" && ms != null) html += '<div class="hb-tip-rt">' + esc(ms) + " ms</div>";
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    const r = hb.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = r.left + r.width / 2 - tw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    let top = r.top - th - 10, below = false;
+    if (top < 8) { top = r.bottom + 10; below = true; }
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+    tip.setAttribute("data-below", below ? "1" : "0");
+    tip.style.setProperty("--arrow-x", (r.left + r.width / 2 - left) + "px");
+  }
+  function hideTip() { if (_tipEl) _tipEl.style.display = "none"; }
+  function initTipEvents() {
+    const grid = document.getElementById("uptimeGrid");
+    if (grid) {
+      grid.addEventListener("mouseover", function (e) { const hb = e.target.closest(".hb"); if (hb && !_pinnedBar) showTip(hb); });
+      grid.addEventListener("mouseout", function (e) { const hb = e.target.closest(".hb"); if (hb && !_pinnedBar) hideTip(); });
+      grid.addEventListener("focusin", function (e) { const hb = e.target.closest(".hb"); if (hb) { _pinnedBar = hb; showTip(hb); } });
+      grid.addEventListener("click", function (e) {
+        const hb = e.target.closest(".hb");
+        if (!hb) return;
+        e.stopPropagation();
+        if (_pinnedBar === hb) { _pinnedBar = null; hideTip(); }
+        else { _pinnedBar = hb; showTip(hb); }
+      });
+    }
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".hb") && !e.target.closest(".hb-tip")) { _pinnedBar = null; hideTip(); }
+    });
+    window.addEventListener("scroll", function () {
+      if (_pinnedBar && document.body.contains(_pinnedBar)) showTip(_pinnedBar);
+      else { _pinnedBar = null; hideTip(); }
+    }, true);
   }
 
   function skeleton(src) {
@@ -154,7 +230,13 @@
     }
 
     const bars = q("bars");
-    if (bars) bars.innerHTML = barsHtml(src.bars);
+    if (bars) {
+      const sig = barsSig(src.bars);
+      if (bars.getAttribute("data-sig") !== sig) {
+        bars.innerHTML = barsHtml(src.bars);
+        bars.setAttribute("data-sig", sig);
+      }
+    }
 
     const setv = function (r, v) { const el = q(r); if (el) el.textContent = v; };
     setv("pct", src.tracked && src.uptime_pct != null ? src.uptime_pct + "%" : "—");
@@ -238,6 +320,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     const btn = document.getElementById("uptimeCheckNow");
     if (btn) btn.setAttribute("data-label", btn.textContent);
+    initTipEvents();
     startPolling();
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) stopPolling(); else startPolling();

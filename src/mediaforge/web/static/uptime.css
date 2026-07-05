@@ -148,7 +148,10 @@
 .uc-bars .hb {
   flex: 1 1 auto; min-width: 3px; max-width: 8px; border-radius: 3px;
   background: var(--up-grey);
+  cursor: pointer;
+  transition: filter .12s, transform .12s;
 }
+.uc-bars .hb:hover, .uc-bars .hb:focus { filter: brightness(1.25); transform: scaleY(1.12); outline: none; }
 .hb.hb-up { background: var(--up-green); }
 .hb.hb-down { background: var(--up-red); }
 .hb.hb-degraded { background: var(--up-amber); }
@@ -204,3 +207,47 @@
   .uc-stats { flex-wrap: wrap; }
   .uc-stat { flex: 1 1 40%; }
 }
+
+
+/* ── Heartbeat tooltip (hover + tap) ──────────────────────────────────────── */
+.hb-tip {
+  position: fixed;
+  z-index: 9999;
+  min-width: 150px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #1c2230;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  color: #e7ebf2;
+  text-align: center;
+  pointer-events: none;
+  animation: hbtip-in .1s ease;
+}
+@keyframes hbtip-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.hb-tip::after {
+  content: "";
+  position: absolute;
+  left: var(--arrow-x, 50%);
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+}
+.hb-tip[data-below="0"]::after { top: 100%; border-top-color: #1c2230; }
+.hb-tip[data-below="1"]::after { bottom: 100%; border-bottom-color: #1c2230; }
+.hb-tip-status {
+  font-size: 0.74rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.hb-tip-status.st-up { color: var(--up-green, #2fd07a); }
+.hb-tip-status.st-down { color: var(--up-red, #f0556a); }
+.hb-tip-status.st-degraded { color: var(--up-amber, #f5a524); }
+.hb-tip-status.st-pending { color: var(--up-grey, #7a8291); }
+.hb-tip-time { font-size: 0.82rem; font-weight: 600; }
+.hb-tip-msg {
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+  font-size: 0.78rem; color: #ffb3bd; line-height: 1.35; word-break: break-word;
+}
+.hb-tip-status.st-degraded ~ .hb-tip-msg { color: #ffd591; }
+.hb-tip-rt { margin-top: 5px; font-size: 0.74rem; color: var(--text-muted, rgba(255,255,255,0.55)); }

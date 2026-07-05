@@ -3624,7 +3624,7 @@ def get_uptime_summary(source, since_ts, bar_limit=50):
             (source,),
         ).fetchone()
         bars = conn.execute(
-            "SELECT ts, status, response_ms FROM uptime_heartbeats "
+            "SELECT ts, status, response_ms, message FROM uptime_heartbeats "
             "WHERE source = ? AND ts >= ? ORDER BY ts DESC LIMIT ?",
             (source, since_ts, int(bar_limit)),
         ).fetchall()

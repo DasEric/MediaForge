@@ -160,20 +160,40 @@ _MK_HEADERS = {
 }
 
 
+def _doh_get(url, headers, timeout):
+    return GLOBAL_SESSION.get(url, headers=headers, timeout=timeout)
+
+
+def _plain_get(url, headers, timeout):
+    return _get_session().get(url, headers=headers, timeout=timeout)
+
+
 def _api_get_json(path, params=None, timeout=15):
+    """Fetch a megakino JSON endpoint, trying the DoH session first (bypasses
+    ISP DNS blocks) and the plain requests session as a fallback. The body is
+    validated to actually be JSON — a Cloudflare/HTML interstitial from either
+    transport is skipped rather than crashing the JSON parser."""
     url = base_url() + path
     if params:
         url += "?" + urlencode(params)
-    # Use the shared DoH session so megakino.to resolves via the project DNS
-    # (niquests/DoH) and isn't hit by the ISP resolver / block, like the other
-    # providers. Falls back to a plain requests session if unavailable.
     headers = dict(_MK_HEADERS, Referer=base_url() + "/")
-    try:
-        resp = GLOBAL_SESSION.get(url, headers=headers, timeout=timeout)
-    except Exception:
-        resp = _get_session().get(url, timeout=timeout)
-    resp.raise_for_status()
-    return resp.json()
+    last_exc = None
+    for _get in (_doh_get, _plain_get):
+        try:
+            resp = _get(url, headers, timeout)
+            resp.raise_for_status()
+        except Exception as e:
+            last_exc = e
+            continue
+        body = (getattr(resp, "text", "") or "").lstrip()
+        if body[:1] in ("{", "["):
+            try:
+                return resp.json()
+            except Exception as e:
+                last_exc = e
+                continue
+        last_exc = ValueError("non-JSON response from megakino (possible block/challenge page)")
+    raise last_exc or ValueError("megakino: request failed")
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +208,7 @@ def _browse(type_="", order_by="releases", keyword="", page=1, limit=24):
     try:
         data = _api_get_json("/data/browse/", params)
     except Exception as e:
-        logger.warning("Megakino browse failed (type=%s order=%s kw=%r): %s", type_, order_by, keyword, e)
+        logger.debug("Megakino browse failed (type=%s order=%s kw=%r): %s", type_, order_by, keyword, e)
         return None
     items = data.get("movies") if isinstance(data, dict) else None
     if items is None:
