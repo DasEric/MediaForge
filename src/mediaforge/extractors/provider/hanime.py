@@ -73,16 +73,47 @@ def get_direct_link_from_hanime(url):
 
 
 def download_from_hanime(stream_url, output_path, cancel_event=None, label=""):
-    """Download a hanime HLS stream to ``output_path`` (best quality)."""
+    """Download a hanime HLS stream to ``output_path``.
+
+    hanime streams are AES-128 encrypted HLS with ``.html``-disguised segments
+    and the key on ``sign.bin``.  yt-dlp (without pycryptodomex) delegates that
+    to a *verbose* internal ffmpeg -> console spam + no progress.  Instead we run
+    ONE ffmpeg pass ourselves via ``_run_ffmpeg_with_progress`` (ffmpeg decrypts
+    AES-128 natively): stderr is piped/parsed (no spam) and the known manifest
+    duration yields a real progress bar, consistent with the other providers.
+    """
+    import os
+    from pathlib import Path
+    import ffmpeg
     try:
-        from ...models.common.common import _run_ytdlp_download
+        from ...models.common import common as C
     except ImportError:
-        from mediaforge.models.common.common import _run_ytdlp_download
-    _run_ytdlp_download(
-        stream_url,
-        output_path,
-        headers={"Referer": HANIME_BASE_URL + "/", "User-Agent": _HEADERS["User-Agent"]},
-        label=label,
-        cancel_event=cancel_event,
+        from mediaforge.models.common import common as C
+
+    output_path = Path(output_path)
+    os.makedirs(C._MEDIAFORGE_TEMP_DIR, exist_ok=True)
+    tmp = C._MEDIAFORGE_TEMP_DIR / f"{output_path.stem}.hanime.mkv"
+
+    in_opts = {
+        "headers": f"Referer: {HANIME_BASE_URL}/\r\n",
+        "user_agent": _HEADERS["User-Agent"],
+        # segments are served as .html and the key/segments use crypto+https
+        "allowed_extensions": "ALL",
+        "protocol_whitelist": "file,http,https,tcp,tls,crypto,httpproxy,data",
+        "reconnect": 1,
+        "reconnect_streamed": 1,
+        "reconnect_delay_max": 30,
+    }
+    vcodec, acodec, vopts, gargs = C._get_ffmpeg_codec_opts()
+    node = ffmpeg.input(stream_url, **in_opts).output(
+        str(tmp), vcodec=vcodec, acodec=acodec, **vopts
     )
+    if gargs:
+        node = node.global_args(*gargs)
+    # This single pass IS the download (segments fetched + AES-decrypted),
+    # so report it as the Download phase rather than 'FFmpeg'.
+    C._run_ffmpeg_with_progress(node, label=label, cancel_event=cancel_event, phase="download")
+
+    os.makedirs(output_path.parent, exist_ok=True)
+    C._move_with_progress(tmp, output_path, label=label, cancel_event=cancel_event)
     return True

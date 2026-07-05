@@ -37,7 +37,11 @@ def _sync_playwright():
 
 
 def _new_page(p):
-    browser = p.chromium.launch(headless=True)
+    # Quiet launch args so headless Chromium doesn't spam the captured console.
+    browser = p.chromium.launch(headless=True, args=[
+        "--log-level=3", "--disable-logging", "--disable-dev-shm-usage",
+        "--mute-audio", "--no-first-run",
+    ])
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     return browser, context, page

@@ -405,7 +405,7 @@ def print_episode_summary(title, ep_url, success):
     sys.stderr.flush()
 
 
-def _run_ffmpeg_with_progress(node, overwrite_output=True, label="", cancel_event=None, process_ref=None):
+def _run_ffmpeg_with_progress(node, overwrite_output=True, label="", cancel_event=None, process_ref=None, phase="ffmpeg"):
     """Run an ffmpeg node and stream its progress output cleanly.
 
     Includes stall detection: if FFmpeg stops making progress (same frame/time
@@ -489,7 +489,7 @@ def _run_ffmpeg_with_progress(node, overwrite_output=True, label="", cancel_even
 
     with _ffmpeg_progress_lock:
         _ffmpeg_active_count += 1
-        _ffmpeg_progress.update(percent=0.0, time="", speed="", fps="", encoder=_get_encoder_label(), bandwidth="", active=True, phase="ffmpeg")
+        _ffmpeg_progress.update(percent=0.0, time="", speed="", fps="", encoder=_get_encoder_label(), bandwidth="", active=True, phase=phase)
 
     try:
         while True:
@@ -631,7 +631,7 @@ def _run_ffmpeg_with_progress(node, overwrite_output=True, label="", cancel_even
             _ffmpeg_active_count -= 1
             _ffmpeg_progress.update(
                 percent=0.0, time="", speed="", bandwidth="", downloaded_mb=0.0,
-                active=_ffmpeg_active_count > 0, phase="" if _ffmpeg_active_count == 0 else "ffmpeg"
+                active=_ffmpeg_active_count > 0, phase="" if _ffmpeg_active_count == 0 else phase
             )
 
     reader_thread.join(timeout=5)
