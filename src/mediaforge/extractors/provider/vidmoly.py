@@ -40,6 +40,22 @@ def _extract_script_content(html):
     return "\n".join(filter(None, scripts))  # join non-empty scripts
 
 
+# Some sources (e.g. megakino.to) hand out the Vidmoly *view* URL
+# (vidmoly.<tld>/v/<id>?…) instead of the embed URL. The player's inline
+# ``file:`` m3u8 only appears on the embed page, and only the vidmoly.net
+# host currently serves /embed-<id>.html. Normalise to that form.
+_VIDMOLY_VIEW_PATTERN = re.compile(r"https?://vidmoly\.[a-z]+/v/([a-z0-9]+)", re.IGNORECASE)
+
+
+def _normalize_embed_url(url):
+    if not url:
+        return url
+    m = _VIDMOLY_VIEW_PATTERN.match(url)
+    if m:
+        return f"https://vidmoly.net/embed-{m.group(1)}.html"
+    return url
+
+
 # -----------------------------
 # Main Vidmoly Functions
 # -----------------------------
@@ -48,6 +64,7 @@ def get_direct_link_from_vidmoly(embed_url):
     if not embed_url:
         raise ValueError("Embed URL cannot be empty")
 
+    embed_url = _normalize_embed_url(embed_url)
     resp = GLOBAL_SESSION.get(embed_url, headers=_get_headers())
     resp.raise_for_status()
     html = resp.text
@@ -66,6 +83,7 @@ def get_preview_image_link_from_vidmoly(embed_url):
     if not embed_url:
         raise ValueError("Embed URL cannot be empty")
 
+    embed_url = _normalize_embed_url(embed_url)
     resp = GLOBAL_SESSION.get(embed_url, headers=_get_headers())
     resp.raise_for_status()
     html = resp.text

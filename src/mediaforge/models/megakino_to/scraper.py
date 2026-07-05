@@ -39,7 +39,9 @@ _HOSTER_DOMAINS = [
     ("voe", "VOE"),
     ("vidmoly", "Vidmoly"),
     ("vidoza", "Vidoza"),
+    ("vidavaca", "Vidavaca"),
     ("vidara", "Vidara"),
+    ("vidaar", "Vidara"),  # vidaarax.com/.net and other Vidara-family mirrors
     ("veev", "VeeV"),
     ("filemoon", "Filemoon"),
     ("dood", "Doodstream"),

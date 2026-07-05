@@ -449,6 +449,8 @@ SUPPORTED_PROVIDERS = (
     "Vidmoly",
     "Vidoza",
     "VeeV",
+    "Vidara",
+    "Vidavaca",
     # "Doodstream",
     # "Filemoon",
     # "LoadX",
@@ -458,6 +460,8 @@ SUPPORTED_PROVIDERS = (
 
 PROVIDER_HEADERS_D = {
     "Vidmoly": {"Referer": "https://vidmoly.biz"},
+    "Vidara": {"User-Agent": DEFAULT_USER_AGENT, "Referer": "https://vidara.so/"},
+    "Vidavaca": {"User-Agent": DEFAULT_USER_AGENT, "Referer": "https://vidavaca.net/"},
     "Doodstream": {"Referer": "https://dood.li/"},
     "VOE": {
         "User-Agent": DEFAULT_USER_AGENT,
@@ -488,6 +492,8 @@ PROVIDER_HEADERS_D = {
 
 PROVIDER_HEADERS_W = {
     "Vidmoly": {"Referer": "https://vidmoly.biz"},
+    "Vidara": {"User-Agent": DEFAULT_USER_AGENT, "Referer": "https://vidara.so/"},
+    "Vidavaca": {"User-Agent": DEFAULT_USER_AGENT, "Referer": "https://vidavaca.net/"},
     "Doodstream": {"Referer": "https://dood.li/"},
     "VOE": {"User-Agent": DEFAULT_USER_AGENT},
     "Luluvdo": {"User-Agent": LULUVDO_USER_AGENT},

@@ -1,80 +1,93 @@
-"""
-VIDARA (vidara.to) stream extractor.
+"""VIDARA stream extractor (vidara.to / vidaraa.cc / vidaratem.so / vidaarax.* …).
 
-The VIDARA embed page makes a POST request to /api/stream with the filecode
-extracted from the URL path (e.g. https://vidara.to/e/{filecode}).
-The response JSON contains a `streaming_url` field with the direct HLS URL.
+The VIDARA embed page fetches the actual stream from a small JSON API:
+    POST <host>/api/stream   body {"filecode": <id>, "device": "web"}
+    -> {"streaming_url": "<master.m3u8>", "thumbnail": …, "subtitles": …}
+
+Unlike the original single-domain implementation, the API host is taken from
+the embed URL itself, so every VIDARA mirror domain works (VIDARA rotates
+domains frequently). The same scheme powers the Vidavaca clone (vidavaca.py).
 """
+import json
 import logging
 import re
 
-import niquests
+try:
+    from ...config import GLOBAL_SESSION, DEFAULT_USER_AGENT
+except ImportError:
+    from mediaforge.config import GLOBAL_SESSION, DEFAULT_USER_AGENT
 
 logger = logging.getLogger(__name__)
 
-try:
-    from ...config import DEFAULT_USER_AGENT
-except ImportError:
-    from mediaforge.config import DEFAULT_USER_AGENT
-
-VIDARA_DOMAINS = {"vidara.to"}
+# …/e/<filecode> or …/v/<filecode> ; query string optional and ignored for the id
+_EMBED_PATTERN = re.compile(r"^(https?://[^/]+)/(?:e|v)/([A-Za-z0-9_\-]+)", re.IGNORECASE)
 
 
-def _extract_filecode(url: str) -> str:
-    """Extract the filecode from a VIDARA embed URL.
+def _split_embed(embed_url):
+    """Return (host_origin, filecode, leftover_query) from a VIDARA embed URL."""
+    m = _EMBED_PATTERN.match(embed_url or "")
+    if not m:
+        raise ValueError(f"Cannot extract filecode from VIDARA URL: {embed_url}")
+    host, filecode = m.group(1), m.group(2)
+    query = embed_url.split("?", 1)[1] if "?" in embed_url else ""
+    return host, filecode, query
 
-    Accepts:
-      https://vidara.to/e/<filecode>
-      https://vidara.to/v/<filecode>
+
+def get_stream_data(embed_url, headers=None, timeout=20):
+    """Call the VIDARA /api/stream endpoint and return the parsed JSON payload.
+
+    Domain-agnostic: the API host is derived from the embed URL, so every
+    VIDARA / Vidavaca mirror works.
     """
-    match = re.search(r"/(?:e|v)/([A-Za-z0-9_\-]+)", url)
-    if not match:
-        raise ValueError(f"Cannot extract filecode from VIDARA URL: {url}")
-    return match.group(1)
+    if not embed_url:
+        raise ValueError("Embed URL cannot be empty")
 
-
-def get_direct_link_from_vidara(embed_url: str, headers=None, timeout: int = 20) -> str:
-    """Return the direct HLS stream URL from a VIDARA embed link.
-
-    Args:
-        embed_url: A VIDARA embed URL such as https://vidara.to/e/fMxYhG3HN5mUn
-        headers:   Optional request headers (defaults applied if None).
-        timeout:   Request timeout in seconds.
-
-    Returns:
-        Direct HLS/MP4 stream URL string.
-
-    Raises:
-        ValueError: If extraction fails for any reason.
-    """
-    filecode = _extract_filecode(embed_url)
-
+    host, filecode, query = _split_embed(embed_url)
+    api_url = host + "/api/stream" + (("?" + query) if query else "")
     req_headers = {
         "User-Agent": headers.get("User-Agent", DEFAULT_USER_AGENT) if headers else DEFAULT_USER_AGENT,
-        "Referer": embed_url,
         "Content-Type": "application/json",
-        "Accept": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": host,
+        "Referer": embed_url,
+        "X-Requested-With": "XMLHttpRequest",
     }
-
-    api_url = "https://vidara.to/api/stream"
-    payload = {"filecode": filecode, "device": "web"}
-
     try:
-        resp = niquests.post(api_url, json=payload, headers=req_headers, timeout=timeout)
+        resp = GLOBAL_SESSION.post(
+            api_url, data=json.dumps({"filecode": filecode, "device": "web"}),
+            headers=req_headers, timeout=timeout,
+        )
         resp.raise_for_status()
-        data = resp.json()
+        return resp.json()
     except Exception as exc:
         raise ValueError(f"VIDARA API request failed for {embed_url}: {exc}") from exc
 
-    streaming_url = data.get("streaming_url") or data.get("file") or data.get("url")
+
+def _stream_from_data(data, embed_url, name="VIDARA"):
+    streaming_url = (data or {}).get("streaming_url") or (data or {}).get("file") or (data or {}).get("url")
     if not streaming_url:
         raise ValueError(
-            f"No streaming_url in VIDARA API response for {embed_url}. "
+            f"No streaming_url in {name} API response for {embed_url}. "
             f"Response: {str(data)[:200]}"
         )
-
-    logger.debug("VIDARA stream URL extracted: %s…", streaming_url[:60])
     return streaming_url
+
+
+def get_direct_link_from_vidara(embed_url, headers=None, timeout=20):
+    """Return the direct HLS (m3u8) stream URL from a VIDARA embed link."""
+    data = get_stream_data(embed_url, headers=headers, timeout=timeout)
+    url = _stream_from_data(data, embed_url, "VIDARA")
+    logger.debug("VIDARA stream URL extracted: %s…", url[:60])
+    return url
+
+
+def get_preview_image_link_from_vidara(embed_url, headers=None, timeout=20):
+    """Return the VIDARA thumbnail/preview image URL, if any."""
+    data = get_stream_data(embed_url, headers=headers, timeout=timeout)
+    thumb = (data or {}).get("thumbnail")
+    if not thumb:
+        raise ValueError(f"No thumbnail in VIDARA API response for {embed_url}")
+    return thumb
 
 
 if __name__ == "__main__":

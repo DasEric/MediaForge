@@ -1933,7 +1933,10 @@ const SOURCE_META = {
                   { key: "new_series",     de: "Neue Serien",    en: "New Series" },
                   { key: "popular_series", de: "Beliebte Serien", en: "Popular Series" },
               ] },
-  hanime:     { label: "hanime 18+",  cls: "browse-provider-hanime",     hasSections: false }
+  hanime:     { label: "hanime 18+",  cls: "browse-provider-hanime",     hasSections: false, multiSections: [
+                  { key: "new",      de: "Neu",      en: "New" },
+                  { key: "trending", de: "Trending", en: "Trending" },
+              ] }
 };
 
 let _sourceState = {
@@ -1975,6 +1978,11 @@ function _loadSourceSettings(sources) {
       new_series:     mp.new_series     !== "0",
       popular_series: mp.popular_series !== "0",
     };
+  }
+  // hanime: new + trending
+  {
+    const hn = secVis.hanime || {};
+    _sourceState.sections_visible.hanime = { new: hn.new !== "0", trending: hn.trending !== "0" };
   }
 
   const en = sources.enabled || {};
