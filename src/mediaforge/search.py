@@ -612,7 +612,7 @@ def search(is_aniworld=None):
 
 
 # ---------------------------------------------------------------------------
-# MegaKino (megakino9.com) — thin wrappers around the model-package scraper
+# MegaKino (megakino.to) — thin wrappers around the model-package scraper
 # ---------------------------------------------------------------------------
 def _megakino_scraper():
     from .models.megakino_to import scraper
@@ -628,12 +628,16 @@ def fetch_megakino_new_movies():
     return _megakino_scraper().fetch_new_movies()
 
 
+def fetch_megakino_popular_movies():
+    return _megakino_scraper().fetch_popular_movies()
+
+
 def fetch_megakino_new_series():
     return _megakino_scraper().fetch_new_series()
 
 
-def fetch_megakino_popular():
-    return _megakino_scraper().fetch_popular()
+def fetch_megakino_popular_series():
+    return _megakino_scraper().fetch_popular_series()
 
 
 # ---------------------------------------------------------------------------

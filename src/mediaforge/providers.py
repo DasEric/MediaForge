@@ -80,18 +80,19 @@ PROVIDERS = [
         episode_pattern=FILMPALAST_EPISODE_PATTERN,
         episode_cls=FilmPalastEpisode,
     ),
-    # MegaKino series: one post == one season. Episode URLs are synthetic
-    # (<post>.html?episode=N).
+    # MegaKino series episodes: synthetic <watch-post>?episode=N URLs.
+    # Movies and series share the plain /watch/<slug>/<id> URL, so it is only
+    # routed here for the ?episode form; the plain form falls through to
+    # MegakinoFilm below. Series/season handling goes through the dedicated
+    # api_* branches (which pick the type from the JSON API), not resolve_provider.
     Provider(
         name="Megakino",
-        series_pattern=MEGAKINO_SERIES_PATTERN,
-        season_pattern=MEGAKINO_SERIES_PATTERN,
         episode_pattern=MEGAKINO_EPISODE_PATTERN,
         series_cls=MegakinoSeries,
         season_cls=MegakinoSeason,
         episode_cls=MegakinoEpisode,
     ),
-    # MegaKino movies: standalone films (the movie page is the "episode").
+    # MegaKino movies (and the plain /watch landing): the page is the "episode".
     Provider(
         name="MegakinoFilm",
         episode_pattern=MEGAKINO_MOVIE_PATTERN,

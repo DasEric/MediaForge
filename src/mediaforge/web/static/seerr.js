@@ -457,7 +457,7 @@ async function seerrDoSearch() {
     ]);
     const fpList = (fpRes.status === "fulfilled" ? fpRes.value : []).map(r => Object.assign({}, r, { _source: "FilmPalast" }));
     const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
-      .filter(r => !/\/serials\//.test(r.url))
+      .filter(r => !r.is_series)
       .map(r => Object.assign({}, r, { _source: "MegaKino" }));
     combined = fpList.concat(mkList);
   } else {
@@ -471,7 +471,7 @@ async function seerrDoSearch() {
     const aniList = (aniRes.status === "fulfilled" ? aniRes.value : []).map(r => Object.assign({}, r, { _source: "AniWorld" }));
     const stoList = (stoRes.status === "fulfilled" ? stoRes.value : []).map(r => Object.assign({}, r, { _source: "S.TO" }));
     const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
-      .filter(r => /\/serials\//.test(r.url))
+      .filter(r => r.is_series)
       .map(r => Object.assign({}, r, { _source: "MegaKino" }));
     const hanList = (hanRes.status === "fulfilled" ? hanRes.value : []).map(r => Object.assign({}, r, { _source: "hanime 18+" }));
     // Interleave: alternate aniworld/sto so both appear near the top

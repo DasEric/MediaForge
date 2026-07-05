@@ -1,8 +1,4 @@
-"""MegaKino episode — one episode of a season post.
-
-The URL is synthetic: ``<season-post>.html?episode=<n>``. The real hoster
-embed for the episode lives in a ``<select id="epN">`` on the season post.
-"""
+"""MegaKino episode (megakino.to). Synthetic URL: <watch-post>?episode=<n>."""
 import os
 import re
 from pathlib import Path
@@ -27,7 +23,7 @@ except ImportError:  # pragma: no cover
 
 class MegakinoEpisode:
     def __init__(self, url=None, series=None, season=None, episode_number=None,
-                 title_de=None, title_en=None, provider_data=None,
+                 title_de=None, title_en=None, provider_data=None, _data=None,
                  selected_path=None, selected_language=None, selected_provider=None):
         if not MEGAKINO_EPISODE_PATTERN.match(url or ""):
             raise ValueError(f"Invalid MegaKino episode URL: {url}")
@@ -35,6 +31,7 @@ class MegakinoEpisode:
         self._post_url = url.split("?")[0]
         self._series = series
         self._season = season
+        self.__data = _data
         self.__episode_number = episode_number
         self.__title_de = title_de
         self.__title_en = title_en
@@ -51,28 +48,26 @@ class MegakinoEpisode:
         self.__file_extension = None
         self.__episode_path = None
         self.__is_downloaded = None
-        self.__html = None
 
-    # --- relations ---
+    @property
+    def _data(self):
+        if self.__data is None:
+            self.__data = scraper.fetch_watch(self._post_url)
+        return self.__data
+
     @property
     def series(self):
         if self._series is None:
             from .series import MegakinoSeries
-            self._series = MegakinoSeries(url=self._post_url)
+            self._series = MegakinoSeries(url=self._post_url, _data=self.__data)
         return self._series
 
     @property
     def season(self):
         if self._season is None:
             from .season import MegakinoSeason
-            self._season = MegakinoSeason(url=self._post_url, series=self._series)
+            self._season = MegakinoSeason(url=self._post_url, series=self._series, _data=self.__data)
         return self._season
-
-    @property
-    def _html(self):
-        if self.__html is None:
-            self.__html = scraper.fetch_html(self._post_url)
-        return self.__html
 
     @property
     def episode_number(self):
@@ -93,13 +88,11 @@ class MegakinoEpisode:
 
     @property
     def provider_data(self):
-        """{'German Dub': {provider_name: embed_url}}"""
         if self.__provider_data is None:
-            hosters = scraper.extract_episode_hosters(self._html, self.episode_number)
+            hosters = scraper.episode_hosters(self._data, self.episode_number)
             self.__provider_data = {"German Dub": hosters} if hosters else {}
         return self.__provider_data
 
-    # --- selection ---
     @property
     def selected_path(self):
         if self.__selected_path is None:
@@ -136,7 +129,6 @@ class MegakinoEpisode:
             self.__selected_provider = raw.replace(" HD", "").replace(" HQ", "").strip()
         return self.__selected_provider
 
-    # --- resolution ---
     @property
     def provider_url(self):
         data = self.provider_data.get(self.selected_language) or {}
@@ -158,7 +150,6 @@ class MegakinoEpisode:
             raise ValueError(f"The provider '{self.selected_provider}' is not yet implemented.")
         return fn(self.provider_url)
 
-    # --- paths (NAMING_TEMPLATE, season/episode layout) ---
     def _fmt(self, template_part):
         return template_part.format(
             title=self.series.title_cleaned,
@@ -173,20 +164,16 @@ class MegakinoEpisode:
     def _base_folder(self):
         if self.__base_folder is None:
             parts = os.getenv("MEDIAFORGE_NAMING_TEMPLATE", NAMING_TEMPLATE).split("/")
-            if len(parts) <= 1:
-                self.__base_folder = Path(self.selected_path)
-            else:
-                self.__base_folder = Path(self.selected_path) / self._fmt(parts[0])
+            self.__base_folder = (Path(self.selected_path) if len(parts) <= 1
+                                  else Path(self.selected_path) / self._fmt(parts[0]))
         return self.__base_folder
 
     @property
     def _folder_path(self):
         if self.__folder_path is None:
             parts = os.getenv("MEDIAFORGE_NAMING_TEMPLATE", NAMING_TEMPLATE).split("/")
-            if len(parts) <= 2:
-                self.__folder_path = self._base_folder
-            else:
-                self.__folder_path = self._base_folder / self._fmt(parts[1])
+            self.__folder_path = (self._base_folder if len(parts) <= 2
+                                  else self._base_folder / self._fmt(parts[1]))
         return self.__folder_path
 
     @property
@@ -221,7 +208,6 @@ class MegakinoEpisode:
             self.__is_downloaded = check_downloaded(self._episode_path)
         return self.__is_downloaded
 
-    # --- actions ---
     def download(self, cancel_event=None, **kwargs):
         if self.selected_provider.upper() == "VEEV":
             try:

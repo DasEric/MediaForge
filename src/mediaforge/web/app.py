@@ -49,7 +49,8 @@ from ..search import query as aniworld_query
 from ..search import (
     fetch_megakino_new_movies,
     fetch_megakino_new_series,
-    fetch_megakino_popular,
+    fetch_megakino_popular_movies,
+    fetch_megakino_popular_series,
     megakino_search,
 )
 from ..search import (
@@ -986,17 +987,17 @@ def _is_filmpalast_url(url: str) -> bool:
 
 
 def _is_megakino_url(url: str) -> bool:
-    return "megakino" in (url or "") and ".html" in url
+    return "megakino" in (url or "") and "/watch/" in (url or "")
 
 
-def _is_megakino_movie_url(url: str) -> bool:
-    from ..config import MEGAKINO_MOVIE_PATTERN
-    return bool(MEGAKINO_MOVIE_PATTERN.match(url or ""))
+def _megakino_watch(url: str):
+    """Fetch the /data/watch payload for a MegaKino /watch URL (movie or series)."""
+    from ..models.megakino_to import scraper as _mk
+    return _mk.fetch_watch(url)
 
 
-def _is_megakino_series_url(url: str) -> bool:
-    from ..config import MEGAKINO_SERIES_PATTERN
-    return bool(MEGAKINO_SERIES_PATTERN.match(url or ""))
+def _megakino_is_series(watch_data) -> bool:
+    return str((watch_data or {}).get("tv")) == "1"
 
 
 def _is_hanime_url(url: str) -> bool:
@@ -3703,22 +3704,54 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 logger.error(f"FilmPalast series fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
-        # MegaKino movie: use the movie object as metadata source (single film)
-        if _is_megakino_movie_url(url):
+        # MegaKino (movie or series) — the /watch URL is shared; the JSON API's
+        # "tv" field decides the type.
+        if _is_megakino_url(url):
             try:
+                _mk_data = _megakino_watch(url)
+                from .db import get_setting
+                api_key = get_setting("cineinfo_tmdb_api_key", "").strip()
+                _country = get_setting("cineinfo_country", "DE")
+                _ui_lang = session.get("ui_language", "de")
+
+                if _megakino_is_series(_mk_data):
+                    from ..models.megakino_to.series import MegakinoSeries
+                    series = MegakinoSeries(url=url, _data=_mk_data)
+                    title = _html_unescape(series.title)
+                    description = series.description or ""
+                    genres = series.genres or []
+                    poster = series.poster_url
+                    imdb_id = series.imdb or None
+                    if api_key:
+                        try:
+                            tmdb_data = _tmdb_lookup_cached(title, imdb_id, api_key, _country, _ui_lang)
+                            if tmdb_data.get("found"):
+                                if tmdb_data.get("title_confident"):
+                                    title = tmdb_data.get("title") or title
+                                description = tmdb_data.get("overview") or description
+                                if tmdb_data.get("genres"):
+                                    genres = tmdb_data.get("genres")
+                        except Exception as _tmdb_exc:
+                            logger.debug("[api_series] TMDB localization failed for MegaKino series: %s", _tmdb_exc)
+                    return jsonify({
+                        "title": title,
+                        "poster_url": _poster_proxy(poster),
+                        "description": description,
+                        "genres": genres,
+                        "release_year": series.release_year or "",
+                        "imdb_id": imdb_id,
+                    })
+
                 from ..models.megakino_to.movie import MegakinoMovie
-                mv = MegakinoMovie(url=url)
+                mv = MegakinoMovie(url=url, _data=_mk_data)
                 title = mv.title_de or ""
                 description = mv.description or ""
                 genres = mv.genres or []
                 poster = mv.image_url
-                from .db import get_setting
-                api_key = get_setting("cineinfo_tmdb_api_key", "").strip()
+                imdb_id = mv.imdb or None
                 if api_key:
                     try:
-                        country = get_setting("cineinfo_country", "DE")
-                        ui_lang = session.get("ui_language", "de")
-                        tmdb_data = _tmdb_lookup_cached(title, None, api_key, country, ui_lang)
+                        tmdb_data = _tmdb_lookup_cached(title, imdb_id, api_key, _country, _ui_lang)
                         if tmdb_data.get("found"):
                             if tmdb_data.get("title_confident"):
                                 title = tmdb_data.get("title") or title
@@ -3737,45 +3770,8 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     "available_providers": mv.available_providers,
                 })
             except Exception as e:
-                logger.error(f"MegaKino movie fetch failed: {e}", exc_info=True)
+                logger.error(f"MegaKino series/movie fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
-
-        # MegaKino series (one post == one season)
-        if _is_megakino_series_url(url):
-            try:
-                from ..models.megakino_to.series import MegakinoSeries
-                series = MegakinoSeries(url=url)
-                title = _html_unescape(series.title)
-                description = series.description or ""
-                genres = series.genres or []
-                poster = series.poster_url
-                from .db import get_setting
-                api_key = get_setting("cineinfo_tmdb_api_key", "").strip()
-                if api_key:
-                    try:
-                        country = get_setting("cineinfo_country", "DE")
-                        ui_lang = session.get("ui_language", "de")
-                        tmdb_data = _tmdb_lookup_cached(title, None, api_key, country, ui_lang)
-                        if tmdb_data.get("found"):
-                            if tmdb_data.get("title_confident"):
-                                title = tmdb_data.get("title") or title
-                            description = tmdb_data.get("overview") or description
-                            if tmdb_data.get("genres"):
-                                genres = tmdb_data.get("genres")
-                    except Exception as _tmdb_exc:
-                        logger.debug("[api_series] TMDB localization failed for MegaKino series: %s", _tmdb_exc)
-                return jsonify({
-                    "title": title,
-                    "poster_url": _poster_proxy(poster),
-                    "description": description,
-                    "genres": genres,
-                    "release_year": series.release_year or "",
-                    "imdb_id": None,
-                })
-            except Exception as e:
-                logger.error(f"MegaKino series fetch failed: {e}", exc_info=True)
-                return jsonify({"error": str(e)}), 500
-
         try:
             prov = resolve_provider(url)
             series = prov.series_cls(url=url)
@@ -3835,15 +3831,14 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         if _is_filmpalast_url(url):
             return jsonify({"seasons": [{"url": url, "season_number": 1, "episode_count": 1, "are_movies": True, "is_single_movie": True}]})
 
-        # MegaKino movie: single fake season/episode = the film itself
-        if _is_megakino_movie_url(url):
-            return jsonify({"seasons": [{"url": url, "season_number": 1, "episode_count": 1, "are_movies": True, "is_single_movie": True}]})
-
-        # MegaKino series: one post == one season
-        if _is_megakino_series_url(url):
+        # MegaKino: movie -> single fake season; series -> the one season post
+        if _is_megakino_url(url):
             try:
+                _mk_data = _megakino_watch(url)
+                if not _megakino_is_series(_mk_data):
+                    return jsonify({"seasons": [{"url": url, "season_number": 1, "episode_count": 1, "are_movies": True, "is_single_movie": True}]})
                 from ..models.megakino_to.series import MegakinoSeries
-                series = MegakinoSeries(url=url)
+                series = MegakinoSeries(url=url, _data=_mk_data)
                 seasons_data = []
                 for season in series.seasons:
                     seasons_data.append({
@@ -3899,30 +3894,26 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 logger.error(f"FilmPalast episodes fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
 
-        # MegaKino movie: the movie itself as a single episode
-        if _is_megakino_movie_url(url):
-            try:
-                from ..models.megakino_to.movie import MegakinoMovie
-                mv = MegakinoMovie(url=url)
-                return jsonify({"episodes": [{
-                    "url": url,
-                    "episode_number": 1,
-                    "season_number": 1,
-                    "title_de": mv.title_de or "",
-                    "title_en": mv.title_de or "",
-                    "downloaded": False,
-                    "languages": ["German Dub"],
-                }]})
-            except Exception as e:
-                logger.error(f"MegaKino movie episodes fetch failed: {e}", exc_info=True)
-                return jsonify({"error": str(e)}), 500
-
-        # MegaKino series: list all episodes of the season post
-        if _is_megakino_series_url(url):
+        # MegaKino: movie -> single episode; series -> all episodes of the season
+        if _is_megakino_url(url):
             try:
                 from pathlib import Path as _P
+                _mk_data = _megakino_watch(url)
+                if not _megakino_is_series(_mk_data):
+                    from ..models.megakino_to.movie import MegakinoMovie
+                    mv = MegakinoMovie(url=url, _data=_mk_data)
+                    return jsonify({"episodes": [{
+                        "url": url,
+                        "episode_number": 1,
+                        "season_number": 1,
+                        "title_de": mv.title_de or "",
+                        "title_en": mv.title_de or "",
+                        "downloaded": False,
+                        "languages": ["German Dub"],
+                    }]})
+
                 from ..models.megakino_to.series import MegakinoSeries
-                series = MegakinoSeries(url=url)
+                series = MegakinoSeries(url=url, _data=_mk_data)
                 season = series.seasons[0]
                 sn = season.season_number
 
@@ -5333,6 +5324,13 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return jsonify({"error": "Failed to fetch megakino movies"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
+    @app.route("/api/megakino/popular-movies")
+    def api_megakino_popular_movies():
+        results = _cached_browse("megakino_popular_movies", fetch_megakino_popular_movies)
+        if results is None:
+            return jsonify({"error": "Failed to fetch megakino popular movies"}), 500
+        return jsonify({"results": _proxy_result_list(results)})
+
     @app.route("/api/megakino/new-series")
     def api_megakino_new_series():
         results = _cached_browse("megakino_new_series", fetch_megakino_new_series)
@@ -5340,11 +5338,11 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return jsonify({"error": "Failed to fetch megakino series"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
-    @app.route("/api/megakino/popular")
-    def api_megakino_popular():
-        results = _cached_browse("megakino_popular", fetch_megakino_popular)
+    @app.route("/api/megakino/popular-series")
+    def api_megakino_popular_series():
+        results = _cached_browse("megakino_popular_series", fetch_megakino_popular_series)
         if results is None:
-            return jsonify({"error": "Failed to fetch megakino popular"}), 500
+            return jsonify({"error": "Failed to fetch megakino popular series"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
     @app.route("/api/hanime/new")
@@ -5631,7 +5629,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     "section_order": {
                         "aniworld": get_setting("home_section_order_aniworld", "new,popular"),
                         "sto":      get_setting("home_section_order_sto",      "new,popular"),
-                        "megakino": get_setting("home_section_order_megakino", "new,series,popular"),
+                        "megakino": get_setting("home_section_order_megakino", "new_movies,popular_movies,new_series,popular_series"),
                         "hanime":   get_setting("home_section_order_hanime",   "new,trending"),
                     },
                     "sections": {
@@ -5644,9 +5642,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                             "popular": get_setting("source_show_popular_sto", "1"),
                         },
                         "megakino": {
-                            "new":     get_setting("source_show_new_megakino",     "1"),
-                            "series":  get_setting("source_show_series_megakino",  "1"),
-                            "popular": get_setting("source_show_popular_megakino", "1"),
+                            "new_movies":     get_setting("source_show_new_movies_megakino",     "1"),
+                            "popular_movies": get_setting("source_show_popular_movies_megakino", "1"),
+                            "new_series":     get_setting("source_show_new_series_megakino",     "1"),
+                            "popular_series": get_setting("source_show_popular_series_megakino", "1"),
                         },
                         "hanime": {
                             "new":      get_setting("source_show_new_hanime",      "1"),
@@ -7672,11 +7671,14 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         _source_keys = (
             "home_source_order",
             "home_section_order_aniworld", "home_section_order_sto", "home_section_order_hanime",
+            "home_section_order_megakino",
             "source_enabled_aniworld", "source_enabled_sto", "source_enabled_filmpalast",
             "source_enabled_megakino", "source_enabled_hanime",
             "source_show_new_aniworld", "source_show_popular_aniworld",
             "source_show_new_sto", "source_show_popular_sto",
             "source_show_new_hanime", "source_show_trending_hanime",
+            "source_show_new_movies_megakino", "source_show_popular_movies_megakino",
+            "source_show_new_series_megakino", "source_show_popular_series_megakino",
             "sources_hide_in_search",
         )
         if any(_sk in data for _sk in _source_keys):
@@ -7712,6 +7714,15 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
         for _sec in ("new", "trending"):
             _k = "source_show_" + _sec + "_hanime"
+            if _k in data:
+                set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
+        if "home_section_order_megakino" in data:
+            _parts = [p.strip().lower() for p in str(data["home_section_order_megakino"]).split(",") if p.strip()]
+            if sorted(_parts) != ["new_movies", "new_series", "popular_movies", "popular_series"]:
+                return jsonify({"error": "Invalid home_section_order_megakino"}), 400
+            set_setting("home_section_order_megakino", ",".join(_parts))
+        for _sec in ("new_movies", "popular_movies", "new_series", "popular_series"):
+            _k = "source_show_" + _sec + "_megakino"
             if _k in data:
                 set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
         if "sources_hide_in_search" in data:
@@ -8408,7 +8419,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         try:
             for item in (megakino_search(title) or []):
                 url = item.get("url", "")
-                if "/serials/" not in url:  # Auto-Sync tracks series only
+                if not item.get("is_series"):  # Auto-Sync tracks series only
                     continue
                 if url in seen:
                     continue
@@ -11188,9 +11199,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             ("new_series",     fetch_new_series),
             ("popular_series", fetch_popular_series),
             ("new_movies",     _fetch_new_movies),
-            ("megakino_new_movies", fetch_megakino_new_movies),
-            ("megakino_new_series", fetch_megakino_new_series),
-            ("megakino_popular",    fetch_megakino_popular),
+            ("megakino_new_movies",    fetch_megakino_new_movies),
+            ("megakino_popular_movies", fetch_megakino_popular_movies),
+            ("megakino_new_series",    fetch_megakino_new_series),
+            ("megakino_popular_series", fetch_megakino_popular_series),
         ]
         all_entries = []
         for bkey, fn in browse_sources:

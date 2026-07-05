@@ -614,30 +614,27 @@ SERIENSTREAM_EPISODE_PATTERN = re.compile(
 )
 
 # -----------------------------
-# MegaKino (megakino9.com / megakino.*)
+# MegaKino (megakino.to)
 # -----------------------------
-# The domain occasionally bumps its number (megakino9, megakino10, ...), so the
-# base URL is overridable via env and the URL patterns match any host that
-# contains "megakino".
-MEGAKINO_BASE_URL = os.environ.get("MEGAKINO_BASE_URL", "https://megakino9.com").rstrip("/")
+# megakino.to is a React SPA backed by a JSON API. Content lives at
+# /watch/<slug>/<24-hex-id>; movies and series share that URL form (the media
+# type is decided by the API's ``tv`` field). Episodes use a synthetic
+# ``…?episode=<n>`` URL. The base URL is overridable and the patterns match any
+# host containing "megakino".
+MEGAKINO_BASE_URL = os.environ.get("MEGAKINO_BASE_URL", "https://megakino.to").rstrip("/")
 
-# Movie post: /films/<id>-<slug>.html (also kinofilme / multfilm / documentary)
+# Movie / series landing (no query): /watch/<slug>/<hexid>
 MEGAKINO_MOVIE_PATTERN = re.compile(
-    r"^https?://[^/]*megakino[^/]*/"
-    r"(?:films|kinofilme|multfilm|documentary)/"
-    r"\d+-[^/?#]+\.html$",
+    r"^https?://[^/]*megakino[^/]*/watch/[^/?#]+/[a-f0-9]{24}$",
     re.IGNORECASE,
 )
 
-# Series post (one post == one season): /serials/<id>-<slug>.html
-MEGAKINO_SERIES_PATTERN = re.compile(
-    r"^https?://[^/]*megakino[^/]*/serials/\d+-[^/?#]+\.html$",
-    re.IGNORECASE,
-)
+# Series and movies share the same landing URL form.
+MEGAKINO_SERIES_PATTERN = MEGAKINO_MOVIE_PATTERN
 
-# Synthetic single-episode URL: <series-post>.html?episode=<n>
+# Synthetic single-episode URL: <watch-post>?episode=<n>
 MEGAKINO_EPISODE_PATTERN = re.compile(
-    r"^https?://[^/]*megakino[^/]*/serials/\d+-[^/?#]+\.html\?episode=\d+$",
+    r"^https?://[^/]*megakino[^/]*/watch/[^/?#]+/[a-f0-9]{24}\?episode=\d+$",
     re.IGNORECASE,
 )
 

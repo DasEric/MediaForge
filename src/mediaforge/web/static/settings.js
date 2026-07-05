@@ -1927,14 +1927,19 @@ const SOURCE_META = {
   aniworld:   { label: "AniWorld",   cls: "browse-provider-aniworld",   hasSections: true },
   sto:        { label: "S.TO",       cls: "browse-provider-sto",        hasSections: true },
   filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false },
-  megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false },
+  megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false, multiSections: [
+                  { key: "new_movies",     de: "Neue Filme",     en: "New Movies" },
+                  { key: "popular_movies", de: "Beliebte Filme", en: "Popular Movies" },
+                  { key: "new_series",     de: "Neue Serien",    en: "New Series" },
+                  { key: "popular_series", de: "Beliebte Serien", en: "Popular Series" },
+              ] },
   hanime:     { label: "hanime 18+",  cls: "browse-provider-hanime",     hasSections: false }
 };
 
 let _sourceState = {
   order: ["aniworld", "sto", "filmpalast", "megakino", "hanime"],
-  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new", "series", "popular"], hanime: ["new", "trending"] },
-  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new: true, series: true, popular: true }, hanime: { new: true, trending: true } },
+  section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new_movies", "popular_movies", "new_series", "popular_series"], hanime: ["new", "trending"] },
+  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new_movies: true, popular_movies: true, new_series: true, popular_series: true }, hanime: { new: true, trending: true } },
   enabled: { aniworld: true, sto: true, filmpalast: true, megakino: true, hanime: false },
   hide_in_search: false
 };
@@ -1961,6 +1966,16 @@ function _loadSourceSettings(sources) {
     const sp = secVis[p] || {};
     _sourceState.sections_visible[p] = { new: sp.new !== "0", popular: sp.popular !== "0" };
   });
+  // MegaKino: four independently toggleable sections
+  {
+    const mp = secVis.megakino || {};
+    _sourceState.sections_visible.megakino = {
+      new_movies:     mp.new_movies     !== "0",
+      popular_movies: mp.popular_movies !== "0",
+      new_series:     mp.new_series     !== "0",
+      popular_series: mp.popular_series !== "0",
+    };
+  }
 
   const en = sources.enabled || {};
   _sourceState.enabled.aniworld   = en.aniworld   !== "0";
@@ -2016,6 +2031,14 @@ function _renderSourceOrder() {
         '<button type="button" class="source-section-toggle" ' + (bothVisible ? "" : "disabled") +
           ' title="' + t("Reihenfolge der Bereiche", "Order of the sections") + '"' +
           ' onclick="toggleSourceSection(\'' + prov + '\')">' + _sectionLabel(prov) + '</button>';
+    } else if (meta.multiSections) {
+      const vis = _sourceState.sections_visible[prov] || {};
+      sectionCtrls = meta.multiSections.map(function (sec) {
+        return '<label class="source-sec-check"><input type="checkbox" class="chb-main" ' +
+          (vis[sec.key] !== false ? "checked" : "") +
+          ' onchange="toggleSourceSectionVisible(\'' + prov + '\',\'' + sec.key + '\')"> ' +
+          t(sec.de, sec.en) + '</label>';
+      }).join("");
     }
 
     row.innerHTML =
@@ -2089,13 +2112,20 @@ function toggleSourceSection(prov) {
 }
 
 function toggleSourceSectionVisible(prov, sec) {
-  const vis = _sourceState.sections_visible[prov] || { new: true, popular: true };
+  const vis = _sourceState.sections_visible[prov] || {};
   vis[sec] = !vis[sec];
   _sourceState.sections_visible[prov] = vis;
   _renderSourceOrder();
   const payload = {};
   payload["source_show_" + sec + "_" + prov] = vis[sec];
-  const secLabel = sec === "new" ? t("Neu", "New") : t("Beliebt", "Popular");
+  let secLabel;
+  const meta = SOURCE_META[prov];
+  if (meta && meta.multiSections) {
+    const ms = meta.multiSections.find(function (m) { return m.key === sec; });
+    secLabel = ms ? t(ms.de, ms.en) : sec;
+  } else {
+    secLabel = sec === "new" ? t("Neu", "New") : t("Beliebt", "Popular");
+  }
   _putSettings(payload, secLabel + (vis[sec] ? t(" eingeblendet", " shown") : t(" ausgeblendet", " hidden")));
 }
 

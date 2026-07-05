@@ -29,8 +29,9 @@ const popularSeriesSection = document.getElementById("popularSeriesSection");
 const newMoviesGrid = document.getElementById("newMoviesGrid");
 const newMoviesSection = document.getElementById("newMoviesSection");
 const megakinoNewMoviesGrid = document.getElementById("megakinoNewMoviesGrid");
+const megakinoPopularMoviesGrid = document.getElementById("megakinoPopularMoviesGrid");
 const megakinoNewSeriesGrid = document.getElementById("megakinoNewSeriesGrid");
-const megakinoPopularGrid = document.getElementById("megakinoPopularGrid");
+const megakinoPopularSeriesGrid = document.getElementById("megakinoPopularSeriesGrid");
 const hanimeNewGrid = document.getElementById("hanimeNewGrid");
 const hanimeTrendingGrid = document.getElementById("hanimeTrendingGrid");
 
@@ -413,54 +414,32 @@ let megakinoLoadedAt = 0;
 async function loadMegakinoBrowse() {
   if (megakinoLoadedAt && Date.now() - megakinoLoadedAt < 3600000) return;
   megakinoLoadedAt = Date.now();
-  if (megakinoNewMoviesGrid) renderSkeletons(megakinoNewMoviesGrid);
-  if (megakinoNewSeriesGrid) renderSkeletons(megakinoNewSeriesGrid);
-  if (megakinoPopularGrid) renderSkeletons(megakinoPopularGrid);
+  const grids = [megakinoNewMoviesGrid, megakinoPopularMoviesGrid, megakinoNewSeriesGrid, megakinoPopularSeriesGrid];
+  grids.forEach(g => { if (g) renderSkeletons(g); });
+  const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
   try {
-    const [mvResp, seResp, popResp] = await Promise.all([
+    const [nmResp, pmResp, nsResp, psResp] = await Promise.all([
       fetch("/api/megakino/new-movies"),
+      fetch("/api/megakino/popular-movies"),
       fetch("/api/megakino/new-series"),
-      fetch("/api/megakino/popular"),
+      fetch("/api/megakino/popular-series"),
     ]);
     await Promise.all([loadDownloadedFolders(), loadAutoSyncJobs(), loadCineinfoSettings(), loadGeneralSettings()]);
-    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
-    const mvData = await mvResp.json();
-    const seData = await seResp.json();
-    const popData = await popResp.json();
-    if (megakinoNewMoviesGrid) megakinoNewMoviesGrid.innerHTML = "", (mvData.results ? renderBrowseCards(megakinoNewMoviesGrid, mvData.results) : (megakinoNewMoviesGrid.innerHTML = errHtml));
-    if (megakinoNewSeriesGrid) (seData.results ? renderBrowseCards(megakinoNewSeriesGrid, seData.results) : (megakinoNewSeriesGrid.innerHTML = errHtml));
-    if (megakinoPopularGrid) (popData.results ? renderBrowseCards(megakinoPopularGrid, popData.results) : (megakinoPopularGrid.innerHTML = errHtml));
+    const data = await Promise.all([nmResp.json(), pmResp.json(), nsResp.json(), psResp.json()]);
+    const targets = [
+      [megakinoNewMoviesGrid, data[0]],
+      [megakinoPopularMoviesGrid, data[1]],
+      [megakinoNewSeriesGrid, data[2]],
+      [megakinoPopularSeriesGrid, data[3]],
+    ];
+    targets.forEach(([grid, d]) => {
+      if (!grid) return;
+      if (d && d.results) renderBrowseCards(grid, d.results);
+      else grid.innerHTML = errHtml;
+    });
   } catch (e) {
     megakinoLoadedAt = 0;
-    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
-    if (megakinoNewMoviesGrid) megakinoNewMoviesGrid.innerHTML = errHtml;
-    if (megakinoNewSeriesGrid) megakinoNewSeriesGrid.innerHTML = errHtml;
-    if (megakinoPopularGrid) megakinoPopularGrid.innerHTML = errHtml;
-  }
-}
-
-let hanimeLoadedAt = 0;
-async function loadHanimeBrowse() {
-  if (hanimeLoadedAt && Date.now() - hanimeLoadedAt < 3600000) return;
-  hanimeLoadedAt = Date.now();
-  if (hanimeNewGrid) renderSkeletons(hanimeNewGrid);
-  if (hanimeTrendingGrid) renderSkeletons(hanimeTrendingGrid);
-  try {
-    const [newResp, trendResp] = await Promise.all([
-      fetch("/api/hanime/new"),
-      fetch("/api/hanime/trending"),
-    ]);
-    await Promise.all([loadDownloadedFolders(), loadAutoSyncJobs(), loadCineinfoSettings(), loadGeneralSettings()]);
-    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
-    const newData = await newResp.json();
-    const trendData = await trendResp.json();
-    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results) : (hanimeNewGrid.innerHTML = errHtml));
-    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results) : (hanimeTrendingGrid.innerHTML = errHtml));
-  } catch (e) {
-    hanimeLoadedAt = 0;
-    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
-    if (hanimeNewGrid) hanimeNewGrid.innerHTML = errHtml;
-    if (hanimeTrendingGrid) hanimeTrendingGrid.innerHTML = errHtml;
+    grids.forEach(g => { if (g) g.innerHTML = errHtml; });
   }
 }
 
@@ -2475,7 +2454,7 @@ function submitDirectLink() {
 
   const isSto = /s\.to\/serie\/[^\/]+/.test(url);
   const isAniworld = /aniworld\.to\/anime\/stream\/[^\/]+/.test(url);
-  const isMegakino = /megakino[^/]*\/(?:films|serials|kinofilme|multfilm|documentary)\/\d+-[^/]+\.html/.test(url);
+  const isMegakino = /megakino[^/]*\/watch\/[^/]+\/[a-f0-9]{24}/i.test(url);
   const isHanime = /hanime\.tv\/videos\/hentai\/[^/?#]+/.test(url);
 
   if (!isSto && !isAniworld && !isMegakino && !isHanime) {

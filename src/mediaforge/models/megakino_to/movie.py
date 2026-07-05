@@ -1,4 +1,4 @@
-"""MegaKino movie (single-video post under /films/, /kinofilme/, ...)."""
+"""MegaKino movie (megakino.to, tv=0). Flat single-file download, VOE by default."""
 import os
 import re
 from pathlib import Path
@@ -22,14 +22,12 @@ except ImportError:  # pragma: no cover
 
 
 class MegakinoMovie:
-    """A standalone MegaKino movie. Structurally analogous to FilmPalastEpisode:
-    a flat ``<Title> (<Year>).mkv`` file, single German language, direct hoster
-    embeds (VOE by default)."""
-
-    def __init__(self, url, selected_path=None, selected_language=None, selected_provider=None):
+    def __init__(self, url, selected_path=None, selected_language=None,
+                 selected_provider=None, _data=None):
         if not MEGAKINO_MOVIE_PATTERN.match(url or ""):
             raise ValueError(f"Invalid MegaKino movie URL: {url}")
         self.url = url
+        self.__data = _data
         self.__meta = None
         self.__provider_data = None
         self.__selected_path_param = selected_path
@@ -44,19 +42,17 @@ class MegakinoMovie:
         self.__file_extension = None
         self.__episode_path = None
         self.__is_downloaded = None
-        self.__html = None
 
-    # --- html / meta ---
     @property
-    def _html(self):
-        if self.__html is None:
-            self.__html = scraper.fetch_html(self.url)
-        return self.__html
+    def _data(self):
+        if self.__data is None:
+            self.__data = scraper.fetch_watch(self.url)
+        return self.__data
 
     @property
     def _meta(self):
         if self.__meta is None:
-            self.__meta = scraper.parse_meta(self._html)
+            self.__meta = scraper.parse_meta(self._data)
         return self.__meta
 
     @property
@@ -84,14 +80,13 @@ class MegakinoMovie:
         return self._meta.get("poster_url") or ""
 
     @property
-    def imdb_rating(self):
-        return self._meta.get("imdb_rating") or ""
+    def imdb(self):
+        return self._meta.get("imdb_id") or ""
 
     @property
     def provider_data(self):
-        """{'German Dub': {provider_name: embed_url}}"""
         if self.__provider_data is None:
-            hosters = scraper.extract_movie_hosters(self._html)
+            hosters = scraper.movie_hosters(self._data)
             self.__provider_data = {"German Dub": hosters} if hosters else {}
         return self.__provider_data
 
@@ -104,7 +99,6 @@ class MegakinoMovie:
                     names.append(n)
         return names
 
-    # --- selection ---
     @property
     def selected_path(self):
         if self.__selected_path is None:
@@ -140,7 +134,6 @@ class MegakinoMovie:
             self.__selected_provider = raw.replace(" HD", "").replace(" HQ", "").strip()
         return self.__selected_provider
 
-    # --- resolution ---
     @property
     def provider_url(self):
         data = self.provider_data.get(self.selected_language) or {}
@@ -162,7 +155,6 @@ class MegakinoMovie:
             raise ValueError(f"The provider '{self.selected_provider}' is not yet implemented.")
         return fn(self.provider_url)
 
-    # --- paths (flat movie layout) ---
     @property
     def title_cleaned(self):
         t = re.sub(r'[<>:"/\\|?*]', "", self.title_de or "").strip()
@@ -209,7 +201,6 @@ class MegakinoMovie:
             self.__is_downloaded = check_downloaded(self._episode_path)
         return self.__is_downloaded
 
-    # --- actions ---
     def download(self, cancel_event=None, **kwargs):
         if self.selected_provider.upper() == "VEEV":
             try:
