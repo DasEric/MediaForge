@@ -456,6 +456,67 @@ async function showBrowseSections() {
   if (enabled.filmpalast !== "0") loadFilmPalastBrowse();
   if (enabled.megakino !== "0") loadMegakinoBrowse();
   if (enabled.hanime === "1") loadHanimeBrowse();
+
+  applyUptimeStatus();
+}
+
+// ── Source offline banner (only when UpTime monitoring is enabled) ──────────
+let _uptimeBannerDismissed = false;
+async function applyUptimeStatus() {
+  if (!window.__UPTIME_ENABLED) return;
+  const wrap = document.getElementById("sourceStatusBanner");
+  if (!wrap || _uptimeBannerDismissed) return;
+  let data;
+  try {
+    const resp = await fetch("/api/uptime/status");
+    data = await resp.json();
+  } catch (e) { return; }
+  if (!data || !data.enabled || !Array.isArray(data.sources)) return;
+
+  // Offline = tracked, enabled as a home source, and currently down.
+  const offline = data.sources.filter(function (sc) {
+    return sc.tracked && sc.enabled_source && sc.current_status === "down";
+  });
+
+  // Hide the offline provider blocks on the start page.
+  offline.forEach(function (sc) {
+    const block = browseDiv && browseDiv.querySelector('.browse-provider-block[data-provider="' + sc.id + '"]');
+    if (block) block.style.display = "none";
+  });
+
+  if (!offline.length) { wrap.innerHTML = ""; return; }
+
+  const names = offline.map(function (sc) { return sc.label; });
+  const anyBlocked = offline.some(function (sc) { return sc.blocked; });
+  const list = names.join(", ");
+  const title = names.length === 1
+    ? t("<b>" + escapeHtml(list) + "</b> ist gerade offline", "<b>" + escapeHtml(list) + "</b> is currently offline")
+    : t("<b>" + escapeHtml(list) + "</b> sind gerade offline", "<b>" + escapeHtml(list) + "</b> are currently offline");
+  const desc = anyBlocked
+    ? t("Diese Quelle wurde ausgeblendet — eine Sperr-/ISP-Seite wurde erkannt. Prüfe deine DNS- und Netzwerkeinstellungen.",
+        "This source was hidden — a block/ISP page was detected. Check your DNS and network settings.")
+    : t("Ausgeblendet, weil nicht erreichbar. Prüfe deine DNS- und Netzwerkeinstellungen.",
+        "Hidden because unreachable. Check your DNS and network settings.");
+
+  wrap.innerHTML =
+    '<div class="src-alert">' +
+      '<span class="src-alert-ic">!</span>' +
+      '<div class="src-alert-body">' +
+        '<div class="src-alert-title">' + title + '</div>' +
+        '<div class="src-alert-desc">' + desc + '</div>' +
+      '</div>' +
+      '<div class="src-alert-actions">' +
+        '<a class="src-alert-btn primary" href="/settings#network">' + t("DNS-Test öffnen", "Open DNS test") + '</a>' +
+        '<a class="src-alert-btn" href="/uptime">' + t("UpTime öffnen", "Open UpTime") + '</a>' +
+      '</div>' +
+      '<button class="src-alert-close" title="' + t("Ausblenden", "Dismiss") + '" onclick="dismissUptimeBanner()">×</button>' +
+    '</div>';
+}
+
+function dismissUptimeBanner() {
+  _uptimeBannerDismissed = true;
+  const wrap = document.getElementById("sourceStatusBanner");
+  if (wrap) wrap.innerHTML = "";
 }
 
 // Reorder provider blocks + their new/popular sections on the start page and

@@ -22,9 +22,9 @@ from html import unescape
 from urllib.parse import urlencode
 
 try:
-    from ...config import MEGAKINO_BASE_URL, logger
+    from ...config import MEGAKINO_BASE_URL, logger, GLOBAL_SESSION
 except ImportError:  # pragma: no cover
-    from mediaforge.config import MEGAKINO_BASE_URL, logger
+    from mediaforge.config import MEGAKINO_BASE_URL, logger, GLOBAL_SESSION
 
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 
@@ -152,11 +152,26 @@ def reset_session():
         _session = None
 
 
+_MK_HEADERS = {
+    "User-Agent": _UA,
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+    "X-Requested-With": "XMLHttpRequest",
+}
+
+
 def _api_get_json(path, params=None, timeout=15):
     url = base_url() + path
     if params:
         url += "?" + urlencode(params)
-    resp = _get_session().get(url, timeout=timeout)
+    # Use the shared DoH session so megakino.to resolves via the project DNS
+    # (niquests/DoH) and isn't hit by the ISP resolver / block, like the other
+    # providers. Falls back to a plain requests session if unavailable.
+    headers = dict(_MK_HEADERS, Referer=base_url() + "/")
+    try:
+        resp = GLOBAL_SESSION.get(url, headers=headers, timeout=timeout)
+    except Exception:
+        resp = _get_session().get(url, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -181,6 +196,13 @@ def _browse(type_="", order_by="releases", keyword="", page=1, limit=24):
     return [_card(it) for it in items]
 
 
+def _genres_str(genres):
+    """Normalise the API's genres field (may be a list or a string) to text."""
+    if isinstance(genres, (list, tuple)):
+        return ", ".join(str(g).strip() for g in genres if g)
+    return str(genres or "").strip()
+
+
 def _card(item):
     poster = item.get("poster_path") or item.get("poster_path_season") or ""
     series = is_series_item(item)
@@ -189,7 +211,7 @@ def _card(item):
         "title": title,
         "url": content_url(item),
         "poster_url": poster_url(poster),
-        "genre": (item.get("genres") or "").strip(),
+        "genre": _genres_str(item.get("genres")),
         "rating": str(item.get("rating") or ""),
         "year": str(item.get("year") or ""),
         "is_series": series,

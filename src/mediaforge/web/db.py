@@ -1218,6 +1218,35 @@ def init_autosync_db():
             )
         except Exception:
             pass
+        # One-time migration: rewrite legacy s.to AutoSync URLs to serienstream.to
+        # (the s.to domain was deactivated). Done per-row so the UNIQUE index on
+        # series_url can't be violated: if the serienstream.to equivalent already
+        # exists, the stale s.to duplicate is dropped instead.
+        try:
+            _sto_rows = conn.execute(
+                "SELECT id, series_url FROM autosync_jobs "
+                "WHERE series_url LIKE '%://s.to/%' OR series_url LIKE '%://www.s.to/%'"
+            ).fetchall()
+            _mig = 0
+            for _r in _sto_rows:
+                _old = _r["series_url"]
+                _new = _old.replace("://www.s.to/", "://serienstream.to/").replace("://s.to/", "://serienstream.to/")
+                if _new == _old:
+                    continue
+                _dup = conn.execute(
+                    "SELECT 1 FROM autosync_jobs WHERE series_url = ? AND id != ?",
+                    (_new, _r["id"]),
+                ).fetchone()
+                if _dup:
+                    conn.execute("DELETE FROM autosync_jobs WHERE id = ?", (_r["id"],))
+                else:
+                    conn.execute("UPDATE autosync_jobs SET series_url = ? WHERE id = ?", (_new, _r["id"]))
+                    _mig += 1
+            if _mig:
+                conn.commit()
+                logger.info("[Migration] Rewrote %d AutoSync s.to URL(s) to serienstream.to", _mig)
+        except Exception:
+            logger.warning("[Migration] AutoSync s.to->serienstream.to rewrite failed", exc_info=True)
         # Add UNIQUE index on series_url (migration for existing DBs)
         try:
             conn.execute(

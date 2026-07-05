@@ -3995,6 +3995,10 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     "available_providers": mv.available_providers,
                 })
             except Exception as e:
+                _cls = e.__class__.__name__.lower()
+                if any(k in _cls for k in ("connection", "timeout", "protocol", "ssl")):
+                    logger.warning("MegaKino nicht erreichbar (Netzwerk): %s", e)
+                    return jsonify({"error": "MegaKino ist gerade nicht erreichbar"}), 502
                 logger.error(f"MegaKino series/movie fetch failed: {e}", exc_info=True)
                 return jsonify({"error": str(e)}), 500
         try:
