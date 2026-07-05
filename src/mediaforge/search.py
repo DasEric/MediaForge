@@ -291,7 +291,7 @@ def _fetch_series_homepage():
         if _series_html_content is not None:  # double-check after acquiring lock
             return _series_html_content
         try:
-            response = GLOBAL_SESSION.get("https://s.to/beliebte-serien")
+            response = GLOBAL_SESSION.get("https://serienstream.to/beliebte-serien")
             response.raise_for_status()
             _series_html_content = response.text
             return _series_html_content
@@ -330,7 +330,7 @@ def _extract_series_cards(section_html):
             continue
         seen_slugs.add(series_slug)
 
-        url = f"https://s.to/serie/{series_slug}"
+        url = f"https://serienstream.to/serie/{series_slug}"
 
         # --- Title: try img alt, then link title attr, then alt on any tag ---
         title = ""
@@ -353,7 +353,7 @@ def _extract_series_cards(section_html):
             p = re.search(pat, inner)
             if p:
                 raw = p.group(1).strip()
-                poster_url = raw if raw.startswith("http") else f"https://s.to{raw}"
+                poster_url = raw if raw.startswith("http") else f"https://serienstream.to{raw}"
                 break
 
         if title or poster_url:
@@ -520,7 +520,7 @@ def _normalize_s_to_link(link: str) -> str:
 def query_s_to(keyword):
     """Search s.to for the given keyword and return a list of matching series with their URLs."""
     # Use query params to ensure proper URL encoding (spaces, umlauts, etc.)
-    url = "https://s.to/api/search/suggest"
+    url = "https://serienstream.to/api/search/suggest"
     response = GLOBAL_SESSION.get(url, params={"term": keyword}, timeout=10)
 
     data = response.json()
@@ -545,7 +545,7 @@ def search(is_aniworld=None):
 
     # print(f"Using {'Aniworld' if is_aniworld else 's.to'} for search results.\n")
 
-    base_url = "https://aniworld.to" if is_aniworld else "https://s.to"
+    base_url = "https://aniworld.to" if is_aniworld else "https://serienstream.to"
     query_fn = query if is_aniworld else query_s_to
 
     if use_random:

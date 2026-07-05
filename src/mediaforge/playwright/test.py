@@ -1,6 +1,6 @@
 from mediaforge.models import SerienstreamEpisode
 
-episode = SerienstreamEpisode("https://s.to/serie/mr-pickles/staffel-1/episode-1")
+episode = SerienstreamEpisode("https://serienstream.to/serie/mr-pickles/staffel-1/episode-1")
 
 print("=== SERIES INFO ===")
 print("URL:", episode.url)

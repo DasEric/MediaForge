@@ -462,3 +462,42 @@
   .integ-subsection-header { padding: 16px 14px 6px; }
   .integ-subsection-hint   { padding: 0 14px 10px; }
 }
+
+
+/* ── UpTime tab config ─────────────────────────────────────────────────── */
+.settings-subhead {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 18px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.uptime-num-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.uptime-num-field .integ-num {
+  width: 82px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  background: var(--input-bg, rgba(255,255,255,0.04));
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: right;
+}
+.uptime-num-field .integ-num:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.uptime-num-unit {
+  font-size: 0.82rem;
+  color: var(--text-muted, rgba(255,255,255,0.55));
+  min-width: 30px;
+}
+
+@media (max-width: 640px) {
+  .uptime-num-field .integ-num { width: 72px; }
+}

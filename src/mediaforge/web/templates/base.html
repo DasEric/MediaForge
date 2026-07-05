@@ -194,6 +194,16 @@
         <span>{{ _('Download History') }}</span>
       </a>
 
+      {% if uptime_enabled %}
+      <a href="{{ url_for('uptime_page') }}" class="sidebar-link" data-page="uptime">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </svg>
+        <span>UpTime</span>
+      </a>
+      {% endif %}
+
       {% endif %}{# /guest-hidden app navigation #}
 
       {% if syncplay_enabled and (not auth_enabled or current_user) %}

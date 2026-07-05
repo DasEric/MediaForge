@@ -338,7 +338,7 @@ function setUiLanguage(lang) {
       <div class="settings-hint">{{ _('Enable or disable the available sources. Disabled sources are hidden on the start page and are no longer loaded there.') }}</div>
       <label class="settings-checkbox-row" for="sourceEnabledSto">
         <input type="checkbox" class="chb-main" id="sourceEnabledSto" onchange="saveSourceEnabled('sto')" />
-        <span>S.TO</span>
+        <span>SerienStream</span>
       </label>
       <label class="settings-checkbox-row" for="sourceEnabledAniworld">
         <input type="checkbox" class="chb-main" id="sourceEnabledAniworld" onchange="saveSourceEnabled('aniworld')" />
@@ -716,7 +716,7 @@ function setUiLanguage(lang) {
       </div>
       {% endif %}
       <div class="settings-hint">
-        {{ _('Defines which DNS server resolves domains. Useful if your ISP blocks AniWorld or S.TO.') }}
+        {{ _('Defines which DNS server resolves domains. Useful if your ISP blocks AniWorld or SerienStream.') }}
       </div>
       <div style="padding:0 22px 16px;display:flex;gap:8px;align-items:center;">
         <button onclick="toggleDnsTestPanel()" id="dnsTestToggleBtn" style="font-size:0.82rem;padding:5px 12px;">{{ _('Test DNS') }}</button>
@@ -739,11 +739,19 @@ function setUiLanguage(lang) {
             <span class="dns-test-site-result dns-test-idle">—</span>
           </div>
           <div class="dns-test-site-row" id="dnsTestRowSTO">
-            <span class="dns-test-site-name">s.to</span>
+            <span class="dns-test-site-name">serienstream.to</span>
             <span class="dns-test-site-result dns-test-idle">—</span>
           </div>
           <div class="dns-test-site-row" id="dnsTestRowFilmpalast">
             <span class="dns-test-site-name">filmpalast.to</span>
+            <span class="dns-test-site-result dns-test-idle">—</span>
+          </div>
+          <div class="dns-test-site-row" id="dnsTestRowMegaKino">
+            <span class="dns-test-site-name">megakino.to</span>
+            <span class="dns-test-site-result dns-test-idle">—</span>
+          </div>
+          <div class="dns-test-site-row" id="dnsTestRowHanime">
+            <span class="dns-test-site-name">hanime.tv</span>
             <span class="dns-test-site-result dns-test-idle">—</span>
           </div>
         </div>

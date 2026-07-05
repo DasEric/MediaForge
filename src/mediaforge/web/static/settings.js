@@ -918,7 +918,7 @@ async function runDnsTest() {
   const statusEl = document.getElementById("dnsTestStatus");
   if (btn) { btn.disabled = true; btn.textContent = t("⏳ Teste…","⏳ Testing..."); }
   if (statusEl) statusEl.innerHTML = t('<span class="dns-test-loading">⏳ Lädt…</span>','<span class="dns-test-loading">⏳ Loading...</span>');
-  for (const id of ["dnsTestRowAniWorld", "dnsTestRowSTO", "dnsTestRowFilmpalast"]) {
+  for (const id of ["dnsTestRowAniWorld", "dnsTestRowSTO", "dnsTestRowFilmpalast", "dnsTestRowMegaKino", "dnsTestRowHanime"]) {
     const row = document.getElementById(id);
     if (row) {
       const res = row.querySelector(".dns-test-site-result");
@@ -940,7 +940,7 @@ async function runDnsTest() {
         statusEl.innerHTML = t('<span class="dns-test-warn">⚠ Gespeicherter Modus: ' + modeLabel + ' — aber kein Server aktiv. Einstellungen erneut speichern?</span>','<span class="dns-test-warn">⚠ Saved mode: ' + modeLabel + ' — but no server active. Save settings again?</span>');
       }
     }
-    const siteMap = { AniWorld: "dnsTestRowAniWorld", "S.TO": "dnsTestRowSTO", FilmPalast: "dnsTestRowFilmpalast" };
+    const siteMap = { AniWorld: "dnsTestRowAniWorld", SerienStream: "dnsTestRowSTO", FilmPalast: "dnsTestRowFilmpalast", MegaKino: "dnsTestRowMegaKino", hanime: "dnsTestRowHanime" };
     for (const [label, rowId] of Object.entries(siteMap)) {
       const row = document.getElementById(rowId);
       if (!row) continue;
@@ -948,16 +948,19 @@ async function runDnsTest() {
       if (!resEl) continue;
       const site = data.sites?.[label];
       if (!site) { resEl.className = "dns-test-site-result dns-test-warn"; resEl.textContent = t("— Keine Daten","— No data"); continue; }
-      const ip = site.ip ? " (" + site.ip + ")" : "";
+      const ip = site.ip ? " (" + site.ip + (site.ip_provider ? " · " + site.ip_provider : "") + ")" : "";
       resEl.innerHTML = "";
       const txt = document.createElement("span");
       resEl.appendChild(txt);
       if (site.http_ok && site.site_verified) {
         resEl.className = "dns-test-site-result dns-test-ok";
         txt.textContent = t("✓ Erreichbar & verifiziert","✓ Reachable & verified") + ip;
+      } else if (site.http_ok && site.blocked) {
+        resEl.className = "dns-test-site-result dns-test-fail";
+        txt.textContent = t("✗ Sperr-/Blockseite erkannt — nicht die echte Seite","✗ Block/ISP page detected — not the real site") + ip;
       } else if (site.http_ok && !site.site_verified) {
         resEl.className = "dns-test-site-result dns-test-warn";
-        txt.textContent = t("⚠ Erreichbar","⚠ Reachable") + ip + t(", aber Inhalt unbekannt — möglicherweise Sperr-Seite"," , but content unknown — possibly blocking page");
+        txt.textContent = t("⚠ Erreichbar","⚠ Reachable") + ip + t(", aber echte Seite nicht bestätigt (evtl. Schutz-/Challenge-Seite)"," , but real site not confirmed (possibly protection/challenge page)");
       } else if (site.socket_ok) {
         resEl.className = "dns-test-site-result dns-test-warn";
         txt.textContent = t("⚠ DNS aufgelöst","⚠ DNS resolved") + ip + t(", aber HTTP fehlgeschlagen"," , but HTTP failed");
@@ -1925,7 +1928,7 @@ function changeTimeFormatSetting() {
 
 const SOURCE_META = {
   aniworld:   { label: "AniWorld",   cls: "browse-provider-aniworld",   hasSections: true },
-  sto:        { label: "S.TO",       cls: "browse-provider-sto",        hasSections: true },
+  sto:        { label: "SerienStream", cls: "browse-provider-sto",       hasSections: true },
   filmpalast: { label: "FilmPalast", cls: "browse-provider-filmpalast", hasSections: false },
   megakino:   { label: "MegaKino",   cls: "browse-provider-megakino",   hasSections: false, multiSections: [
                   { key: "new_movies",     de: "Neue Filme",     en: "New Movies" },

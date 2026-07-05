@@ -179,6 +179,11 @@ from .db import (
     save_watch_progress,
     get_watch_progress,
     get_watch_progress_bulk,
+    # uptime monitoring
+    init_uptime_db,
+    record_uptime_heartbeat,
+    prune_uptime_heartbeats,
+    get_uptime_summary,
 )
 
 logger = get_logger(__name__)
@@ -313,6 +318,222 @@ def _apply_dns_patch(server_ip: str | None, mode: str | None = None) -> None:
     doh_urls = _DNS_NIQUESTS_MAP.get(mode) if mode in _DNS_NIQUESTS_MAP else "system"
     rebuild_global_session(doh_urls)
     set_active_dns_mode(mode)
+
+
+# Known CDN / edge networks — used to label shared anycast IPs so that several
+# sites resolving to the same address (normal for Cloudflare) doesn't look like
+# a DNS bug.
+_CDN_NETS = [
+    # Cloudflare IPv4
+    ("Cloudflare", "173.245.48.0/20"), ("Cloudflare", "103.21.244.0/22"),
+    ("Cloudflare", "103.22.200.0/22"), ("Cloudflare", "103.31.4.0/22"),
+    ("Cloudflare", "141.101.64.0/18"), ("Cloudflare", "108.162.192.0/18"),
+    ("Cloudflare", "190.93.240.0/20"), ("Cloudflare", "188.114.96.0/20"),
+    ("Cloudflare", "197.234.240.0/22"), ("Cloudflare", "198.41.128.0/17"),
+    ("Cloudflare", "162.158.0.0/15"), ("Cloudflare", "104.16.0.0/13"),
+    ("Cloudflare", "104.24.0.0/14"), ("Cloudflare", "172.64.0.0/13"),
+    ("Cloudflare", "131.0.72.0/22"),
+]
+
+
+def _ip_provider(ip):
+    """Return a CDN/provider label for an IP (e.g. 'Cloudflare') or None."""
+    if not ip:
+        return None
+    try:
+        import ipaddress as _ipa
+        addr = _ipa.ip_address(ip)
+        for name, cidr in _CDN_NETS:
+            if addr in _ipa.ip_network(cidr):
+                return name
+    except Exception:
+        pass
+    return None
+
+
+# ── Source-site monitoring (shared by DNS test + UpTime) ──────────────────────
+# Ordered mapping of trackable source sites. Keys match the source ids used by
+# the ``source_enabled_<id>`` settings and the UpTime per-source tracking toggles.
+#   id -> (label, url, expected_domain, body_markers)
+_MONITOR_SITES = {
+    "aniworld":   ("AniWorld",   "https://aniworld.to",   "aniworld.to",   ["aniworld"]),
+    "sto":        ("SerienStream", "https://serienstream.to", "serienstream.to", ["serienstream"]),
+    "filmpalast": ("FilmPalast", "https://filmpalast.to", "filmpalast.to", ["filmpalast"]),
+    "megakino":   ("MegaKino",   "https://megakino.to",   "megakino.to",   ["megakino"]),
+    "hanime":     ("hanime",     "https://hanime.tv",     "hanime.tv",     ["hanime"]),
+}
+
+# Signatures of ISP / CUII (Clearingstelle Urheberrecht im Internet) block pages
+# and generic legal-block interstitials. If any appears in the body we must NOT
+# report the site as verified even when the block page names the brand/domain.
+_BLOCK_MARKERS = [
+    # High-precision full phrases from real ISP / CUII block interstitials.
+    # Deliberately NOT short substrings (e.g. "gvu", "cuii") — those match by
+    # chance inside minified JS / base64 on a real homepage and caused false
+    # "blocked" reports for aniworld.to and serienstream.to.
+    "clearingstelle urheberrecht im internet",
+    "cuii.info",
+    "der zugang zu der von ihnen aufgerufenen",
+    "der zugriff auf diese website wurde",
+    "aus urheberrechtlichen gründen gesperrt",
+    "aufgrund einer urheberrechtlichen",
+    "diese website wurde gesperrt",
+    "diese domain wurde aus rechtlichen",
+    "access to this website has been blocked",
+    "this website has been blocked",
+    "has been blocked pursuant to",
+    "blocked in accordance with",
+    "site blocked by court order",
+]
+
+
+def _probe_site(url, expected_domain, markers, timeout=10):
+    """Resolve + fetch a site and verify we reached the real thing.
+
+    Returns a dict with: hostname, ip, socket_ok, http_status, http_ok,
+    site_verified, response_ms, and optional socket_error / http_error.
+    Shared by the DNS diagnostics endpoint and the UpTime monitor so both use
+    identical reachability + identity checks (final-URL domain, then body
+    markers as a fallback for Cloudflare-challenged pages).
+    """
+    import socket as _sock
+    import time as _time
+    from ..config import GLOBAL_SESSION as _GS
+
+    hostname = url.replace("https://", "").replace("http://", "").rstrip("/")
+    entry = {"hostname": hostname, "ip": None, "socket_ok": False,
+             "http_ok": False, "site_verified": False, "response_ms": None}
+
+    # DNS resolve (tests the getaddrinfo patch; ffmpeg/mpv rely on it locally)
+    try:
+        infos = _sock.getaddrinfo(hostname, 443, proto=_sock.IPPROTO_TCP)
+        entry["ip"] = infos[0][4][0] if infos else None
+        entry["socket_ok"] = True
+        entry["ip_provider"] = _ip_provider(entry["ip"])
+    except Exception as e:
+        entry["socket_error"] = str(e)
+
+    # HTTP reachability + identity check via the global (DoH) session
+    try:
+        _t0 = _time.monotonic()
+        resp = _GS.get(url, allow_redirects=True, timeout=timeout)
+        entry["response_ms"] = int((_time.monotonic() - _t0) * 1000)
+        entry["http_status"] = resp.status_code
+        entry["http_ok"] = resp.status_code < 500
+        final_url = str(getattr(resp, "url", url) or url)
+        entry["final_url"] = final_url
+        body_lower = (resp.text or "").lower()
+        # Real-content check: the page must carry a site-specific brand marker
+        # AND must not look like an ISP/CUII block interstitial. This prevents
+        # reporting "verified" when the ISP injected a block page (even if that
+        # block page happens to name the blocked domain/brand).
+        has_marker = any(m.lower() in body_lower for m in markers)
+        url_on_domain = expected_domain in final_url
+        is_block = any(b in body_lower for b in _BLOCK_MARKERS)
+        entry["blocked"] = bool(is_block)
+        # Verified when it is NOT a block/ISP page AND we either saw a site-
+        # specific brand marker OR at least stayed on the correct domain (the
+        # latter covers Cloudflare challenge pages, which are the real site
+        # behind a bot check — an ISP block would redirect off-domain or inject
+        # a block signature, both handled above).
+        entry["site_verified"] = bool((not is_block) and (has_marker or url_on_domain))
+    except Exception as e:
+        entry["http_error"] = str(e)
+
+    return entry
+
+
+# ── UpTime monitor ────────────────────────────────────────────────────────────
+_uptime_monitor_started = False
+_uptime_monitor_lock = threading.Lock()
+_uptime_wake = threading.Event()  # set to wake the monitor early (config change)
+
+
+def _uptime_config():
+    """Read the current UpTime configuration from app_settings (clamped)."""
+    def _clamp_int(key, default, lo, hi):
+        try:
+            v = int(float(get_setting(key, str(default))))
+        except (TypeError, ValueError):
+            v = default
+        return max(lo, min(hi, v))
+
+    tracked = {}
+    for _sid in _MONITOR_SITES:
+        _def = "0" if _sid == "hanime" else "1"
+        tracked[_sid] = get_setting("uptime_track_" + _sid, _def) == "1"
+
+    return {
+        "enabled":        get_setting("uptime_enabled", "0") == "1",
+        "interval":       _clamp_int("uptime_interval", 300, 60, 86400),
+        "retention_days": _clamp_int("uptime_retention_days", 7, 1, 7),
+        "timeout":        _clamp_int("uptime_timeout", 15, 5, 120),
+        "tracked":        tracked,
+    }
+
+
+def _uptime_run_round(cfg=None):
+    """Probe every tracked source once and store a heartbeat each; then prune."""
+    cfg = cfg or _uptime_config()
+    for _sid, (_label, _url, _domain, _markers) in _MONITOR_SITES.items():
+        if not cfg["tracked"].get(_sid):
+            continue
+        try:
+            r = _probe_site(_url, _domain, _markers, timeout=cfg["timeout"])
+            if r.get("http_ok") and r.get("site_verified"):
+                status, msg = "up", None
+            elif r.get("blocked"):
+                status, msg = "down", "blocked_page"
+            elif r.get("http_ok"):
+                status, msg = "degraded", "reachable, content unverified"
+            else:
+                status = "down"
+                msg = r.get("http_error") or r.get("socket_error") or "unreachable"
+            record_uptime_heartbeat(
+                _sid, status,
+                response_ms=r.get("response_ms"),
+                http_status=r.get("http_status"),
+                message=msg,
+            )
+        except Exception as exc:
+            try:
+                record_uptime_heartbeat(_sid, "down", message=str(exc))
+            except Exception:
+                pass
+    try:
+        prune_uptime_heartbeats(cfg["retention_days"])
+    except Exception:
+        pass
+
+
+def _start_uptime_monitor():
+    """Start the background monitor loop once. Idle-waits while disabled."""
+    global _uptime_monitor_started
+    with _uptime_monitor_lock:
+        if _uptime_monitor_started:
+            return
+        _uptime_monitor_started = True
+
+    def _loop():
+        while True:
+            try:
+                cfg = _uptime_config()
+            except Exception:
+                cfg = None
+            if not cfg or not cfg["enabled"]:
+                _uptime_wake.wait(timeout=10)
+                _uptime_wake.clear()
+                continue
+            try:
+                _uptime_run_round(cfg)
+            except Exception:
+                logger.warning("[UpTime] monitor round failed", exc_info=True)
+            # Sleep until the next round, waking early if the config changes.
+            _uptime_wake.wait(timeout=cfg["interval"])
+            _uptime_wake.clear()
+
+    threading.Thread(target=_loop, daemon=True, name="uptime-monitor").start()
+
 
 
 # Queue worker state
@@ -3038,6 +3259,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 "cineinfo_advanced_search": _get_setting("cineinfo_advanced_search", "0") == "1",
                 "cineinfo_calendar": _get_setting("cineinfo_calendar", "0") == "1",
                 "syncplay_enabled": _get_setting("syncplay_enabled", "0") == "1",
+                "uptime_enabled": _get_setting("uptime_enabled", "0") == "1",
             }
     else:
         # No-auth mode still needs a secret key for flask.session
@@ -3069,6 +3291,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 "cineinfo_advanced_search": _get_setting("cineinfo_advanced_search", "0") == "1",
                 "cineinfo_calendar": _get_setting("cineinfo_calendar", "0") == "1",
                 "syncplay_enabled": _get_setting("syncplay_enabled", "0") == "1",
+                "uptime_enabled": _get_setting("uptime_enabled", "0") == "1",
             }
 
     # Initialize download queue, custom paths and autosync (works with or without auth)
@@ -3104,6 +3327,8 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     init_upscale_queue_db()
     init_mediascan_db()
     init_watch_progress_db()
+    init_uptime_db()
+    _start_uptime_monitor()
     _load_queue_paused_from_db()
     # Start MediaScan 24-h background scheduler
     _start_mediascan_scheduler()
@@ -3432,7 +3657,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                     link = item.get("link") or item.get("url", "")
                     if _STO_SERIES_LINK_PATTERN.match(link):
                         title = _html_unescape(item.get("title") or item.get("name", "Unknown")).replace("<em>", "").replace("</em>", "")
-                        site_res.append({"title": title, "url": f"https://s.to{link}"})
+                        site_res.append({"title": title, "url": f"https://serienstream.to{link}"})
             else:
                 items = aniworld_query(kw) or []
                 if isinstance(items, dict): items = [items]
@@ -4774,6 +4999,15 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return redirect(url_for("index"))
         room = (request.args.get("room") or "").strip()
         return render_template("syncplay.html", invite_room=room)
+
+    @app.route("/uptime")
+    def uptime_page():
+        """Dedicated UpTime monitoring dashboard (visible only when enabled)."""
+        from .db import get_setting as _gs
+        if _gs("uptime_enabled", "0") != "1":
+            from flask import redirect, url_for
+            return redirect(url_for("index"))
+        return render_template("uptime.html")
 
     @app.route("/advanced-search")
     def advanced_search_page():
@@ -7154,60 +7388,16 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
              and verifying the response body contains a known marker so we know we
              actually reached the correct site (not a block page).
         """
-        import socket as _sock
-        from ..config import GLOBAL_SESSION as _GS
-
         _saved_mode = get_setting("dns_mode", "system")
         _saved_server = get_setting("dns_server", "")
 
-        # (url, expected-domain-fragment, body-fallback-markers)
-        # Verification priority:
-        #   1. Final URL after redirects contains the expected domain → verified
-        #   2. Response body contains at least one marker → verified
-        #   (Cloudflare challenge pages land on the correct domain, so URL check
-        #    handles CDN-fronted sites that return JS challenges to bots.)
-        sites = {
-            "AniWorld":   ("https://aniworld.to",   "aniworld.to",   ["aniworld", "anime"]),
-            "S.TO":       ("https://s.to",          "s.to",          ["serienstream", "serie", "s.to"]),
-            "FilmPalast": ("https://filmpalast.to", "filmpalast.to", ["filmpalast", "film"]),
-        }
-
+        # Reachability + site-identity check for every trackable source site.
+        # Verification priority inside _probe_site:
+        #   1. Final URL after redirects contains the expected domain, else
+        #   2. Response body contains a known marker (handles CDN challenges).
         results = {}
-        for label, (url, expected_domain, markers) in sites.items():
-            hostname = url.replace("https://", "").rstrip("/")
-            entry = {"hostname": hostname}
-
-            # --- socket resolve (tests getaddrinfo patch) ---
-            try:
-                infos = _sock.getaddrinfo(hostname, 443, proto=_sock.IPPROTO_TCP)
-                entry["ip"] = infos[0][4][0] if infos else None
-                entry["socket_ok"] = True
-            except Exception as e:
-                entry["ip"] = None
-                entry["socket_ok"] = False
-                entry["socket_error"] = str(e)
-
-            # --- HTTP reachability + site identity check via GLOBAL_SESSION ---
-            try:
-                resp = _GS.get(url, allow_redirects=True, timeout=10)
-                entry["http_status"] = resp.status_code
-                entry["http_ok"] = resp.status_code < 500
-
-                # Primary: check final URL domain (works even through Cloudflare challenges)
-                final_url = str(getattr(resp, "url", url) or url)
-                url_verified = expected_domain in final_url
-
-                # Fallback: body content check
-                body_lower = (resp.text or "").lower()
-                body_verified = any(m.lower() in body_lower for m in markers)
-
-                entry["site_verified"] = url_verified or body_verified
-            except Exception as e:
-                entry["http_ok"] = False
-                entry["site_verified"] = False
-                entry["http_error"] = str(e)
-
-            results[label] = entry
+        for _sid, (label, url, expected_domain, markers) in _MONITOR_SITES.items():
+            results[label] = _probe_site(url, expected_domain, markers, timeout=10)
 
         return jsonify({
             "dns_mode":          _saved_mode,
@@ -7215,6 +7405,95 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             "dns_active_server": _active_dns_server,
             "sites":             results,
         })
+
+    @app.route("/api/uptime/status")
+    def api_uptime_status():
+        """Current UpTime config + per-source status/uptime%/heartbeat bars."""
+        import time as _t
+        cfg = _uptime_config()
+        since = int(_t.time()) - cfg["retention_days"] * 86400
+        sources = []
+        for _sid, (_label, _url, _domain, _markers) in _MONITOR_SITES.items():
+            summ = get_uptime_summary(_sid, since, bar_limit=60)
+            latest = summ["latest"] or {}
+            _src_def = "0" if _sid == "hanime" else "1"
+            sources.append({
+                "id":               _sid,
+                "label":            _label,
+                "url":              _url,
+                "tracked":          cfg["tracked"].get(_sid, False),
+                "enabled_source":   get_setting("source_enabled_" + _sid, _src_def) == "1",
+                "current_status":   latest.get("status"),
+                "last_ts":          latest.get("ts"),
+                "last_response_ms": latest.get("response_ms"),
+                "last_http_status": latest.get("http_status"),
+                "last_message":     latest.get("message"),
+                "blocked":          latest.get("status") == "down" and latest.get("message") == "blocked_page",
+                "uptime_pct":       summ["stats"]["uptime_pct"],
+                "avg_ms":           summ["stats"]["avg_ms"],
+                "total_checks":     summ["stats"]["total"],
+                "bars":             summ["bars"],
+            })
+        return jsonify({
+            "enabled":        cfg["enabled"],
+            "interval":       cfg["interval"],
+            "retention_days": cfg["retention_days"],
+            "timeout":        cfg["timeout"],
+            "now":            int(_t.time()),
+            "sources":        sources,
+        })
+
+    @app.route("/api/settings/uptime", methods=["PUT"])
+    def api_settings_uptime():
+        _u, _is_admin = _get_current_user_info()
+        if not _is_admin:
+            return jsonify({"error": "forbidden"}), 403
+        data = request.get_json(silent=True) or {}
+
+        if "enabled" in data:
+            on = str(data["enabled"]).lower() in ("1", "true", "on", "yes")
+            set_setting("uptime_enabled", "1" if on else "0")
+
+        def _save_int(key, db_key, lo, hi):
+            if key not in data:
+                return None
+            try:
+                v = int(float(data[key]))
+            except (TypeError, ValueError):
+                return "invalid " + key
+            set_setting(db_key, str(max(lo, min(hi, v))))
+            return None
+
+        for _k, _dbk, _lo, _hi in (
+            ("interval",       "uptime_interval",        60, 86400),
+            ("retention_days", "uptime_retention_days",   1,     7),
+            ("timeout",        "uptime_timeout",          5,   120),
+        ):
+            err = _save_int(_k, _dbk, _lo, _hi)
+            if err:
+                return jsonify({"error": err}), 400
+
+        tracked = data.get("tracked")
+        if isinstance(tracked, dict):
+            for _sid in _MONITOR_SITES:
+                if _sid in tracked:
+                    set_setting("uptime_track_" + _sid,
+                                "1" if tracked[_sid] else "0")
+
+        _uptime_wake.set()  # apply immediately (start/adjust the monitor)
+        return jsonify({"ok": True})
+
+    @app.route("/api/uptime/check-now", methods=["POST"])
+    def api_uptime_check_now():
+        _u, _is_admin = _get_current_user_info()
+        if not _is_admin:
+            return jsonify({"error": "forbidden"}), 403
+        cfg = _uptime_config()
+        if not cfg["enabled"]:
+            return jsonify({"error": "uptime disabled"}), 400
+        threading.Thread(target=_uptime_run_round, daemon=True,
+                         name="uptime-checknow").start()
+        return jsonify({"ok": True})
 
     @app.route("/api/settings/browser", methods=["PUT"])
     def api_settings_browser():
@@ -8413,7 +8692,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             logger.debug("[AutosyncSearch] AniWorld search failed: %s", e)
         try:
             _collect(query_s_to(title), "sto", "S.TO",
-                     "https://s.to", _STO_SERIES_LINK_PATTERN)
+                     "https://serienstream.to", _STO_SERIES_LINK_PATTERN)
         except Exception as e:
             logger.debug("[AutosyncSearch] S.TO search failed: %s", e)
         try:
@@ -8749,8 +9028,8 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         host = netloc.removeprefix("www.")
         referer_by_host = {
             "filmpalast.to": "https://filmpalast.to/",
-            "s.to": "https://s.to/",
-            "serienstream.to": "https://s.to/",
+            "s.to": "https://serienstream.to/",
+            "serienstream.to": "https://serienstream.to/",
             "aniworld.to": "https://aniworld.to/",
             "cdn.aniworld.to": "https://aniworld.to/",
         }

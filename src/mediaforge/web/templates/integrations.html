@@ -14,6 +14,7 @@
     <button class="settings-tab" data-tab="mediaplayer" onclick="switchIntegTab('mediaplayer')">Mediaplayer</button>
     <button class="settings-tab" data-tab="cineinfo" onclick="switchIntegTab('cineinfo')">CineInfo</button>
     <button class="settings-tab" data-tab="syncplay" onclick="switchIntegTab('syncplay')">SyncPlay</button>
+    <button class="settings-tab" data-tab="uptime" onclick="switchIntegTab('uptime')">UpTime</button>
   </div>
 
   <!-- ══════════════════════════════════════════════════════
@@ -751,6 +752,106 @@
       </div>
     </div>
   </div><!-- /tab-syncplay -->
+
+  <!-- ══════════════════════════════════════════════════════
+       Tab: UpTime (native provider-site monitoring)
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-uptime">
+    <div class="settings-section">
+      <h2>UpTime <span class="section-badge" style="background:var(--accent);color:#fff;">{{ _('Monitoring') }}</span></h2>
+      <div class="settings-hint integ-hint-border">
+        {{ _('Continuously monitors your source sites — reachability and real-site verification, the same check used in the DNS diagnostics. When enabled, an "UpTime" entry appears in the sidebar with an Uptime-Kuma-style dashboard (online/offline, uptime percentage, response time, heartbeat history).') }}
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Enable UpTime monitoring') }}</div>
+          <div class="settings-row-desc">{{ _('Adds an UpTime entry to the sidebar and starts the background monitor.') }}</div>
+        </div>
+        <div class="settings-row-right">
+          <label class="toggle">
+            <input type="checkbox" id="uptimeEnabled" onchange="saveUptimeSettings(true)" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div id="uptimeConfig" style="display:none;">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-label">{{ _('Check interval') }}</div>
+            <div class="settings-row-desc">{{ _('How often each site is checked. Minimum 1 minute.') }}</div>
+          </div>
+          <div class="settings-row-right">
+            <div class="uptime-num-field">
+              <input type="number" id="uptimeInterval" class="integ-num" min="1" max="1440" step="1" onchange="saveUptimeSettings()" />
+              <span class="uptime-num-unit">{{ _('min') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-label">{{ _('Retention') }}</div>
+            <div class="settings-row-desc">{{ _('How long heartbeats are kept. Maximum 7 days.') }}</div>
+          </div>
+          <div class="settings-row-right">
+            <div class="uptime-num-field">
+              <input type="number" id="uptimeRetention" class="integ-num" min="1" max="7" step="1" onchange="saveUptimeSettings()" />
+              <span class="uptime-num-unit">{{ _('days') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-label">{{ _('Timeout') }}</div>
+            <div class="settings-row-desc">{{ _('Request timeout per check (5–120 s).') }}</div>
+          </div>
+          <div class="settings-row-right">
+            <div class="uptime-num-field">
+              <input type="number" id="uptimeTimeout" class="integ-num" min="5" max="120" step="1" onchange="saveUptimeSettings()" />
+              <span class="uptime-num-unit">{{ _('sec') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-subhead">{{ _('Tracked sources') }}</div>
+        <div class="settings-row-desc" style="padding:0 0 8px;">{{ _('Choose which of your source sites should be monitored.') }}</div>
+
+        <label class="settings-checkbox-row" for="uptimeTrack_aniworld">
+          <input type="checkbox" class="chb-main" id="uptimeTrack_aniworld" onchange="saveUptimeSettings()" />
+          <span>AniWorld <small style="opacity:.6">aniworld.to</small></span>
+        </label>
+        <label class="settings-checkbox-row" for="uptimeTrack_sto">
+          <input type="checkbox" class="chb-main" id="uptimeTrack_sto" onchange="saveUptimeSettings()" />
+          <span>SerienStream <small style="opacity:.6">serienstream.to</small></span>
+        </label>
+        <label class="settings-checkbox-row" for="uptimeTrack_filmpalast">
+          <input type="checkbox" class="chb-main" id="uptimeTrack_filmpalast" onchange="saveUptimeSettings()" />
+          <span>FilmPalast <small style="opacity:.6">filmpalast.to</small></span>
+        </label>
+        <label class="settings-checkbox-row" for="uptimeTrack_megakino">
+          <input type="checkbox" class="chb-main" id="uptimeTrack_megakino" onchange="saveUptimeSettings()" />
+          <span>MegaKino <small style="opacity:.6">megakino.to</small></span>
+        </label>
+        <label class="settings-checkbox-row" for="uptimeTrack_hanime">
+          <input type="checkbox" class="chb-main" id="uptimeTrack_hanime" onchange="saveUptimeSettings()" />
+          <span>hanime <small style="opacity:.6">hanime.tv · 18+</small></span>
+        </label>
+
+        <div class="settings-row" id="uptimeOpenRow" style="margin-top:14px;">
+          <div class="settings-row-left">
+            <div class="settings-row-label">{{ _('Open UpTime') }}</div>
+            <div class="settings-row-desc">{{ _('Also appears in the sidebar on the left once enabled.') }}</div>
+          </div>
+          <div class="settings-row-right">
+            <a href="/uptime" class="settings-btn integ-open-btn">{{ _('Open UpTime →') }}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-uptime -->
 
 </div>
 <div id="toast" class="toast"></div>

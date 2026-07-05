@@ -344,7 +344,7 @@ function renderStats(data, container) {
   // --- Source breakdown ---
   html += '<div class="stats-section"><h2 class="stats-section-title">' + t('Quelle', 'Source') + '</h2><div class="stats-kpi-row">';
   html += statCard("Anime (AniWorld)", g.anime_downloads ?? 0, `${g.anime_episodes ?? 0} ${t('Episoden heruntergeladen', 'episodes downloaded')}`, "#6ea8fe");
-  html += statCard("Serien (S.TO)", g.series_downloads ?? 0, `${g.series_episodes ?? 0} ${t('Episoden heruntergeladen', 'episodes downloaded')}`, "#a78bfa");
+  html += statCard("Serien (SerienStream)", g.series_downloads ?? 0, `${g.series_episodes ?? 0} ${t('Episoden heruntergeladen', 'episodes downloaded')}`, "#a78bfa");
   html += statCard(t("Filme (FilmPalast)", "Movies (FilmPalast)"), g.movie_downloads ?? 0, `${g.movie_files ?? 0} ${t('Filme heruntergeladen', 'movies downloaded')}`, "#e8914a");
   html += '</div></div>';
 

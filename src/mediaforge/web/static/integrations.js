@@ -16,7 +16,7 @@ function switchIntegTab(name) {
 (function restoreIntegTab() {
   var hash = "";
   try { hash = (window.location.hash || "").replace("#", "").trim(); } catch (e) {}
-  var valid = ["seerr", "mediaplayer", "cineinfo", "syncplay"];
+  var valid = ["seerr", "mediaplayer", "cineinfo", "syncplay", "uptime"];
   var tab = (hash && valid.indexOf(hash) !== -1) ? hash : "";
   if (!tab) {
     try { tab = localStorage.getItem("integActiveTab") || "seerr"; } catch (e) { tab = "seerr"; }
@@ -518,10 +518,79 @@ async function saveSyncplaySettings() {
 }
 
 
+// ===== UpTime =====
+const _UPTIME_SOURCES = ["aniworld", "sto", "filmpalast", "megakino", "hanime"];
+
+async function loadUptimeSettings() {
+  try {
+    const resp = await fetch("/api/uptime/status");
+    const data = await resp.json();
+    const en = document.getElementById("uptimeEnabled");
+    if (en) en.checked = !!data.enabled;
+    const iv = document.getElementById("uptimeInterval");
+    if (iv) iv.value = Math.max(1, Math.round((data.interval || 300) / 60));
+    const rt = document.getElementById("uptimeRetention");
+    if (rt) rt.value = data.retention_days || 7;
+    const to = document.getElementById("uptimeTimeout");
+    if (to) to.value = data.timeout || 15;
+    const trackedMap = {};
+    (data.sources || []).forEach(function (s) { trackedMap[s.id] = !!s.tracked; });
+    _UPTIME_SOURCES.forEach(function (sid) {
+      const cb = document.getElementById("uptimeTrack_" + sid);
+      if (cb) cb.checked = trackedMap[sid] !== undefined ? trackedMap[sid] : (sid !== "hanime");
+    });
+    _applyUptimeState();
+  } catch (e) {}
+}
+
+function _applyUptimeState() {
+  const on = !!document.getElementById("uptimeEnabled")?.checked;
+  const cfg = document.getElementById("uptimeConfig");
+  if (cfg) cfg.style.display = on ? "" : "none";
+}
+
+async function saveUptimeSettings(reload) {
+  const on = !!document.getElementById("uptimeEnabled")?.checked;
+  const intervalMin = Math.max(1, parseInt(document.getElementById("uptimeInterval")?.value || "5", 10) || 5);
+  const retention = Math.min(7, Math.max(1, parseInt(document.getElementById("uptimeRetention")?.value || "7", 10) || 7));
+  const timeout = Math.min(120, Math.max(5, parseInt(document.getElementById("uptimeTimeout")?.value || "15", 10) || 15));
+  const tracked = {};
+  _UPTIME_SOURCES.forEach(function (sid) {
+    const cb = document.getElementById("uptimeTrack_" + sid);
+    tracked[sid] = !!(cb && cb.checked);
+  });
+  _applyUptimeState();
+  try {
+    const resp = await fetch("/api/settings/uptime", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        enabled: on,
+        interval: intervalMin * 60,
+        retention_days: retention,
+        timeout: timeout,
+        tracked: tracked,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error); return; }
+    if (reload) {
+      // Reload so the sidebar UpTime entry appears/disappears immediately.
+      setTimeout(function () { location.reload(); }, 250);
+    } else {
+      showToast(t("UpTime gespeichert", "UpTime saved"));
+    }
+  } catch (e) {
+    showToast(t("Fehler: ", "Error: ") + e.message);
+  }
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
 
   loadIntegrations();
   loadSyncplaySettings();
+  loadUptimeSettings();
   loadCineinfoSettings();
   loadCrunchyrollSettings();
   loadMediaplayerSettings();

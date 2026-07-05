@@ -1028,7 +1028,7 @@ function renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResu
 
   const sections = [
     { key: "aniworld", label: "AniWorld", cls: "browse-provider-aniworld", results: aniResults },
-    { key: "sto", label: "S.TO", cls: "browse-provider-sto", results: stoResults },
+    { key: "sto", label: "SerienStream", cls: "browse-provider-sto", results: stoResults },
     { key: "filmpalast", label: "FilmPalast", cls: "browse-provider-filmpalast", results: fpResults },
     { key: "megakino", label: "MegaKino", cls: "browse-provider-megakino", results: mkResults },
     { key: "hanime", label: "hanime 18+", cls: "browse-provider-hanime", results: hanResults },
@@ -2458,7 +2458,7 @@ function submitDirectLink() {
   const isHanime = /hanime\.tv\/videos\/hentai\/[^/?#]+/.test(url);
 
   if (!isSto && !isAniworld && !isMegakino && !isHanime) {
-    error.textContent = t("Ungültige URL. Bitte eine s.to, aniworld.to, megakino oder hanime.tv Serien-/Film-URL eingeben.", "Invalid URL. Please enter an s.to, aniworld.to, megakino or hanime.tv series/movie URL.");
+    error.textContent = t("Ungültige URL. Bitte eine serienstream.to, aniworld.to, megakino oder hanime.tv Serien-/Film-URL eingeben.", "Invalid URL. Please enter a serienstream.to, aniworld.to, megakino or hanime.tv series/movie URL.");
     error.style.display = "block";
     input.focus();
     return;
@@ -3636,7 +3636,7 @@ async function runAniSearch(primaryTitle, tmdbId, type, posterPath) {
     });
 
     if (allResults.length === 0) {
-      grid.innerHTML = `<div class="adv-empty-state">${t("Keine exakten Treffer für " + escapeHtml(displayTitle) + " auf AniWorld, S.to oder FilmPalast gefunden.", "No exact matches for " + escapeHtml(displayTitle) + " found on AniWorld, S.to or FilmPalast.")}</div>`;
+      grid.innerHTML = `<div class="adv-empty-state">${t("Keine exakten Treffer für " + escapeHtml(displayTitle) + " auf AniWorld, SerienStream oder FilmPalast gefunden.", "No exact matches for " + escapeHtml(displayTitle) + " found on AniWorld, SerienStream or FilmPalast.")}</div>`;
       return;
     }
 

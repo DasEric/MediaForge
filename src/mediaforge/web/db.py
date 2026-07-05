@@ -3506,3 +3506,111 @@ def get_watch_progress_bulk(file_paths: list, username=None) -> dict:
         return result
     finally:
         conn.close()
+
+
+# ── UpTime monitoring ─────────────────────────────────────────────────────────
+_CREATE_UPTIME_TABLE = """
+CREATE TABLE IF NOT EXISTS uptime_heartbeats (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    source      TEXT    NOT NULL,
+    ts          INTEGER NOT NULL,
+    status      TEXT    NOT NULL,
+    response_ms INTEGER,
+    http_status INTEGER,
+    message     TEXT
+)
+"""
+_CREATE_UPTIME_INDEX = (
+    "CREATE INDEX IF NOT EXISTS idx_uptime_source_ts "
+    "ON uptime_heartbeats(source, ts)"
+)
+
+
+def init_uptime_db():
+    """Create the uptime_heartbeats table used by the UpTime monitor."""
+    MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    conn = get_db()
+    try:
+        conn.execute(_CREATE_UPTIME_TABLE)
+        conn.execute(_CREATE_UPTIME_INDEX)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_uptime_heartbeat(source, status, response_ms=None,
+                            http_status=None, message=None, ts=None):
+    """Persist a single heartbeat. status is 'up' | 'degraded' | 'down'."""
+    import time as _t
+    if ts is None:
+        ts = int(_t.time())
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO uptime_heartbeats "
+            "(source, ts, status, response_ms, http_status, message) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (source, int(ts), status, response_ms, http_status, message),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def prune_uptime_heartbeats(retention_days):
+    """Delete heartbeats older than the retention window (and orphan sources)."""
+    import time as _t
+    try:
+        days = float(retention_days)
+    except (TypeError, ValueError):
+        days = 7.0
+    cutoff = int(_t.time()) - int(days * 86400)
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM uptime_heartbeats WHERE ts < ?", (cutoff,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_uptime_summary(source, since_ts, bar_limit=50):
+    """Return {stats, latest, bars} for one source over [since_ts, now].
+
+    stats: total, up_count (status != 'down'), avg_ms
+    latest: most recent heartbeat (any time) or None
+    bars: last ``bar_limit`` heartbeats within the window, oldest first
+    """
+    conn = get_db()
+    try:
+        stat = conn.execute(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN status = 'down' THEN 0 ELSE 1 END) AS up_count, "
+            "AVG(response_ms) AS avg_ms "
+            "FROM uptime_heartbeats WHERE source = ? AND ts >= ?",
+            (source, since_ts),
+        ).fetchone()
+        latest = conn.execute(
+            "SELECT ts, status, response_ms, http_status, message "
+            "FROM uptime_heartbeats WHERE source = ? ORDER BY ts DESC LIMIT 1",
+            (source,),
+        ).fetchone()
+        bars = conn.execute(
+            "SELECT ts, status, response_ms FROM uptime_heartbeats "
+            "WHERE source = ? AND ts >= ? ORDER BY ts DESC LIMIT ?",
+            (source, since_ts, int(bar_limit)),
+        ).fetchall()
+        total = (stat["total"] if stat else 0) or 0
+        up_count = (stat["up_count"] if stat else 0) or 0
+        avg_ms = stat["avg_ms"] if stat and stat["avg_ms"] is not None else None
+        return {
+            "stats": {
+                "total": total,
+                "up_count": up_count,
+                "uptime_pct": round(up_count / total * 100, 2) if total else None,
+                "avg_ms": round(avg_ms) if avg_ms is not None else None,
+            },
+            "latest": dict(latest) if latest else None,
+            "bars": [dict(r) for r in reversed(bars)],
+        }
+    finally:
+        conn.close()

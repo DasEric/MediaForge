@@ -469,7 +469,7 @@ async function seerrDoSearch() {
       seerrFetchSearch(q, "hanime"),
     ]);
     const aniList = (aniRes.status === "fulfilled" ? aniRes.value : []).map(r => Object.assign({}, r, { _source: "AniWorld" }));
-    const stoList = (stoRes.status === "fulfilled" ? stoRes.value : []).map(r => Object.assign({}, r, { _source: "S.TO" }));
+    const stoList = (stoRes.status === "fulfilled" ? stoRes.value : []).map(r => Object.assign({}, r, { _source: "SerienStream" }));
     const mkList = (mkRes.status === "fulfilled" ? mkRes.value : [])
       .filter(r => r.is_series)
       .map(r => Object.assign({}, r, { _source: "MegaKino" }));

@@ -926,8 +926,8 @@ msgstr "Weiter"
 msgid "Please select your filters and click Search."
 msgstr "Bitte wähle deine Filter und klicke auf Suchen."
 
-msgid "Searching streams on AniWorld, S.TO & FilmPalast..."
-msgstr "Suche Streams auf AniWorld, S.TO & FilmPalast..."
+msgid "Searching streams on AniWorld, SerienStream & FilmPalast..."
+msgstr "Suche Streams auf AniWorld, SerienStream & FilmPalast..."
 
 # ── autosync.html ─────────────────────────────────────────────────────────
 msgid "Automatically search for new episodes and download them on a schedule."
@@ -1093,8 +1093,8 @@ msgid "Download performance details will be shown here."
 msgstr "Hier werden Details zur Download-Performance angezeigt."
 
 # ── shared_modals.html ────────────────────────────────────────────────────
-msgid "Paste a s.to or aniworld.to series URL"
-msgstr "s.to oder aniworld.to Serien-URL einfügen"
+msgid "Paste a serienstream.to or aniworld.to series URL"
+msgstr "serienstream.to oder aniworld.to Serien-URL einfügen"
 
 msgid "Bookmark"
 msgstr "Merken"
@@ -4079,3 +4079,70 @@ msgstr "Sollen wir dir jetzt wirklich glauben, dass du mindestens 18 bist?"
 msgid "hanime.tv is an adult source (18+) for sexually explicit animated content (hentai). Disabled by default; enabling requires an age confirmation."
 msgstr "hanime.tv ist eine nicht jugendfreie Quelle (18+) für sexuell explizite Zeichentrick-Inhalte (Hentai). Standardmäßig deaktiviert; zum Aktivieren ist eine Altersbestätigung erforderlich."
 
+
+# ── UpTime (added) ─────────────────────────────────────────────────────────
+msgid "Monitoring"
+msgstr "Monitoring"
+
+msgid "Continuously monitors your source sites — reachability and real-site verification, the same check used in the DNS diagnostics. When enabled, an \"UpTime\" entry appears in the sidebar with an Uptime-Kuma-style dashboard (online/offline, uptime percentage, response time, heartbeat history)."
+msgstr "Überwacht kontinuierlich deine Quellen-Seiten — Erreichbarkeit und Echtheits-Prüfung, dieselbe Prüfung wie in der DNS-Diagnose. Ist es aktiviert, erscheint ein „UpTime\"-Eintrag in der Seitenleiste mit einem Dashboard im Uptime-Kuma-Stil (Online/Offline, Uptime-Prozent, Antwortzeit, Heartbeat-Verlauf)."
+
+msgid "Enable UpTime monitoring"
+msgstr "UpTime-Überwachung aktivieren"
+
+msgid "Adds an UpTime entry to the sidebar and starts the background monitor."
+msgstr "Fügt einen UpTime-Eintrag zur Seitenleiste hinzu und startet die Hintergrund-Überwachung."
+
+msgid "Check interval"
+msgstr "Prüfintervall"
+
+msgid "How often each site is checked. Minimum 1 minute."
+msgstr "Wie oft jede Seite geprüft wird. Minimum 1 Minute."
+
+msgid "min"
+msgstr "Min"
+
+msgid "Retention"
+msgstr "Speicherdauer"
+
+msgid "How long heartbeats are kept. Maximum 7 days."
+msgstr "Wie lange die Verlaufsdaten gespeichert werden. Maximal 7 Tage."
+
+msgid "Timeout"
+msgstr "Timeout"
+
+msgid "Request timeout per check (5–120 s)."
+msgstr "Anfrage-Timeout pro Prüfung (5–120 s)."
+
+msgid "sec"
+msgstr "Sek"
+
+msgid "Tracked sources"
+msgstr "Überwachte Quellen"
+
+msgid "Choose which of your source sites should be monitored."
+msgstr "Wähle, welche deiner Quellen-Seiten überwacht werden sollen."
+
+msgid "Open UpTime"
+msgstr "UpTime öffnen"
+
+msgid "Open UpTime →"
+msgstr "UpTime öffnen →"
+
+msgid "Live monitoring of your source sites — reachability and real-site verification"
+msgstr "Live-Überwachung deiner Quellen-Seiten — Erreichbarkeit und Echtheits-Prüfung"
+
+msgid "Loading…"
+msgstr "Lädt…"
+
+msgid "Online"
+msgstr "Online"
+
+msgid "Degraded"
+msgstr "Eingeschränkt"
+
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Defines which DNS server resolves domains. Useful if your ISP blocks AniWorld or SerienStream."
+msgstr "Legt fest, welcher DNS-Server Domains auflöst. Nützlich, wenn dein Provider AniWorld oder SerienStream sperrt."
