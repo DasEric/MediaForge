@@ -4146,3 +4146,14 @@ msgstr "Offline"
 
 msgid "Defines which DNS server resolves domains. Useful if your ISP blocks AniWorld or SerienStream."
 msgstr "Legt fest, welcher DNS-Server Domains auflöst. Nützlich, wenn dein Provider AniWorld oder SerienStream sperrt."
+
+# ── UpTime range selector ──
+msgid "Range"
+msgstr "Zeitraum"
+
+msgid "Custom"
+msgstr "Benutzerdefiniert"
+
+msgid "To"
+msgstr "Bis"
+

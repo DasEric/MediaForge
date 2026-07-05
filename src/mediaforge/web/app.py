@@ -184,6 +184,8 @@ from .db import (
     record_uptime_heartbeat,
     prune_uptime_heartbeats,
     get_uptime_summary,
+    get_uptime_range,
+    get_uptime_heartbeats_between,
 )
 
 logger = get_logger(__name__)
@@ -7412,14 +7414,52 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
 
     @app.route("/api/uptime/status")
     def api_uptime_status():
-        """Current UpTime config + per-source status/uptime%/heartbeat bars."""
+        """UpTime config + per-source stats and bucketed history over a window.
+
+        Window selection (query params):
+          range=<seconds>  -> [now-range, now]
+          start=&end=      -> explicit epoch-second window (custom range)
+        The window is clamped to the retention period (older data is pruned).
+        """
         import time as _t
         cfg = _uptime_config()
-        since = int(_t.time()) - cfg["retention_days"] * 86400
+        now = int(_t.time())
+        retention_sec = cfg["retention_days"] * 86400
+        oldest = now - retention_sec
+
+        def _int(v):
+            try:
+                return int(float(v))
+            except (TypeError, ValueError):
+                return None
+
+        start = _int(request.args.get("start"))
+        end = _int(request.args.get("end"))
+        rng = _int(request.args.get("range"))
+        if start is not None or end is not None:
+            end = end if end is not None else now
+            start = start if start is not None else (end - 3600)
+        else:
+            if rng is None or rng <= 0:
+                rng = min(6 * 3600, retention_sec)
+            rng = max(300, min(rng, retention_sec))
+            end = now
+            start = now - rng
+        # Clamp to sane bounds (allow custom start before retention -> shows nodata)
+        if end > now:
+            end = now
+        if start >= end:
+            start = end - 300
+        # Don't scan absurdly far before pruned data, but keep the user's window
+        # so missing parts render as "no data".
+        if start < oldest - retention_sec:
+            start = oldest - retention_sec
+
+        n_buckets = 50
         sources = []
         for _sid, (_label, _url, _domain, _markers) in _MONITOR_SITES.items():
-            summ = get_uptime_summary(_sid, since, bar_limit=60)
-            latest = summ["latest"] or {}
+            rr = get_uptime_range(_sid, start, end, n_buckets=n_buckets)
+            latest = rr["latest"] or {}
             _src_def = "0" if _sid == "hanime" else "1"
             sources.append({
                 "id":               _sid,
@@ -7433,19 +7473,41 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 "last_http_status": latest.get("http_status"),
                 "last_message":     latest.get("message"),
                 "blocked":          latest.get("status") == "down" and latest.get("message") == "blocked_page",
-                "uptime_pct":       summ["stats"]["uptime_pct"],
-                "avg_ms":           summ["stats"]["avg_ms"],
-                "total_checks":     summ["stats"]["total"],
-                "bars":             summ["bars"],
+                "uptime_pct":       rr["stats"]["uptime_pct"],
+                "avg_ms":           rr["stats"]["avg_ms"],
+                "total_checks":     rr["stats"]["total"],
+                "bucket_seconds":   rr["bucket_seconds"],
+                "buckets":          rr["buckets"],
             })
         return jsonify({
             "enabled":        cfg["enabled"],
             "interval":       cfg["interval"],
             "retention_days": cfg["retention_days"],
             "timeout":        cfg["timeout"],
-            "now":            int(_t.time()),
+            "now":            now,
+            "range_start":    start,
+            "range_end":      end,
+            "range_seconds":  end - start,
             "sources":        sources,
         })
+
+    @app.route("/api/uptime/heartbeats")
+    def api_uptime_heartbeats():
+        """Raw heartbeats for one source within a time window (bucket detail)."""
+        import time as _t
+        src = (request.args.get("source") or "").strip()
+        if src not in _MONITOR_SITES:
+            return jsonify({"error": "unknown source"}), 400
+        now = int(_t.time())
+        def _int(v, d):
+            try:
+                return int(float(v))
+            except (TypeError, ValueError):
+                return d
+        start = _int(request.args.get("start"), now - 3600)
+        end = _int(request.args.get("end"), now)
+        rows = get_uptime_heartbeats_between(src, start, end, limit=1000)
+        return jsonify({"source": src, "start": start, "end": end, "heartbeats": rows})
 
     @app.route("/api/settings/uptime", methods=["PUT"])
     def api_settings_uptime():

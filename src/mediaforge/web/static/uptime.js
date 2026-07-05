@@ -1,5 +1,6 @@
-// UpTime dashboard — polls /api/uptime/status and updates cards in place
-// (no page reload, no full grid rebuild) for smooth live monitoring.
+// UpTime dashboard — polls /api/uptime/status and updates cards in place.
+// Buckets the selected time range into fixed-width history bars; click a bar
+// to expand a per-bucket detail view. No page reload, no full grid rebuild.
 (function () {
   "use strict";
 
@@ -27,13 +28,27 @@
     blockedMsg: t("Sperr-/Blockseite erkannt — nicht die echte Seite", "Block/ISP page detected — not the real site"),
     secAgo: t("s", "s"), minAgo: t("min", "min"), hAgo: t("h", "h"), dAgo: t("d", "d"),
     justNow: t("gerade eben", "just now"),
-    legendOnline: t("Online", "Online"),
-    legendDegraded: t("Eingeschränkt", "Degraded"),
-    legendOffline: t("Offline", "Offline"),
+    noData: t("Keine Daten vorhanden", "No data available"),
+    clickDetails: t("Balken anklicken für Details", "Click a bar for details"),
+    close: t("Schließen", "Close"),
+    loading: t("Lädt…", "Loading…"),
+    days: t("Tage", "d"),
   };
+
+  const RANGE_PRESETS = [
+    { sec: 3600,      label: t("1 Std", "1h") },
+    { sec: 6 * 3600,  label: t("6 Std", "6h") },
+    { sec: 24 * 3600, label: t("24 Std", "24h") },
+    { sec: 3 * 86400, label: t("3 Tage", "3d") },
+    { sec: 7 * 86400, label: t("7 Tage", "7d") },
+  ];
 
   let timer = null;
   let sig = "";
+  let curMode = "range";   // "range" | "custom"
+  let curRange = 6 * 3600; // seconds (range mode)
+  let curStart = null, curEnd = null; // custom mode (epoch seconds)
+  let _rangeBuiltFor = -1;
 
   function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
   function host(url) { return (url || "").replace(/^https?:\/\//, "").replace(/\/$/, ""); }
@@ -48,6 +63,15 @@
     return Math.floor(d / 86400) + " " + I.dAgo;
   }
 
+  function fmtSpan(s, e) {
+    const ds = new Date(s * 1000), de = new Date(e * 1000);
+    const sameDay = ds.toDateString() === de.toDateString();
+    const optD = { day: "2-digit", month: "2-digit" }, optT = { hour: "2-digit", minute: "2-digit" };
+    const a = ds.toLocaleDateString(undefined, optD) + " " + ds.toLocaleTimeString(undefined, optT);
+    const b = (sameDay ? "" : de.toLocaleDateString(undefined, optD) + " ") + de.toLocaleTimeString(undefined, optT);
+    return a + " – " + b;
+  }
+
   function statusInfo(src) {
     if (!src.tracked) return { cls: "st-untracked", label: I.untracked };
     switch (src.current_status) {
@@ -56,6 +80,24 @@
       case "down":     return { cls: "st-down",     label: I.offline };
       default:         return { cls: "st-pending",  label: I.pending };
     }
+  }
+
+  function barStatusLabel(status) {
+    if (status === "up") return I.online;
+    if (status === "degraded") return I.degraded;
+    if (status === "down") return I.offline;
+    if (status === "nodata") return I.noData;
+    return I.pending;
+  }
+
+  function barMessage(status, msg) {
+    if (status === "degraded") return msg && msg !== "reachable, content unverified" ? msg : I.degradedMsg;
+    if (status === "down") {
+      if (msg === "blocked_page") return I.blockedMsg;
+      if (!msg || msg === "unreachable") return I.unreachableMsg;
+      return msg;
+    }
+    return "";
   }
 
   function errorText(src) {
@@ -71,68 +113,51 @@
     return "";
   }
 
-  function barStatusLabel(status) {
-    if (status === "up") return I.online;
-    if (status === "degraded") return I.degraded;
-    if (status === "down") return I.offline;
-    return I.pending;
+  function bucketClass(st) {
+    return st === "up" ? "hb-up" : st === "degraded" ? "hb-degraded" : st === "down" ? "hb-down" : "hb-nodata";
   }
-
-  function barsSig(bars) {
-    return (bars || []).map(function (b) {
-      return (b.ts || 0) + ":" + (b.status || "") + ":" + (b.response_ms == null ? "" : b.response_ms);
-    }).join(",");
+  function bucketsSig(buckets) {
+    return (buckets || []).map(function (b) { return (b.start || 0) + ":" + (b.status || "") + ":" + (b.total || 0); }).join(",");
   }
-
-  function barsHtml(bars) {
-    if (!bars || !bars.length) return '<span class="uc-bars-empty"></span>';
-    return bars.map(function (b) {
-      let c = "hb-pending";
-      if (b.status === "up") c = "hb-up";
-      else if (b.status === "degraded") c = "hb-degraded";
-      else if (b.status === "down") c = "hb-down";
-      return '<i class="hb ' + c + '" tabindex="0"' +
-        ' data-ts="' + (b.ts || "") + '"' +
+  function bucketsHtml(buckets) {
+    if (!buckets || !buckets.length) return '<span class="uc-bars-empty"></span>';
+    return buckets.map(function (b) {
+      return '<i class="hb ' + bucketClass(b.status) + '" tabindex="0"' +
+        ' data-start="' + (b.start || "") + '" data-end="' + (b.end || "") + '"' +
         ' data-status="' + esc(b.status || "") + '"' +
-        ' data-ms="' + (b.response_ms == null ? "" : b.response_ms) + '"' +
-        ' data-msg="' + esc(b.message || "") + '"></i>';
+        ' data-total="' + (b.total || 0) + '"' +
+        ' data-ms="' + (b.avg_ms == null ? "" : b.avg_ms) + '"' +
+        ' data-msg="' + esc(b.msg || "") + '"></i>';
     }).join("");
   }
 
-  function barMessage(status, msg) {
-    if (status === "degraded") return I.degradedMsg;
-    if (status === "down") {
-      if (msg === "blocked_page") return I.blockedMsg;
-      if (!msg || msg === "unreachable") return I.unreachableMsg;
-      return msg;
-    }
-    return "";
-  }
-
-  // ── Custom heartbeat tooltip (works on hover AND tap/click, mobile too) ──
-  let _tipEl = null, _pinnedBar = null;
+  // ── Hover tooltip ─────────────────────────────────────────────────────────
+  let _tipEl = null;
   function _ensureTip() {
-    if (!_tipEl) {
-      _tipEl = document.createElement("div");
-      _tipEl.className = "hb-tip";
-      _tipEl.style.display = "none";
-      document.body.appendChild(_tipEl);
-    }
+    if (!_tipEl) { _tipEl = document.createElement("div"); _tipEl.className = "hb-tip"; _tipEl.style.display = "none"; document.body.appendChild(_tipEl); }
     return _tipEl;
   }
   function showTip(hb) {
     if (!hb || !document.body.contains(hb)) { hideTip(); return; }
     const tip = _ensureTip();
     const status = hb.getAttribute("data-status");
-    const ts = parseInt(hb.getAttribute("data-ts") || "0", 10);
+    const start = parseInt(hb.getAttribute("data-start") || "0", 10);
+    const end = parseInt(hb.getAttribute("data-end") || "0", 10);
+    const total = parseInt(hb.getAttribute("data-total") || "0", 10);
     const ms = hb.getAttribute("data-ms");
     const msg = hb.getAttribute("data-msg");
     const stCls = status === "up" ? "st-up" : status === "degraded" ? "st-degraded" : status === "down" ? "st-down" : "st-pending";
-    let html = '<div class="hb-tip-status ' + stCls + '">' + esc(barStatusLabel(status)) + "</div>";
-    if (ts) html += '<div class="hb-tip-time">' + esc(new Date(ts * 1000).toLocaleString()) + "</div>";
-    const em = barMessage(status, msg);
-    if (em) html += '<div class="hb-tip-msg">' + esc(em) + "</div>";
-    if (ms !== "" && ms != null) html += '<div class="hb-tip-rt">' + esc(ms) + " ms</div>";
+    let html;
+    if (status === "nodata") {
+      html = '<div class="hb-tip-status st-pending">' + esc(I.noData) + "</div>";
+      if (start) html += '<div class="hb-tip-time">' + esc(fmtSpan(start, end)) + "</div>";
+    } else {
+      html = '<div class="hb-tip-status ' + stCls + '">' + esc(barStatusLabel(status)) + "</div>";
+      if (start) html += '<div class="hb-tip-time">' + esc(fmtSpan(start, end)) + "</div>";
+      html += '<div class="hb-tip-rt">' + total + " " + esc(I.checks) + (ms !== "" && ms != null ? " · " + esc(ms) + " ms" : "") + "</div>";
+      const em = barMessage(status, msg);
+      if (em) html += '<div class="hb-tip-msg">' + esc(em) + "</div>";
+    }
     tip.innerHTML = html;
     tip.style.display = "block";
     const r = hb.getBoundingClientRect();
@@ -147,29 +172,148 @@
     tip.style.setProperty("--arrow-x", (r.left + r.width / 2 - left) + "px");
   }
   function hideTip() { if (_tipEl) _tipEl.style.display = "none"; }
-  function initTipEvents() {
-    const grid = document.getElementById("uptimeGrid");
-    if (grid) {
-      grid.addEventListener("mouseover", function (e) { const hb = e.target.closest(".hb"); if (hb && !_pinnedBar) showTip(hb); });
-      grid.addEventListener("mouseout", function (e) { const hb = e.target.closest(".hb"); if (hb && !_pinnedBar) hideTip(); });
-      grid.addEventListener("focusin", function (e) { const hb = e.target.closest(".hb"); if (hb) { _pinnedBar = hb; showTip(hb); } });
-      grid.addEventListener("click", function (e) {
-        const hb = e.target.closest(".hb");
-        if (!hb) return;
-        e.stopPropagation();
-        if (_pinnedBar === hb) { _pinnedBar = null; hideTip(); }
-        else { _pinnedBar = hb; showTip(hb); }
-      });
-    }
-    document.addEventListener("click", function (e) {
-      if (!e.target.closest(".hb") && !e.target.closest(".hb-tip")) { _pinnedBar = null; hideTip(); }
+
+  // ── Bucket detail panel ───────────────────────────────────────────────────
+  function closeAllDetails() {
+    document.querySelectorAll('.uptime-card [data-role="detail"]').forEach(function (d) {
+      d.hidden = true; d.dataset.key = ""; d.innerHTML = "";
     });
-    window.addEventListener("scroll", function () {
-      if (_pinnedBar && document.body.contains(_pinnedBar)) showTip(_pinnedBar);
-      else { _pinnedBar = null; hideTip(); }
-    }, true);
+  }
+  function renderDetail(detailEl, start, end, hbs) {
+    const span = fmtSpan(start, end);
+    let rows;
+    if (!hbs.length) {
+      rows = '<div class="ucd-empty">' + esc(I.noData) + "</div>";
+    } else {
+      rows = hbs.map(function (h) {
+        const stCls = h.status === "up" ? "st-up" : h.status === "degraded" ? "st-degraded" : h.status === "down" ? "st-down" : "st-pending";
+        const tm = new Date(h.ts * 1000).toLocaleString();
+        const rt = h.response_ms != null ? h.response_ms + " ms" : "";
+        const m = barMessage(h.status, h.message);
+        return '<div class="ucd-row">' +
+          '<span class="ucd-dot ' + stCls + '"></span>' +
+          '<span class="ucd-time">' + esc(tm) + "</span>" +
+          '<span class="ucd-status ' + stCls + '">' + esc(barStatusLabel(h.status)) + "</span>" +
+          '<span class="ucd-rt">' + esc(rt) + "</span>" +
+          (m ? '<span class="ucd-msg">' + esc(m) + "</span>" : "") +
+          "</div>";
+      }).join("");
+    }
+    detailEl.innerHTML =
+      '<div class="ucd-head"><span>' + esc(span) + " · " + hbs.length + " " + esc(I.checks) + "</span>" +
+      '<button class="uc-detail-close" type="button">✕ ' + esc(I.close) + "</button></div>" +
+      '<div class="ucd-list">' + rows + "</div>";
+    detailEl.hidden = false;
+  }
+  async function openDetail(card, srcId, start, end) {
+    const detail = card.querySelector('[data-role="detail"]');
+    if (!detail) return;
+    const key = srcId + ":" + start + ":" + end;
+    if (!detail.hidden && detail.dataset.key === key) { detail.hidden = true; detail.dataset.key = ""; detail.innerHTML = ""; return; }
+    detail.dataset.key = key;
+    detail.hidden = false;
+    detail.innerHTML = '<div class="ucd-head"><span>' + esc(I.loading) + "</span></div>";
+    try {
+      const r = await fetch("/api/uptime/heartbeats?source=" + encodeURIComponent(srcId) + "&start=" + start + "&end=" + end);
+      const d = await r.json();
+      if (detail.dataset.key !== key) return;
+      renderDetail(detail, start, end, d.heartbeats || []);
+    } catch (e) {
+      detail.innerHTML = '<div class="ucd-empty">' + esc(e.message) + "</div>";
+    }
   }
 
+  function initGridEvents() {
+    const grid = document.getElementById("uptimeGrid");
+    if (!grid) return;
+    grid.addEventListener("mouseover", function (e) { const hb = e.target.closest(".hb"); if (hb) showTip(hb); });
+    grid.addEventListener("mouseout", function (e) { const hb = e.target.closest(".hb"); if (hb) hideTip(); });
+    grid.addEventListener("focusin", function (e) { const hb = e.target.closest(".hb"); if (hb) showTip(hb); });
+    grid.addEventListener("focusout", function () { hideTip(); });
+    grid.addEventListener("click", function (e) {
+      const close = e.target.closest(".uc-detail-close");
+      if (close) { const d = close.closest('[data-role="detail"]'); if (d) { d.hidden = true; d.dataset.key = ""; d.innerHTML = ""; } return; }
+      const hb = e.target.closest(".hb");
+      if (!hb) return;
+      const card = hb.closest(".uptime-card");
+      if (!card) return;
+      hideTip();
+      openDetail(card, card.dataset.id, hb.getAttribute("data-start"), hb.getAttribute("data-end"));
+    });
+    window.addEventListener("scroll", hideTip, true);
+  }
+
+  // ── Range selector ────────────────────────────────────────────────────────
+  function saveSel() {
+    try { localStorage.setItem("uptimeRangeSel", JSON.stringify({ mode: curMode, range: curRange, start: curStart, end: curEnd })); } catch (e) {}
+  }
+  function loadSel() {
+    try {
+      const o = JSON.parse(localStorage.getItem("uptimeRangeSel"));
+      if (o) { curMode = o.mode === "custom" ? "custom" : "range"; curRange = o.range || 6 * 3600; curStart = o.start || null; curEnd = o.end || null; }
+    } catch (e) {}
+  }
+  function setActivePreset() {
+    const h = document.getElementById("uptimeRangePresets");
+    if (h) h.querySelectorAll(".uptime-range-btn").forEach(function (b) {
+      b.classList.toggle("active", curMode === "range" && parseInt(b.getAttribute("data-sec"), 10) === curRange);
+    });
+    const ct = document.getElementById("uptimeCustomToggle");
+    if (ct) ct.classList.toggle("active", curMode === "custom");
+  }
+  function buildRangeBar(retentionSec) {
+    if (_rangeBuiltFor === retentionSec) { setActivePreset(); return; }
+    _rangeBuiltFor = retentionSec;
+    const h = document.getElementById("uptimeRangePresets");
+    if (!h) return;
+    let opts = RANGE_PRESETS.filter(function (o) { return o.sec <= retentionSec; });
+    if (!opts.length) opts = [RANGE_PRESETS[0]];
+    if (opts[opts.length - 1].sec < retentionSec) {
+      opts = opts.concat([{ sec: retentionSec, label: Math.round(retentionSec / 86400) + " " + I.days }]);
+    }
+    h.innerHTML = opts.map(function (o) {
+      return '<button type="button" class="uptime-range-btn" data-sec="' + o.sec + '">' + esc(o.label) + "</button>";
+    }).join("");
+    setActivePreset();
+  }
+  function toLocalInput(d) {
+    const p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function prefillCustom() {
+    const f = document.getElementById("uptimeCustomFrom"), tt = document.getElementById("uptimeCustomTo");
+    if (curMode === "custom" && curStart && curEnd) {
+      if (f) f.value = toLocalInput(new Date(curStart * 1000));
+      if (tt) tt.value = toLocalInput(new Date(curEnd * 1000));
+      return;
+    }
+    if (f && !f.value) f.value = toLocalInput(new Date(Date.now() - 24 * 3600 * 1000));
+    if (tt && !tt.value) tt.value = toLocalInput(new Date());
+  }
+  window.uptimeToggleCustom = function () {
+    const c = document.getElementById("uptimeCustomRange");
+    if (!c) return;
+    if (c.hidden) { prefillCustom(); c.hidden = false; } else c.hidden = true;
+  };
+  window.uptimeApplyCustom = function () {
+    const f = document.getElementById("uptimeCustomFrom"), tt = document.getElementById("uptimeCustomTo");
+    const err = document.getElementById("uptimeCustomErr");
+    if (!f || !tt) return;
+    const s = f.value ? Math.floor(new Date(f.value).getTime() / 1000) : null;
+    const e = tt.value ? Math.floor(new Date(tt.value).getTime() / 1000) : null;
+    if (!s || !e || s >= e) { if (err) err.textContent = t("Ungültiger Zeitraum", "Invalid range"); return; }
+    if (err) err.textContent = "";
+    curMode = "custom"; curStart = s; curEnd = e; curRange = null;
+    saveSel(); setActivePreset(); closeAllDetails(); refresh();
+  };
+
+  function statusUrl() {
+    if (curMode === "custom" && curStart && curEnd) return "/api/uptime/status?start=" + curStart + "&end=" + curEnd;
+    if (curRange) return "/api/uptime/status?range=" + curRange;
+    return "/api/uptime/status";
+  }
+
+  // ── Cards ─────────────────────────────────────────────────────────────────
   function skeleton(src) {
     return '' +
       '<div class="uptime-card" id="uc-' + esc(src.id) + '" data-id="' + esc(src.id) + '">' +
@@ -185,7 +329,10 @@
             "</div>" +
             '<span class="uc-pill" data-role="pill"></span>' +
           "</div>" +
-          '<div class="uc-bars" data-role="bars"></div>' +
+          '<div class="uc-barswrap">' +
+            '<div class="uc-bars" data-role="bars"></div>' +
+            '<div class="uc-hint" data-role="hint" hidden></div>' +
+          "</div>" +
           '<div class="uc-stats">' +
             '<div class="uc-stat"><b data-role="pct">—</b><span>' + esc(I.uptime) + "</span></div>" +
             '<div class="uc-stat"><b data-role="avg">—</b><span>' + esc(I.response) + "</span></div>" +
@@ -194,6 +341,7 @@
           "</div>" +
         "</div>" +
         '<div class="uc-error" data-role="error" hidden></div>' +
+        '<div class="uc-detail" data-role="detail" hidden></div>' +
       "</div>";
   }
 
@@ -202,20 +350,14 @@
     if (!card) return;
     const st = statusInfo(src);
     card.className = "uptime-card " + st.cls + (src.tracked ? "" : " is-untracked");
-
     const q = function (r) { return card.querySelector('[data-role="' + r + '"]'); };
 
     const pill = q("pill");
     if (pill) { pill.textContent = st.label; pill.className = "uc-pill " + st.cls; }
-
     const url = q("url");
     if (url) { url.textContent = host(src.url); url.href = src.url; }
-
     const chip = q("chip");
-    if (chip) {
-      if (!src.enabled_source) { chip.textContent = I.disabledSource; chip.hidden = false; }
-      else chip.hidden = true;
-    }
+    if (chip) { if (!src.enabled_source) { chip.textContent = I.disabledSource; chip.hidden = false; } else chip.hidden = true; }
 
     const err = q("error");
     if (err) {
@@ -223,7 +365,6 @@
       if (msg) {
         err.hidden = false;
         err.className = "uc-error " + (src.current_status === "down" ? "is-down" : "is-warn");
-        err.title = (I.lastError || "") + ": " + msg;
         err.innerHTML = '<span class="uc-error-ic">' + (src.current_status === "down" ? "✕" : "!") +
                         '</span><span class="uc-error-msg">' + esc(msg) + "</span>";
       } else { err.hidden = true; err.innerHTML = ""; }
@@ -231,11 +372,17 @@
 
     const bars = q("bars");
     if (bars) {
-      const sig = barsSig(src.bars);
-      if (bars.getAttribute("data-sig") !== sig) {
-        bars.innerHTML = barsHtml(src.bars);
-        bars.setAttribute("data-sig", sig);
+      const bsig = bucketsSig(src.buckets);
+      if (bars.getAttribute("data-sig") !== bsig) {
+        bars.innerHTML = bucketsHtml(src.buckets);
+        bars.setAttribute("data-sig", bsig);
       }
+    }
+    const hint = q("hint");
+    if (hint) {
+      const agg = (src.buckets || []).some(function (b) { return (b.total || 0) > 1; });
+      if (src.tracked && agg) { hint.textContent = I.clickDetails; hint.hidden = false; }
+      else hint.hidden = true;
     }
 
     const setv = function (r, v) { const el = q(r); if (el) el.textContent = v; };
@@ -278,7 +425,7 @@
   async function refresh() {
     let data;
     try {
-      const resp = await fetch("/api/uptime/status");
+      const resp = await fetch(statusUrl());
       data = await resp.json();
     } catch (e) {
       const grid = document.getElementById("uptimeGrid");
@@ -289,6 +436,7 @@
     const sources = sortSources(data.sources || []);
     const grid = document.getElementById("uptimeGrid");
     renderSummary(sources);
+    buildRangeBar((data.retention_days || 7) * 86400);
 
     const newSig = sources.map(function (s) { return s.id + ":" + (s.tracked ? 1 : 0); }).join(",");
     if (grid && newSig !== sig) {
@@ -310,20 +458,25 @@
     setTimeout(function () { if (btn) { btn.disabled = false; btn.textContent = btn.getAttribute("data-label") || "Check now"; } }, 2500);
   };
 
-  function startPolling() {
-    if (timer) return;
-    refresh();
-    timer = setInterval(refresh, 10000);
-  }
+  function startPolling() { if (timer) return; refresh(); timer = setInterval(refresh, 10000); }
   function stopPolling() { if (timer) { clearInterval(timer); timer = null; } }
 
   document.addEventListener("DOMContentLoaded", function () {
+    loadSel();
+    if (curMode !== "custom" && !curRange) curRange = 6 * 3600;
     const btn = document.getElementById("uptimeCheckNow");
     if (btn) btn.setAttribute("data-label", btn.textContent);
-    initTipEvents();
-    startPolling();
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden) stopPolling(); else startPolling();
+    const presets = document.getElementById("uptimeRangePresets");
+    if (presets) presets.addEventListener("click", function (e) {
+      const b = e.target.closest(".uptime-range-btn");
+      if (!b) return;
+      curMode = "range"; curRange = parseInt(b.getAttribute("data-sec"), 10); curStart = null; curEnd = null;
+      saveSel(); setActivePreset();
+      const c = document.getElementById("uptimeCustomRange"); if (c) c.hidden = true;
+      closeAllDetails(); refresh();
     });
+    initGridEvents();
+    startPolling();
+    document.addEventListener("visibilitychange", function () { if (document.hidden) stopPolling(); else startPolling(); });
   });
 })();

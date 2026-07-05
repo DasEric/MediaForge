@@ -3643,3 +3643,116 @@ def get_uptime_summary(source, since_ts, bar_limit=50):
         }
     finally:
         conn.close()
+
+
+def get_uptime_range(source, start_ts, end_ts, n_buckets=50):
+    """Aggregate heartbeats of one source over [start_ts, end_ts) into
+    ``n_buckets`` equal time buckets (for the UpTime history bars).
+
+    Returns {stats, latest, buckets, bucket_seconds}. Each bucket:
+      {start, end, status, total, avg_ms, msg, issue_ts}
+    status is 'up' | 'degraded' | 'down' | 'nodata' (empty bucket).
+    stats (uptime_pct/avg_ms/total) are over the whole selected range;
+    latest is the globally most recent heartbeat (independent of range).
+    """
+    start_ts = int(start_ts)
+    end_ts = int(end_ts)
+    if end_ts <= start_ts:
+        end_ts = start_ts + 1
+    n_buckets = max(1, int(n_buckets))
+    span = end_ts - start_ts
+    size = max(1, span // n_buckets)
+
+    conn = get_db()
+    try:
+        agg = {}
+        for r in conn.execute(
+            "SELECT CAST((ts - ?) / ? AS INTEGER) AS b, "
+            "COUNT(*) AS total, "
+            "SUM(CASE WHEN status='down' THEN 1 ELSE 0 END) AS downc, "
+            "SUM(CASE WHEN status='degraded' THEN 1 ELSE 0 END) AS degc, "
+            "SUM(CASE WHEN status='up' THEN 1 ELSE 0 END) AS upc, "
+            "SUM(response_ms) AS rt_sum, "
+            "SUM(CASE WHEN response_ms IS NOT NULL THEN 1 ELSE 0 END) AS rt_n "
+            "FROM uptime_heartbeats WHERE source=? AND ts>=? AND ts<? GROUP BY b",
+            (start_ts, size, source, start_ts, end_ts),
+        ).fetchall():
+            idx = r["b"]
+            idx = 0 if idx < 0 else (n_buckets - 1 if idx >= n_buckets else idx)
+            a = agg.setdefault(idx, {"total": 0, "down": 0, "deg": 0, "up": 0, "rt_sum": 0, "rt_n": 0})
+            a["total"] += r["total"] or 0
+            a["down"] += r["downc"] or 0
+            a["deg"] += r["degc"] or 0
+            a["up"] += r["upc"] or 0
+            a["rt_sum"] += r["rt_sum"] or 0
+            a["rt_n"] += r["rt_n"] or 0
+
+        issues = {}
+        for r in conn.execute(
+            "SELECT ts, status, message FROM uptime_heartbeats "
+            "WHERE source=? AND ts>=? AND ts<? AND status!='up' ORDER BY ts ASC",
+            (source, start_ts, end_ts),
+        ).fetchall():
+            idx = (r["ts"] - start_ts) // size
+            idx = 0 if idx < 0 else (n_buckets - 1 if idx >= n_buckets else idx)
+            issues[idx] = {"ts": r["ts"], "status": r["status"], "message": r["message"]}
+
+        buckets = []
+        for i in range(n_buckets):
+            b_start = start_ts + i * size
+            b_end = end_ts if i == n_buckets - 1 else start_ts + (i + 1) * size
+            a = agg.get(i)
+            if not a or a["total"] == 0:
+                buckets.append({"start": b_start, "end": b_end, "status": "nodata",
+                                "total": 0, "avg_ms": None, "msg": None, "issue_ts": None})
+                continue
+            st = "down" if a["down"] else ("degraded" if a["deg"] else ("up" if a["up"] else "nodata"))
+            avg = round(a["rt_sum"] / a["rt_n"]) if a["rt_n"] else None
+            iss = issues.get(i)
+            buckets.append({"start": b_start, "end": b_end, "status": st, "total": a["total"],
+                            "avg_ms": avg, "msg": iss["message"] if iss else None,
+                            "issue_ts": iss["ts"] if iss else None})
+
+        stat = conn.execute(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN status='down' THEN 0 ELSE 1 END) AS up_count, "
+            "AVG(response_ms) AS avg_ms "
+            "FROM uptime_heartbeats WHERE source=? AND ts>=? AND ts<?",
+            (source, start_ts, end_ts),
+        ).fetchone()
+        latest = conn.execute(
+            "SELECT ts, status, response_ms, http_status, message "
+            "FROM uptime_heartbeats WHERE source=? ORDER BY ts DESC LIMIT 1",
+            (source,),
+        ).fetchone()
+        total = (stat["total"] if stat else 0) or 0
+        up_count = (stat["up_count"] if stat else 0) or 0
+        avg_ms = stat["avg_ms"] if stat and stat["avg_ms"] is not None else None
+        return {
+            "stats": {
+                "total": total,
+                "up_count": up_count,
+                "uptime_pct": round(up_count / total * 100, 2) if total else None,
+                "avg_ms": round(avg_ms) if avg_ms is not None else None,
+            },
+            "latest": dict(latest) if latest else None,
+            "buckets": buckets,
+            "bucket_seconds": size,
+        }
+    finally:
+        conn.close()
+
+
+def get_uptime_heartbeats_between(source, start_ts, end_ts, limit=1000):
+    """Raw heartbeats for one source within [start_ts, end_ts] (detail view)."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT ts, status, response_ms, http_status, message "
+            "FROM uptime_heartbeats WHERE source=? AND ts>=? AND ts<=? "
+            "ORDER BY ts ASC LIMIT ?",
+            (source, int(start_ts), int(end_ts), int(limit)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
