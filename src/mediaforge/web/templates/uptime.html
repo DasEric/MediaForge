@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}UpTime — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='uptime.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="uptime-page">
+  <div class="page-header uptime-header">
+    <div>
+      <h1 class="page-title">UpTime</h1>
+      <p class="page-subtitle">{{ _('Live monitoring of your source sites — reachability and real-site verification') }}</p>
+    </div>
+    <div class="uptime-header-actions">
+      <span class="uptime-updated" id="uptimeUpdated"></span>
+      <button class="uptime-btn" id="uptimeCheckNow" onclick="uptimeCheckNow()">{{ _('Check now') }}</button>
+    </div>
+  </div>
+
+  <div class="uptime-legend">
+    <span><i class="lg-up"></i>{{ _('Online') }}</span>
+    <span><i class="lg-degraded"></i>{{ _('Degraded') }}</span>
+    <span><i class="lg-down"></i>{{ _('Offline') }}</span>
+  </div>
+
+  <div class="uptime-summary" id="uptimeSummary"></div>
+
+  <div class="uptime-grid" id="uptimeGrid">
+    <div class="uptime-empty" id="uptimeLoading">{{ _('Loading…') }}</div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='uptime.js') }}"></script>
+{% endblock %}
