@@ -443,6 +443,31 @@ async function loadMegakinoBrowse() {
   }
 }
 
+let hanimeLoadedAt = 0;
+async function loadHanimeBrowse() {
+  if (hanimeLoadedAt && Date.now() - hanimeLoadedAt < 3600000) return;
+  hanimeLoadedAt = Date.now();
+  if (hanimeNewGrid) renderSkeletons(hanimeNewGrid);
+  if (hanimeTrendingGrid) renderSkeletons(hanimeTrendingGrid);
+  try {
+    const [newResp, trendResp] = await Promise.all([
+      fetch("/api/hanime/new"),
+      fetch("/api/hanime/trending"),
+    ]);
+    await Promise.all([loadDownloadedFolders(), loadAutoSyncJobs(), loadCineinfoSettings(), loadGeneralSettings()]);
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    const newData = await newResp.json();
+    const trendData = await trendResp.json();
+    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results) : (hanimeNewGrid.innerHTML = errHtml));
+    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results) : (hanimeTrendingGrid.innerHTML = errHtml));
+  } catch (e) {
+    hanimeLoadedAt = 0;
+    const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
+    if (hanimeNewGrid) hanimeNewGrid.innerHTML = errHtml;
+    if (hanimeTrendingGrid) hanimeTrendingGrid.innerHTML = errHtml;
+  }
+}
+
 async function showBrowseSections() {
   browseDiv.style.display = "";
   let settings = {};
