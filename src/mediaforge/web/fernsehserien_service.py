@@ -137,6 +137,11 @@ def _slugify(title: str) -> str:
     out = unicodedata.normalize("NFKD", out)
     out = "".join(ch for ch in out if not unicodedata.combining(ch))
     out = out.lower()
+    # Apostrophes and apostrophe-like marks (straight/curly quotes, backtick,
+    # acute/grave accent, prime marks) are dropped outright, not turned into
+    # a hyphen — fernsehserien.de renders "Duke's"/"Won't" as "dukes"/"wont",
+    # not "duke-s"/"won-t".
+    out = _re.sub(r"['‘’‛ʼ`´′ʹˊˋ]", "", out)
     out = _re.sub(r"[^a-z0-9]+", "-", out)
     return out.strip("-")
 
