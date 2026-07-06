@@ -211,7 +211,7 @@ def _browse(type_="", order_by="releases", keyword="", page=1, limit=24):
         logger.debug("Megakino browse failed (type=%s order=%s kw=%r): %s", type_, order_by, keyword, e)
         return None
     items = data.get("movies") if isinstance(data, dict) else None
-    if items is None:
+    if not isinstance(items, list):
         return None
     return [_card(it) for it in items]
 
