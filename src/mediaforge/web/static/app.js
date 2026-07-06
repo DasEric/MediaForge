@@ -186,6 +186,10 @@ async function _flushTmdbBatch() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ titles }),
+      // Deprioritize vs. poster images competing for the same connection pool
+      // (Chrome/Edge; harmlessly ignored elsewhere) — CineInfo/pill data is
+      // secondary to actually seeing the card art.
+      priority: "low",
     });
     if (!resp.ok) return;
     const results = await resp.json();
@@ -499,8 +503,10 @@ async function loadHanimeBrowse() {
     const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
     const newData = await newResp.json();
     const trendData = await trendResp.json();
-    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results) : (hanimeNewGrid.innerHTML = errHtml));
-    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results) : (hanimeTrendingGrid.innerHTML = errHtml));
+    // skipTmdb: hanime is adult content, not in TMDB's database — CineInfo
+    // (TMDB + Crunchyroll/Fernsehserien pills) doesn't apply here.
+    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results, { skipTmdb: true }) : (hanimeNewGrid.innerHTML = errHtml));
+    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results, { skipTmdb: true }) : (hanimeTrendingGrid.innerHTML = errHtml));
   } catch (e) {
     hanimeLoadedAt = 0;
     const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
@@ -919,7 +925,8 @@ function _hanimeCensLabel(c) {
   return c || "";
 }
 
-function renderBrowseCards(grid, items) {
+function renderBrowseCards(grid, items, opts) {
+  opts = opts || {};
   grid.innerHTML = "";
   items.forEach((item) => {
     const card = document.createElement("div");
@@ -936,6 +943,19 @@ function renderBrowseCards(grid, items) {
     addDownloadedBadge(card, item.title);
     addSyncBadge(card, item.url);
     grid.appendChild(card);
+    // CineInfo (TMDB + Crunchyroll/Fernsehserien fallback pills) doesn't apply
+    // here — hanime is adult content that isn't in TMDB's database, so this
+    // would just be a wasted lookup (or, worse, a wrong match) on every card.
+    // Genres/FSK hover info still applies — same overlay as everywhere else,
+    // just fed from hanime's own data (tags + a hardcoded 18, since hanime is
+    // inherently all-18+ content) instead of TMDB.
+    if (opts.skipTmdb) {
+      const hanimeTags = (item.tags && item.tags.length)
+        ? item.tags
+        : (item.genre ? item.genre.split(",").map(g => g.trim()).filter(Boolean) : []);
+      renderBrowseHoverCards(card, null, hanimeTags, 18);
+      return;
+    }
     // If TMDB data came pre-loaded from the server cache → apply instantly (no fetch)
     if (item.tmdb) {
       if (item.tmdb.found) {
@@ -1348,7 +1368,12 @@ async function openSeries(url) {
 
     if (modalMeta) modalMeta.classList.add('loaded');
 
-    enrichModalWithTmdb(currentSeriesTitle, seriesData.imdb_id || null);
+    // CineInfo (TMDB + Crunchyroll/Fernsehserien pills) doesn't apply to
+    // hanime — adult content isn't in TMDB's database, so this would just be
+    // a wasted lookup (or a wrong match).
+    if (!/hanime\.tv/i.test(url)) {
+      enrichModalWithTmdb(currentSeriesTitle, seriesData.imdb_id || null);
+    }
 
     currentSeasons = seasonsData.seasons || [];
     buildAccordion(currentSeasons);
@@ -2144,7 +2169,7 @@ async function _crProviderPill(title, containerEl, opts) {
   if (!title || !containerEl) return false;
   try {
     const resp = await fetch('/api/crunchyroll/availability?title=' +
-      encodeURIComponent(title).replace(/'/g, "%27"));
+      encodeURIComponent(title).replace(/'/g, "%27"), { priority: "low" });
     const cd = await resp.json();
     if (!cd || !cd.available) return false;
     const already = Array.from(containerEl.querySelectorAll('span')).some(
@@ -2175,7 +2200,7 @@ async function _fsProviderPill(title, containerEl, opts) {
   if (!title || !containerEl) return false;
   try {
     const resp = await fetch('/api/fernsehserien/availability?title=' +
-      encodeURIComponent(title).replace(/'/g, "%27"));
+      encodeURIComponent(title).replace(/'/g, "%27"), { priority: "low" });
     const fd = await resp.json();
     if (!fd || !fd.available || !fd.provider) return false;
     const already = Array.from(containerEl.querySelectorAll('span')).some(

@@ -134,6 +134,16 @@ def _tag_names(hit):
     return [n for n in names if n]
 
 
+def _display_tags(hit, limit=None):
+    """Tag names for display (genre line + hover card), excluding the
+    censorship-status tags ("censored"/"uncensored") — those are already
+    surfaced via the dedicated hanime-pill (see _censored_label) and would
+    just be a confusing duplicate in a genre list.
+    """
+    names = [t for t in _tag_names(hit) if t.lower() not in ("censored", "uncensored")]
+    return names[:limit] if limit else names
+
+
 _EP_SUFFIX_RE = re.compile(r"\s*[-–:]?\s*(?:ep(?:isode)?\.?\s*)?\d+\s*$", re.IGNORECASE)
 
 
@@ -162,12 +172,17 @@ def _poster(hit):
 def _hit_to_card(hit):
     slug = hit.get("slug") or ""
     name = _clean(hit.get("name") or hit.get("title"))
-    genres = ", ".join(_tag_names(hit)[:3])
+    display_tags = _display_tags(hit)
+    genres = ", ".join(display_tags[:3])
     return {
         "title": name,
         "url": series_url(slug) if slug else "",
         "poster_url": _poster(hit),
         "genre": genres,
+        # Fuller tag list for the browse-card hover overlay (genres/FSK, see
+        # renderBrowseHoverCards in app.js) — "genre" above stays a short
+        # 3-tag summary for the subtitle line under the poster.
+        "tags": display_tags[:8],
         "censored": _censored_label(hit),
         "franchise": franchise_key(hit),
         "is_series": True,
