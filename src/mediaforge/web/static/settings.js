@@ -1937,15 +1937,19 @@ const SOURCE_META = {
                   { key: "popular_series", de: "Beliebte Serien", en: "Popular Series" },
               ] },
   hanime:     { label: "hanime 18+",  cls: "browse-provider-hanime",     hasSections: false, multiSections: [
-                  { key: "new",      de: "Neu",      en: "New" },
-                  { key: "trending", de: "Trending", en: "Trending" },
+                  { key: "new",        de: "Neu",         en: "New" },
+                  { key: "trending",   de: "Trending",    en: "Trending" },
+                  // Content-type filters — applied per item within the New/
+                  // Trending lists above (not separate sections themselves).
+                  { key: "censored",   de: "Zensiert",    en: "Censored" },
+                  { key: "uncensored", de: "Unzensiert",  en: "Uncensored" },
               ] }
 };
 
 let _sourceState = {
   order: ["aniworld", "sto", "filmpalast", "megakino", "hanime"],
   section_order: { aniworld: ["new", "popular"], sto: ["new", "popular"], megakino: ["new_movies", "popular_movies", "new_series", "popular_series"], hanime: ["new", "trending"] },
-  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new_movies: true, popular_movies: true, new_series: true, popular_series: true }, hanime: { new: true, trending: true } },
+  sections_visible: { aniworld: { new: true, popular: true }, sto: { new: true, popular: true }, megakino: { new_movies: true, popular_movies: true, new_series: true, popular_series: true }, hanime: { new: true, trending: true, censored: true, uncensored: true } },
   enabled: { aniworld: true, sto: true, filmpalast: true, megakino: true, hanime: false },
   hide_in_search: false
 };
@@ -1982,10 +1986,15 @@ function _loadSourceSettings(sources) {
       popular_series: mp.popular_series !== "0",
     };
   }
-  // hanime: new + trending
+  // hanime: new + trending (sections) plus censored/uncensored (item filters)
   {
     const hn = secVis.hanime || {};
-    _sourceState.sections_visible.hanime = { new: hn.new !== "0", trending: hn.trending !== "0" };
+    _sourceState.sections_visible.hanime = {
+      new: hn.new !== "0",
+      trending: hn.trending !== "0",
+      censored: hn.censored !== "0",
+      uncensored: hn.uncensored !== "0",
+    };
   }
 
   const en = sources.enabled || {};

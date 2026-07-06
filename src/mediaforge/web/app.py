@@ -5625,12 +5625,27 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             return jsonify({"error": "Failed to fetch megakino popular series"}), 500
         return jsonify({"results": _proxy_result_list(results)})
 
+    def _hanime_censorship_prefs():
+        """Current censored/uncensored display prefs, and a short cache-key
+        suffix so each filter combination gets its own browse-cache entry —
+        otherwise toggling "Zensiert" in Settings would keep serving whatever
+        combination happened to be cached first (see fetch_new/fetch_trending
+        in hanime_tv/scraper.py, which now filter + backfill server-side)."""
+        show_censored = get_setting("source_show_censored_hanime", "1") != "0"
+        show_uncensored = get_setting("source_show_uncensored_hanime", "1") != "0"
+        suffix = "_c%d_u%d" % (int(show_censored), int(show_uncensored))
+        return show_censored, show_uncensored, suffix
+
     @app.route("/api/hanime/new")
     def api_hanime_new():
         # Adult source: only serve data when the user has explicitly enabled it.
         if not _hanime_enabled():
             return jsonify({"results": []})
-        results = _cached_browse("hanime_new", fetch_hanime_new)
+        show_censored, show_uncensored, suffix = _hanime_censorship_prefs()
+        results = _cached_browse(
+            "hanime_new" + suffix,
+            lambda: fetch_hanime_new(show_censored=show_censored, show_uncensored=show_uncensored),
+        )
         if results is None:
             return jsonify({"error": "Failed to fetch hanime new"}), 500
         return jsonify({"results": _proxy_result_list(results)})
@@ -5639,7 +5654,11 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     def api_hanime_trending():
         if not _hanime_enabled():
             return jsonify({"results": []})
-        results = _cached_browse("hanime_trending", fetch_hanime_trending)
+        show_censored, show_uncensored, suffix = _hanime_censorship_prefs()
+        results = _cached_browse(
+            "hanime_trending" + suffix,
+            lambda: fetch_hanime_trending(show_censored=show_censored, show_uncensored=show_uncensored),
+        )
         if results is None:
             return jsonify({"error": "Failed to fetch hanime trending"}), 500
         return jsonify({"results": _proxy_result_list(results)})
@@ -5933,8 +5952,12 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                             "popular_series": get_setting("source_show_popular_series_megakino", "1"),
                         },
                         "hanime": {
-                            "new":      get_setting("source_show_new_hanime",      "1"),
-                            "trending": get_setting("source_show_trending_hanime", "1"),
+                            "new":        get_setting("source_show_new_hanime",        "1"),
+                            "trending":   get_setting("source_show_trending_hanime",   "1"),
+                            # Content-type filters (applied per item within the New/
+                            # Trending lists, not separate sections like the two above).
+                            "censored":   get_setting("source_show_censored_hanime",   "1"),
+                            "uncensored": get_setting("source_show_uncensored_hanime", "1"),
                         },
                     },
                     "enabled": {
@@ -8142,6 +8165,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             "source_show_new_aniworld", "source_show_popular_aniworld",
             "source_show_new_sto", "source_show_popular_sto",
             "source_show_new_hanime", "source_show_trending_hanime",
+            "source_show_censored_hanime", "source_show_uncensored_hanime",
             "source_show_new_movies_megakino", "source_show_popular_movies_megakino",
             "source_show_new_series_megakino", "source_show_popular_series_megakino",
             "sources_hide_in_search",
@@ -8177,7 +8201,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
                 _k = "source_show_" + _sec + "_" + _prov
                 if _k in data:
                     set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
-        for _sec in ("new", "trending"):
+        for _sec in ("new", "trending", "censored", "uncensored"):
             _k = "source_show_" + _sec + "_hanime"
             if _k in data:
                 set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")

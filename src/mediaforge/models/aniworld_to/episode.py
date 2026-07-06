@@ -198,7 +198,7 @@ class AniworldEpisode:
                     episode=f"{self.episode_number:03d}",
                     language=self.selected_language,
                 )
-                self.__base_folder = Path(self.selected_path) / folder_str
+                self.__base_folder = Path(self.selected_path) / folder_str.strip()
         return self.__base_folder
 
     @property

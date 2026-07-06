@@ -238,24 +238,72 @@ def _search_request(search_text="", order_by="created_at_unix", ordering="desc",
     return hits or []
 
 
-def fetch_new():
+_LISTING_TARGET_COUNT = 24  # aim for a full-looking grid
+_LISTING_MAX_PAGES = 4      # politeness cap — stop even if still short of target
+
+
+def _fetch_filtered(order_by, ordering, show_censored=True, show_uncensored=True):
+    """Fetch a new/trending listing, applying the censored/uncensored content
+    filter and backfilling from additional pages so filtering doesn't just
+    leave a half-empty grid.
+
+    The censorship filter has to happen here (before the page is "full")
+    rather than after a single fixed-size page is fetched — otherwise ticking
+    off "Zensiert" would simply remove matching cards from an already-short
+    list instead of the caller getting a fresh page's worth of items that
+    actually match. Franchise de-duplication (see _group_by_franchise) spans
+    all fetched pages, not just one, so a franchise seen on page 0 can't
+    reappear once page 1 is pulled in.
+    """
+    if show_censored and show_uncensored:
+        # No filtering needed — one page is enough, same as before.
+        try:
+            hits = _search_request(order_by=order_by, ordering=ordering)
+        except Exception as e:
+            logger.warning("hanime %s fetch failed: %s", order_by, e)
+            return None
+        return _group_by_franchise(hits)
+
+    cards, seen_franchise = [], set()
+    fetched_any_page = False
+    for page in range(_LISTING_MAX_PAGES):
+        try:
+            hits = _search_request(order_by=order_by, ordering=ordering, page=page)
+        except Exception as e:
+            logger.warning("hanime %s fetch failed (page %s): %s", order_by, page, e)
+            break
+        fetched_any_page = True
+        if not hits:
+            break
+        for hit in hits:
+            card = _hit_to_card(hit)
+            if not card["url"]:
+                continue
+            key = card["franchise"]
+            if key in seen_franchise:
+                continue
+            seen_franchise.add(key)
+            c = card["censored"]
+            if c == "Censored" and not show_censored:
+                continue
+            if c == "Uncensored" and not show_uncensored:
+                continue
+            cards.append(card)
+        if len(cards) >= _LISTING_TARGET_COUNT:
+            break
+    if not fetched_any_page:
+        return None
+    return cards
+
+
+def fetch_new(show_censored=True, show_uncensored=True):
     """Newest uploads, grouped into franchise cards."""
-    try:
-        hits = _search_request(order_by="created_at_unix", ordering="desc")
-    except Exception as e:
-        logger.warning("hanime new fetch failed: %s", e)
-        return None
-    return _group_by_franchise(hits)
+    return _fetch_filtered("created_at_unix", "desc", show_censored, show_uncensored)
 
 
-def fetch_trending():
+def fetch_trending(show_censored=True, show_uncensored=True):
     """Most-viewed uploads (trending), grouped into franchise cards."""
-    try:
-        hits = _search_request(order_by="views", ordering="desc")
-    except Exception as e:
-        logger.warning("hanime trending fetch failed: %s", e)
-        return None
-    return _group_by_franchise(hits)
+    return _fetch_filtered("views", "desc", show_censored, show_uncensored)
 
 
 def search(keyword):

@@ -488,6 +488,23 @@ async function loadMegakinoBrowse() {
   }
 }
 
+// "Zensiert"/"Unzensiert" are content-type filters applied to individual
+// hanime items (both the New/Trending lists and the general title-search
+// results mix censored and uncensored entries) — not separate sections, so
+// this filters an item array rather than hiding a whole grid/section. Shared
+// by loadHanimeBrowse() (home page New/Trending) and renderResultsBoth()
+// (title search) so both respect the same setting identically.
+function _filterHanimeCensorship(results) {
+  const hnVis = (generalSettings && generalSettings.sources && generalSettings.sources.sections && generalSettings.sources.sections.hanime) || {};
+  const showCensored = hnVis.censored !== "0";
+  const showUncensored = hnVis.uncensored !== "0";
+  return (results || []).filter((item) => {
+    if (item.censored === "Censored" && !showCensored) return false;
+    if (item.censored === "Uncensored" && !showUncensored) return false;
+    return true; // items without censorship info are always kept
+  });
+}
+
 let hanimeLoadedAt = 0;
 async function loadHanimeBrowse() {
   if (hanimeLoadedAt && Date.now() - hanimeLoadedAt < 3600000) return;
@@ -503,10 +520,12 @@ async function loadHanimeBrowse() {
     const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
     const newData = await newResp.json();
     const trendData = await trendResp.json();
+    const newResults = _filterHanimeCensorship(newData.results);
+    const trendResults = _filterHanimeCensorship(trendData.results);
     // skipTmdb: hanime is adult content, not in TMDB's database — CineInfo
     // (TMDB + Crunchyroll/Fernsehserien pills) doesn't apply here.
-    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newData.results, { skipTmdb: true }) : (hanimeNewGrid.innerHTML = errHtml));
-    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendData.results, { skipTmdb: true }) : (hanimeTrendingGrid.innerHTML = errHtml));
+    if (hanimeNewGrid) (newData.results ? renderBrowseCards(hanimeNewGrid, newResults, { skipTmdb: true }) : (hanimeNewGrid.innerHTML = errHtml));
+    if (hanimeTrendingGrid) (trendData.results ? renderBrowseCards(hanimeTrendingGrid, trendResults, { skipTmdb: true }) : (hanimeTrendingGrid.innerHTML = errHtml));
   } catch (e) {
     hanimeLoadedAt = 0;
     const errHtml = `<div class="queue-empty" style="padding: 20px;">${t('Fehler beim Laden', 'Error loading')}</div>`;
@@ -1128,7 +1147,7 @@ async function doSearch() {
       _active("megakino") ? searchSite("megakino").catch(() => []) : Promise.resolve([]),
       _hanActive ? searchSite("hanime").catch(() => []) : Promise.resolve([]),
     ]);
-    renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResults);
+    renderResultsBoth(aniResults, stoResults, fpResults, mkResults, _filterHanimeCensorship(hanResults));
   } catch (e) {
     showToast(t("Suche fehlgeschlagen: ", "Search failed: " + e.message));
   } finally {

@@ -157,6 +157,13 @@
 
   .source-order-actions {
     flex: 1 1 100%;
+    /* Without wrapping, 4+ checkboxes (MegaKino, and now hanime's
+       censored/uncensored filters) plus the two move buttons overflow the
+       row instead of breaking onto a second line. justify-content still
+       right-aligns each wrapped line individually, matching the previous
+       single-line look for rows with fewer controls. */
+    flex-wrap: wrap;
+    row-gap: 8px;
     justify-content: flex-end;
   }
 

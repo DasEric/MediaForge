@@ -156,7 +156,7 @@ class HanimeEpisode:
             season=f"{self.season.season_number:02d}",
             episode=f"{self.episode_number:03d}",
             language=self.selected_language,
-        )
+        ).strip()
 
     @property
     def _base_folder(self):

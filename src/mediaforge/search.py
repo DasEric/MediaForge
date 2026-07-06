@@ -653,12 +653,12 @@ def hanime_search(keyword):
     return _hanime_scraper().search(keyword)
 
 
-def fetch_hanime_new():
-    return _hanime_scraper().fetch_new()
+def fetch_hanime_new(show_censored=True, show_uncensored=True):
+    return _hanime_scraper().fetch_new(show_censored=show_censored, show_uncensored=show_uncensored)
 
 
-def fetch_hanime_trending():
-    return _hanime_scraper().fetch_trending()
+def fetch_hanime_trending(show_censored=True, show_uncensored=True):
+    return _hanime_scraper().fetch_trending(show_censored=show_censored, show_uncensored=show_uncensored)
 
 
 if __name__ == "__main__":
