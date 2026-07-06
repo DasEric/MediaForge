@@ -198,7 +198,10 @@
       <a href="{{ url_for('uptime_page') }}" class="sidebar-link" data-page="uptime">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          <!-- pathLength="100" normalizes stroke-dash units to a 0–100 scale so the
+               hover "pulse monitor" animation (see shell.css) doesn't depend on this
+               path's actual (irregular) geometry. -->
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2" pathLength="100" />
         </svg>
         <span>UpTime</span>
       </a>
