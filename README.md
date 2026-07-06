@@ -82,6 +82,13 @@ Mount your `Downloads` folder for the files and the `mediaforge-data` volume for
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Compatibility
+
+> [!WARNING]
+> **NAS devices (UGREEN, Synology):** Both are **supported**, but MediaForge's code is **not optimized** for these two NAS platforms and will not be — so **expect recurring issues**. We're happy to **help with installation**, but we do not optimize MediaForge for UGREEN or Synology. For the smoothest experience, run it via [Docker](https://github.com/PD-Codes/MediaForge/wiki/Docker) on a standard Linux, Windows or macOS host.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Roadmap
 
 Actively in development — current work in progress:
