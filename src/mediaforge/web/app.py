@@ -171,14 +171,15 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
             _su_logger = get_logger(__name__)
             _su_logger.warning(
                 "\n" + "=" * 72 + "\n"
-                "  ERSTEINRICHTUNG — Noch kein Admin-Konto vorhanden.\n"
-                f"  Setup-Token: {_setup_token}\n"
-                "  Lokale Installation: \n"
-                "  Öffne http://localhost:<PORT>/setup?token=<token> im Browser.\n"
+                "  INITIAL SETUP — No admin account exists yet.\n"
+                f"  Setup Token: {_setup_token}\n"
+                "  Local Installation: \n"
+                "  Open http://localhost:<PORT>/ in your browser and enter the setup token.\n"
                 "  Docker Installation: \n"
-                "  Öffne http://<DockerHostIP>:<HostPort>/setup?token=<token> im Browser.\n"
-                "  Standardport ist 8080\n"
-                "  Der Token ist 30 Minuten gültig. Danach App neu starten.\n"
+                "  Open http://<DockerHostIP>:<HostPort>/ in your browser and enter the setup token.\n"
+                "  (Alternative: Direct link with ?token=<token>)\n"
+                "  Default port is 8080\n"
+                "  The token is valid for 30 minutes. Restart the app afterwards.\n"
                 + "=" * 72
             )
 
