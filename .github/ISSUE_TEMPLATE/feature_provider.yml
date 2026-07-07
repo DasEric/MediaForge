@@ -1,0 +1,33 @@
+name: "🔌 Feature: Provider / Extractor"
+description: "Suggest support for a new streaming provider, hoster, or extractor improvements."
+title: "[Feature - Provider]: "
+labels: ["enhancement", "provider"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "Short Summary"
+      description: "Which provider, extractor or hoster is this about?"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: "Example URL(s)"
+      description: "Please provide the URL of the Provider Extractor or hoster "
+      placeholder: "https://..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: "Special Requirements / Notes"
+      description: "Are there any special requirements (e.g. login required, Cloudflare protection, specific region restrictions)?"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Additional Information (optional)"
+      description: "Any extra context, logs, or links that might help implement this."

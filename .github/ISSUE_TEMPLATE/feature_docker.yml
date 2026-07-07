@@ -1,0 +1,42 @@
+name: "🐳 Feature: Docker & Deployment"
+description: "Suggest improvements for the Docker image, docker-compose setup, or deployment."
+title: "[Feature - Docker]: "
+labels: ["enhancement", "docker"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "Short Summary"
+      description: "What Docker or deployment improvement are you suggesting?"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: "Deployment Environment"
+      description: "Where and how are you running MediaForge? (e.g. Docker Compose, Synology NAS, Unraid, Portainer, Kubernetes, Linux Server)"
+      placeholder: "e.g. Docker Compose on Synology NAS"
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: "Use Case & Desired Behavior"
+      description: "How should the Docker container or deployment setup behave? Why is this change helpful?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: "Suggested Configuration / Environment Variables"
+      description: "Do you need new environment variables (ENVs), volume mounts, or port mappings? Please show an example snippet if possible."
+      render: yaml
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Additional Information (optional)"
+      description: "Any extra logs, error messages, or context."

@@ -1,0 +1,32 @@
+name: "🖥️ Feature: Web Interface"
+description: "Suggest a new feature or improvement for the MediaForge Web UI."
+title: "[Feature - Web UI]: "
+labels: ["enhancement", "web-interface"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "Short Summary"
+      description: "What is this feature or improvement about?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: "Use Case & Functionality"
+      description: "How should this feature work? How would you use it in the Web UI?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: "UI / UX Design Ideas"
+      description: "Where should this be located in the interface? Do you have any ideas for the layout, design, or workflow?"
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "Mockups or Screenshots (optional)"
+      description: "Attach any mockups, sketches, or screenshots if applicable."

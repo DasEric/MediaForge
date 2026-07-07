@@ -1,5 +1,5 @@
-name: "✨ Feature Request"
-description: "Suggest a new feature or improvement for the MediaForge."
+name: "💡 Feature: Other / General"
+description: "Suggest a general feature or improvement that doesn't fit into the other categories."
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
@@ -7,40 +7,26 @@ body:
     id: summary
     attributes:
       label: "Short Summary"
-      description: "What is this feature about?"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: area
-    attributes:
-      label: "Area"
-      description: "Which part of the downloader does this feature relate to?"
-      options:
-        - Download / Streaming
-        - Web Interface
-        - Provider / Extractor
-        - Docker
-        - Other
+      description: "What is this feature or improvement about?"
     validations:
       required: true
 
   - type: textarea
-    id: benefit
+    id: use_case
     attributes:
-      label: "What problem does this solve?"
-      description: "Why should this feature be implemented? What does it improve?"
+      label: "Use Case & Desired Functionality"
+      description: "How should this feature work? What would it allow you or others to do?"
     validations:
       required: true
 
   - type: textarea
     id: details
     attributes:
-      label: "Details or Alternatives"
-      description: "How could this be implemented? Are there any alternative solutions?"
+      label: "Implementation Ideas or Alternatives"
+      description: "Do you have any ideas on how this could be implemented, or alternative approaches?"
 
   - type: textarea
     id: extra
     attributes:
       label: "Additional Information (optional)"
-      description: "Screenshots, examples, links, etc. (if applicable)"
+      description: "Screenshots, examples, links, or any other context."
