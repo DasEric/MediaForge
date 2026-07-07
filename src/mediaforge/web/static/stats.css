@@ -1,0 +1,218 @@
+/* ===================================================================
+   MediaForge — Stat-card component + Stats page
+   The .stat-card/.stat-value/.stat-label/.stat-sub primitive is a
+   small reusable "KPI card" originally built for the Stats page but
+   also reused by Library's own summary widget (via .stat-sub), so
+   this file is linked from both pages. The stats-prefixed
+   classes (layout grid, section headers), the "speed test" result
+   modal, and the "ignore incomplete series" chip UI are Stats-page
+   only but live here too since they're small.
+   Used by: templates/stats.html + static/stats.js (primary),
+            templates/library.html + static/library.js (stat-sub only).
+   Note: templates/autosync.html also links this stylesheet, but its summary
+   widget currently renders its own sync-stat-label/sync-stat-value classes
+   (see autosync.css) — no .stat-card/.stat-value/.stat-label usage was found
+   there, so that link looks stale rather than an active third consumer.
+   =================================================================== */
+
+.stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}.stats-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}.stats-kpi-main .stat-card {
+  padding: 22px 24px;
+}.stats-kpi-main .stat-value {
+  font-size: 2.2rem;
+}.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}.stats-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  /* --kpi-color is set inline per-card by stats.js's statCard() helper to color-code
+     each metric; falls back to the default border color when no color is passed */
+  border-top: 3px solid var(--kpi-color, var(--border));
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: box-shadow var(--transition);
+}.stat-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}.stat-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}.stat-sub {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}/* No consumer found for stat-card-label/value/sub in templates/*.html or
+   static/*.js — looks like an unused alternate naming for the .stat-value/
+   .stat-label/.stat-sub trio above rather than something to delete outright. */
+.stat-card-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}.stat-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}.stat-card-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}.speed-modal-card {
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  overflow-y: auto;
+  margin: 0 auto;
+}.speed-modal-table {
+  width: 100%;
+  table-layout: fixed;
+}/* Fixed column widths for the 3-column speed-test result table
+   (Title / Size / Speed, built in stats.js) so long titles truncate
+   instead of pushing the Size/Speed columns around */
+.speed-modal-table th:nth-child(1),
+.speed-modal-table td:nth-child(1) {
+  width: 55%;
+}.speed-modal-table th:nth-child(2),
+.speed-modal-table td:nth-child(2) {
+  width: 22%;
+}.speed-modal-table th:nth-child(3),
+.speed-modal-table td:nth-child(3) {
+  width: 23%;
+}.speed-modal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0;
+}/* "Ignore incomplete series" chip UI (Stats-page only). Unlike the rest of
+   this file, these rules carry literal-color fallbacks for the var()s
+   (e.g. var(--bg-surface, #222)) — kept as originally written; harmless
+   since the real theme variables are always defined in variables.css. */
+.ignore-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}.ignore-tab {
+  background: var(--bg-surface, #222);
+  border: 1px solid var(--border, #333);
+  color: var(--text-secondary, #aaa);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}.ignore-tab.active {
+  background: var(--accent, #7c3aed);
+  border-color: var(--accent, #7c3aed);
+  color: #fff;
+}.ignore-slot-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}.ignore-slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--warning, #f59e0b);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  cursor: default;
+  user-select: none;
+}.ignore-slot-chip input[type="checkbox"] {
+  cursor: pointer;
+}.ignore-all-chip {
+  background: rgba(124, 58, 237, 0.14);
+  border-color: rgba(124, 58, 237, 0.35);
+  color: var(--accent, #a78bfa);
+}.ignore-remove-x {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.7;
+}.ignore-remove-x:hover {
+  opacity: 1;
+}.ignore-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}.ignore-restore-btn {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+}@media (max-width: 540px) {.speed-modal-card {
+    max-height: 90vh;
+    border-radius: var(--radius-md);
+  }
+
+  .speed-modal-table th,
+  .speed-modal-table td {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+
+  .speed-modal-table th:nth-child(1),
+  .speed-modal-table td:nth-child(1) {
+    width: 50%;
+  }
+
+  .speed-modal-table th:nth-child(2),
+  .speed-modal-table td:nth-child(2) {
+    width: 25%;
+  }
+
+  .speed-modal-table th:nth-child(3),
+  .speed-modal-table td:nth-child(3) {
+    width: 25%;
+  }
+}/* No consumer found for .stat-item's children here either — the base .stat-item
+   rule lives in utilities.css but nothing in templates/*.html or static/*.js
+   currently renders a .stat-item with .stat-label/.stat-value inside it. */
+.stat-item .stat-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}.stat-item .stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}.stat-card.skeleton {
+  height: 100px;
+  min-height: 100px;
+}

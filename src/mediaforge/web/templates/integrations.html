@@ -1,5 +1,6 @@
 {% extends "base.html" %} {% block title %}{{ _('Integrations') }} — MediaForge{% endblock %}
 {% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='settings_rows.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='integrations.css') }}">{% endblock %}
 {% block content %}
 <div class="settings-container">
@@ -734,6 +735,7 @@
         <span class="integ-collapsible-chevron">▸</span>
         <span class="integ-subsection-title">Fernsehserien.de</span>
         <span class="integ-subsection-badge" style="background:#555;color:#fff;">{{ _('Scraper') }}</span>
+        <span class="integ-subsection-badge" style="background:#ac7001;color:#fff;">{{ _('German only') }}</span>
       </div>
       <div class="integ-collapsible-body">
       <div class="integ-subsection-hint">

@@ -77,7 +77,13 @@ class AniworldEpisode:
         watch()
         syncplay()
 
-        provider_link(language=None, provider=None)  # <Audio.GERMAN: 'German'>, <Subtitles.NONE: 'None'>)
+        # e.g. provider_link(language=(Audio.GERMAN, Subtitles.NONE), provider="VOE")
+        provider_link(language=None, provider=None)
+
+    Used by:
+        mediaforge.providers (Provider(name="AniWorld", episode_cls=AniworldEpisode));
+        web/routes/search.py reads the `is_movie` flag via getattr(episode, "is_movie", False)
+        to decide whether to skip the live-availability check (movies only).
     """
 
     def __init__(
@@ -146,6 +152,7 @@ class AniworldEpisode:
 
     @property
     def redirect_url(self):
+        """The AniWorld /redirect/<id> URL for the selected language+provider pair."""
         if self.__redirect_url is None:
             link = self.provider_link(self.__get_language(), self.selected_provider)
             if link is None:
@@ -159,6 +166,7 @@ class AniworldEpisode:
 
     @property
     def provider_url(self):
+        """Follow the redirect_url to the actual hoster page (e.g. voe.sx/e/...)."""
         if self.__provider_url is None:
             resp = GLOBAL_SESSION.get(self.redirect_url)
             if resp.status_code == 404:
@@ -170,6 +178,8 @@ class AniworldEpisode:
 
     @property
     def stream_url(self):
+        """Resolve the direct (playable) stream URL via the matching extractor
+        function in mediaforge.extractors for the selected provider."""
         try:
             stream_url = provider_functions[
                 f"get_direct_link_from_{self.selected_provider.lower()}"
@@ -417,6 +427,8 @@ class AniworldEpisode:
 
     @property
     def is_movie(self):
+        """True if this episode is actually a movie entry (URL under /filme/film-N).
+        AniWorld-only flag; s.to and hanime episodes have no equivalent."""
         if self.__is_movie is None:
             self.__is_movie = self.__extract_is_movie()
         return self.__is_movie
@@ -429,6 +441,8 @@ class AniworldEpisode:
 
     @property
     def skip_times(self):
+        """AniSkip opening/ending timestamps for this episode (None for movies).
+        AniWorld-only; s.to episodes have no skip_times equivalent."""
         if self.__skip_times is None:
             self.__skip_times = self.__extract_skip_times()
         return self.__skip_times
@@ -521,6 +535,8 @@ class AniworldEpisode:
         return provider_dict.get(provider)
 
     def __get_language(self):
+        """Map the currently selected UI language label (e.g. "German Dub") back
+        to its LANG_KEY_MAP key, used to build redirect_url."""
         # Look up the key in LANG_LABELS by value
         key = next(
             (k for k, v in LANG_LABELS.items() if v == self.selected_language), None
@@ -705,6 +721,9 @@ class AniworldEpisode:
         return re.match(pattern, self.url) is not None
 
     def __extract_skip_times(self):
+        """Fetch AniSkip op/ed intervals for this episode via the MAL id resolved
+        from the parent series. Movies have no skip times (aniskip is
+        season/episode-indexed only)."""
         if self.is_movie:
             return None
 

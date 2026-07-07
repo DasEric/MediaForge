@@ -1,3 +1,12 @@
+"""Process-wide logging setup.
+
+Provides a single shared "mediaforge" logger (:func:`get_logger`) that logs
+to both a colored stdout stream and a plain-text file in the temp directory,
+plus a level tagged with the source file/line/function of each call. The
+DEBUG/WARNING level is driven by the ``MEDIAFORGE_DEBUG_MODE`` environment
+variable and can also be flipped at runtime via :func:`set_debug_mode`.
+"""
+
 import logging
 import os
 import tempfile
@@ -7,7 +16,12 @@ _global_logger = None
 
 
 def set_debug_mode(enabled: bool):
-    """Enable or disable DEBUG level on the global logger at runtime."""
+    """Enable or disable DEBUG level on the global logger at runtime.
+
+    Used by: the settings route (``web/routes/settings.py``) when the user
+    toggles debug logging in the WebUI (unless locked via --debug/
+    MEDIAFORGE_DEBUG_FORCED, see arguments.py).
+    """
     global _global_logger
     if _global_logger is not None:
         _global_logger.setLevel(logging.DEBUG if enabled else logging.WARNING)
@@ -77,7 +91,12 @@ class PlainFormatter(logging.Formatter):
 
 # get_logger reads MEDIAFORGE_DEBUG_MODE on every call so runtime changes take effect
 def get_logger(name=__name__, level=None):
-    """Return a logger that writes to both file and stdout, colored in console."""
+    """Return the shared "mediaforge" logger, writing to both a file and
+    colored stdout. The *name* argument is accepted for the familiar
+    ``get_logger(__name__)`` call pattern but does not create a separate
+    logger — handlers/level are configured once (singleton) and every
+    caller across the codebase gets the same logger instance.
+    """
     global _global_logger
     if _global_logger is None:
         _global_logger = logging.getLogger("mediaforge")

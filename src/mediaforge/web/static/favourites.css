@@ -1,0 +1,23 @@
+/* ===================================================================
+   MediaForge — Favorites page
+   Empty-state illustration and page container width. The actual
+   result cards are rendered with the shared .result-card styling in
+   style.css (favourites.js reuses that generic card component).
+   Used by: templates/favourites.html + static/favourites.js
+   =================================================================== */
+
+.favourites-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}.favourites-empty svg {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  display: block;
+  opacity: 0.4;
+}.favourites-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px;
+}

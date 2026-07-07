@@ -8,7 +8,9 @@ function setUiLanguage(lang) {
 }
 </script>
 {% endblock %}
-{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_rows.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='settings.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='settings_schedule.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sources.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='hanime.css') }}">{% endblock %}
 {% set is_admin = not auth_enabled or (current_user and current_user.role == 'admin') %}
@@ -999,6 +1001,36 @@ function setUiLanguage(lang) {
               <td><code>/api/v1/stats</code></td>
               <td>{{ _('Download statistics') }}</td>
             </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/autosync</code></td>
+              <td>{{ _('AutoSync jobs — status overview (all users)') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/uptime</code></td>
+              <td>{{ _('UpTime monitor — current status per source') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/update-status</code></td>
+              <td>{{ _('Self-update progress / state') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/mediascan</code></td>
+              <td>{{ _('MediaScan run status') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/upscale</code></td>
+              <td>{{ _('Upscale queue, badge count & progress') }}</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/v1/history</code></td>
+              <td>{{ _('Download history — all users') }} <span class="api-param">?limit=&offset=&status=&source=</span></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1027,16 +1059,16 @@ function setUiLanguage(lang) {
         <button onclick="checkForUpdates(true)" id="updateCheckBtn">{{ _('Check now') }}</button>
       </div>
       <div id="updateStatus" class="settings-hint" style="margin-top:8px"></div>
-      <div id="updateBanner" style="display:none;margin-top:12px">
+      <div id="updateBanner" style="display:none;">
         <div class="settings-hint" style="margin-bottom:8px">
           🆕 <strong id="updateBannerText"></strong> —
           <a id="updateReleaseLink" href="#" target="_blank" rel="noopener">{{ _('Open release') }}</a>
         </div>
-        <div id="updateInstallRow" style="display:none;margin:4px 0 12px">
+        <div id="updateInstallRow" style="display:none;margin:4px 0 12px;padding-left: 18px;">
           <button type="button" class="update-install-btn" id="updateInstallBtn" onclick="installUpdateNow()">⬇️ {{ _('Install update now') }}</button>
         </div>
         <pre id="updateChangelog"
-          style="background:var(--input-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:6px;padding:12px;font-size:0.78rem;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;margin:0"></pre>
+          style="background:var(--input-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:6px;padding:12px;font-size:0.78rem;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;margin:12px;"></pre>
         <div style="margin-top:12px">
           <span class="settings-field-label">{{ _('Install update') }}</span>
           <div style="display:flex;align-items:center;gap:8px;margin-top:6px">

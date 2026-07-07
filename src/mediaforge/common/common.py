@@ -1,3 +1,11 @@
+"""Generic shared helpers used across the MediaForge codebase.
+
+Currently: fetching GitHub release metadata/asset URLs, and extracting
+downloaded .zip/.7z archives. Not to be confused with
+``mediaforge.models.common.common``, the unrelated download/encode pipeline
+module.
+"""
+
 import re
 import subprocess
 import sys
@@ -18,6 +26,9 @@ def get_latest_github_release(repo):
 
     Returns:
         The tag name of the latest release
+
+    Used by: fetch_github_asset_urls() (below) and
+    mediaforge.anime4k.anime4k.get_anime4k_urls().
     """
     api_url = f"https://api.github.com/repos/{repo}/releases/latest"
     resp = GLOBAL_SESSION.get(api_url)
@@ -37,6 +48,8 @@ def fetch_github_asset_urls(repo, asset_patterns, release="latest"):
 
     Returns:
         List of URLs matching any of the patterns (empty list if none found)
+
+    Used by: mediaforge.autodeps (fetching mpv/ffmpeg portable builds).
     """
     if isinstance(asset_patterns, str):
         asset_patterns = [asset_patterns]
@@ -62,6 +75,13 @@ def fetch_github_asset_urls(repo, asset_patterns, release="latest"):
 
 
 def unzip(file_path, target_dir):
+    """Extract a .zip or .7z archive into *target_dir*.
+
+    Uses the system ``unzip``/``7z`` binaries on macOS/Linux. Windows
+    extraction is not yet implemented (see TODOs below).
+
+    Used by: mediaforge.anime4k.anime4k.extract_anime4k().
+    """
     file_path = Path(file_path)
     target_dir = Path(target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)

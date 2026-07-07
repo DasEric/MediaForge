@@ -1,3 +1,26 @@
+"""Filemoon / Byse-network video hoster extractor (filemoon.* and byse*.com mirrors).
+
+Two independent strategies are tried, newest first:
+
+1. Modern Byse-style REST API: POST-free GET to ``/api/videos/<file_code>``
+   returns a JSON ``playback`` blob whose stream data is AES-256-GCM
+   encrypted. The AES key is reassembled from base64url-encoded
+   ``key_parts``; the IV and ciphertext+tag are base64url-decoded and fed to
+   ``cryptography``'s AESGCM to recover a plaintext JSON payload containing
+   the actual source URLs.
+
+2. Legacy HTML scraping: older Filemoon pages ship the player config as
+   Dean Edwards "packed" JavaScript (the classic
+   ``eval(function(p,a,c,k,e,d){...})`` obfuscator). We unpack it back into
+   readable JS text and regex out the ``.m3u8``/``file:``/``sources:`` URL.
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_filemoon"); see the provider alias table in
+models/megakino_to/scraper.py (("filemoon", "Filemoon")) and the generic
+provider dispatch used by models/megakino_to/{episode,movie}.py,
+models/aniworld_to/episode.py, models/filmpalast_to/episode.py, and
+models/s_to/episode.py.
+"""
 import base64
 import json
 import logging
@@ -52,7 +75,14 @@ def _extract_file_code(url):
 
 
 def _decrypt_payload(playback, key, iv_prop, payload_prop):
-    """Decrypt an AES-256-GCM encrypted payload."""
+    """Decrypt one AES-256-GCM encrypted field pair from the Byse ``playback`` blob.
+
+    ``iv_prop``/``payload_prop`` name the two base64url fields to read (the
+    API can expose a primary pair and a fallback pair, e.g. "iv"/"payload"
+    and "iv2"/"payload2"). Returns the decrypted plaintext parsed as JSON, or
+    None if either field is missing or the ciphertext is too short to
+    contain a valid 16-byte GCM auth tag.
+    """
     iv_str = playback.get(iv_prop)
     payload_str = playback.get(payload_prop)
     if not iv_str or not payload_str:
@@ -187,7 +217,15 @@ def _decode_base_n(token, radix):
 
 
 def _unpack_js(packed, radix, count, keywords):
-    """Unpack Dean Edwards' packed JavaScript (legacy Filemoon)."""
+    """Reverse Dean Edwards' JS "packer" obfuscation used by legacy Filemoon pages.
+
+    The packer replaces every distinct identifier/string token in the
+    original script with a short base-``radix`` number, then ships that
+    numbered code plus a ``|``-separated ``keywords`` list mapping each
+    number back to its original token. To unpack, every word-like token in
+    ``packed`` is decoded from base-``radix`` and substituted with
+    ``keywords[index]`` (left as-is if there's no matching keyword).
+    """
 
     def replacer(match):
         token = match.group(1)
@@ -245,7 +283,11 @@ def _try_extract_from_html(html):
 # Main Filemoon functions
 # -----------------------------
 def get_direct_link_from_filemoon(embeded_filemoon_link, headers=None):
-    """Get direct Filemoon video URL."""
+    """Resolve a Filemoon/Byse embed URL to a direct stream URL.
+
+    Tries the modern encrypted Byse API first, then falls back to scraping
+    the legacy packed-JS HTML page. See module docstring for both strategies.
+    """
     try:
         if headers is None:
             headers = PROVIDER_HEADERS_D.get(

@@ -3,9 +3,10 @@
 
 /* --- Provider header accent + 18+ badge --- */
 .browse-provider-hanime {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  color: #e0356b;
+}
+.browse-provider-hanime::before {
+  background: #e0356b;
 }
 .browse-provider-18 {
   display: inline-flex;
@@ -16,6 +17,8 @@
   padding: 2px 8px;
   border-radius: 999px;
   color: #fff;
+  /* Brand gradient (hanime pink -> purple); reused for the age-modal badge
+     and "No" button below */
   background: linear-gradient(135deg, #e0356b, #b5179e);
 }
 
@@ -48,6 +51,8 @@
 .hanime-age-overlay {
   position: fixed;
   inset: 0;
+  /* Well above the standard modal layer (z-index: 1000 in modals.css) so the
+     age gate always sits on top even if a regular modal is already open */
   z-index: 4000;
   display: none;
   align-items: center;
@@ -55,6 +60,7 @@
   padding: 20px;
   background: rgba(0, 0, 0, 0.72);
 }
+/* .open is toggled by settings.js when the hanime provider is turned on */
 .hanime-age-overlay.open {
   display: flex;
 }

@@ -1,0 +1,269 @@
+/* ===================================================================
+   MediaForge — Detail-page content blocks
+   Page hero headers, the series-detail hero banner, episode list
+   rows, the provider selector, language-availability chips, and
+   generic section titles — the building blocks used to lay out a
+   "details about one thing" page/panel.
+   =================================================================== */
+
+/* ===================================================================
+   HERO / PAGE HEADER
+   =================================================================== */
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  margin-bottom: 6px;
+}
+
+.page-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ===================================================================
+   SERIES DETAIL / HERO BANNER
+   No template or JS currently builds .series-hero markup (checked
+   templates/*.html and static/*.js) — kept for a planned detail-page
+   redesign rather than deleted.
+   =================================================================== */
+.series-hero {
+  position: relative;
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--bg-elevated);
+}
+
+.series-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.35);
+}
+
+.series-hero-overlay {
+  position: absolute;
+  inset: 0;
+  /* Fades the backdrop image to black at the bottom so the title/meta text stays readable */
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
+}
+
+.series-hero-content {
+  position: relative;
+  padding: 24px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  z-index: 1;
+}
+
+.series-hero-poster {
+  width: 100px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+
+.series-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.series-hero-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.series-hero-meta {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.65);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.series-hero-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* ===================================================================
+   EPISODE LIST
+   Not currently referenced by any template or JS — app.js's real
+   episode accordion (buildAccordion) renders .episode-item with
+   .ep-num/.ep-title/a checkbox instead (see cards.css), so this whole
+   block (including the circular .episode-check indicator) looks like
+   a leftover/alternate design rather than dead code to delete outright.
+   =================================================================== */
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition);
+  border: 1px solid transparent;
+}
+
+.episode-item:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.episode-item.selected {
+  background: var(--accent-soft);
+  /* Hardcoded accent purple w/ alpha (not var(--accent-rgb)) for the border;
+     same pattern repeats below for .provider-card and .lang-chip "selected" states */
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.episode-num {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.episode-title {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.episode-title small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.episode-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.episode-item.selected .episode-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ===================================================================
+   PROVIDER SELECTOR
+   Not currently referenced by any template or JS — no consumer found
+   for .provider-grid/.provider-card as of this split.
+   =================================================================== */
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.provider-card {
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  background: var(--bg-card);
+}
+
+.provider-card:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.provider-card.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ===================================================================
+   LANGUAGE CHIPS
+   Not currently referenced by any template or JS — no consumer found
+   for .lang-chips/.lang-chip as of this split (the episode accordion's
+   language flags in app.js use .ep-langs/.ep-lang-flag instead, see cards.css).
+   =================================================================== */
+.lang-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lang-chip {
+  padding: 6px 14px;
+  border: 2px solid var(--border);
+  border-radius: 99px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  transition: all var(--transition);
+}
+
+.lang-chip:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: var(--text-primary);
+}
+
+.lang-chip.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ===================================================================
+   SECTION TITLES
+   =================================================================== */
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title::after {
+  /* Empty flex-growing pseudo-element draws a rule line filling the rest of the row */
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}

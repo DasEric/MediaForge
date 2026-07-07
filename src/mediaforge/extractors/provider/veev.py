@@ -1,3 +1,26 @@
+"""VeeV (veev.to) video hoster extractor.
+
+VeeV serves video from a CDN URL that is only reachable with the exact
+session cookies (and matching User-Agent) issued to the browser that
+requested the embed page -- a plain HTTP client or yt-dlp given just the
+CDN URL will be rejected. There is no JS-decoding trick to reverse here;
+instead a headless Playwright (patchright) browser loads the real embed
+page, plays the video to trigger the CDN request, and we intercept that
+request's URL plus the session's cookies/User-Agent from the network layer.
+
+Two entry points build on that:
+- get_direct_link_from_veev(): returns the raw CDN URL for display/logging
+  only (it is not independently downloadable without the session cookies).
+- download_from_veev(): the real download path. It runs the Playwright
+  session once to obtain the CDN URL + cookies + User-Agent, then closes
+  the browser and performs the actual transfer via plain HTTP range
+  requests (using those captured cookies) in parallel chunks for speed.
+
+Used by: models/filmpalast_to/episode.py and models/megakino_to/{episode,movie}.py
+call download_from_veev directly (VeeV needs the two-step
+browser-then-HTTP flow, so it bypasses the generic
+extractors.provider_functions dispatch used for other hosters).
+"""
 import logging
 import re
 import threading
@@ -21,6 +44,7 @@ _cdn_cache: dict[str, str] = {}
 
 
 def _get_headers() -> dict:
+    """Return the request headers used for plain (non-Playwright) VeeV requests."""
     return PROVIDER_HEADERS_D.get("VeeV", {"Referer": "https://veev.to/"})
 
 
@@ -31,6 +55,17 @@ def _extract_veev_details(
     embed_url: str,
     timeout_ms: int = 25_000,
 ) -> tuple[str | None, list | None, str | None]:
+    """Load the VeeV embed page in a headless browser and capture the real CDN request.
+
+    Opens embed_url with Playwright, waits for the page's own API call to
+    resolve (to distinguish the actual video segment CDN response from the
+    unrelated VTT/timeslide-thumbnail request), then nudges the <video>
+    element to play (both via JS and a synthetic click, since autoplay is
+    often blocked) so the browser issues the real 206 partial-content
+    request to the CDN. Returns (cdn_url, cookies, user_agent) so the
+    caller can replay that request outside the browser, or (None, None,
+    None) if no CDN request was observed within timeout_ms.
+    """
     try:
         from patchright.sync_api import sync_playwright
     except ImportError:
@@ -359,9 +394,11 @@ def download_from_veev(
 def get_direct_link_from_veev(embed_url: str) -> str:
     """Return the VeeV CDN URL (for display/logging only).
 
-    The CDN URL cannot be downloaded by yt-dlp or any external HTTP
-    client — it is TCP-session-bound.  The actual download MUST go through
-    download_from_veev() which runs the whole Playwright session internally.
+    The CDN URL alone is not downloadable by yt-dlp or a plain HTTP client:
+    the CDN requires the session cookies and User-Agent that were issued
+    together with it, which this function does not return. The actual
+    download MUST go through download_from_veev(), which captures and reuses
+    those cookies/User-Agent alongside the CDN URL.
     """
     if not embed_url:
         raise ValueError("Embed URL darf nicht leer sein")

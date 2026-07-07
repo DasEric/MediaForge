@@ -40,17 +40,23 @@ _LEGACY_DB = LEGACY_DIR / "aniworld.db"
 
 
 def _target_name(name: str) -> str:
+    """Map a legacy file/directory name to its new-install name (see _RENAME)."""
     return _RENAME.get(name, name)
 
 
 def _should_skip(name: str) -> bool:
+    """Return True for entries that must never be copied (locks, caches, pid files)."""
     if name in _SKIP_NAMES:
         return True
     return any(name.endswith(sfx) for sfx in _SKIP_SUFFIXES)
 
 
 def detect_legacy() -> dict:
-    """Return the current legacy-import status without changing anything."""
+    """Return the current legacy-import status without changing anything.
+
+    Used by: the settings route (``web/routes/settings.py``) to show the
+    "import legacy data" option in the WebUI.
+    """
     marker = None
     if _MARKER.exists():
         try:
@@ -84,6 +90,8 @@ def run_import(overwrite: bool = False) -> dict:
 
     Non-destructive: the legacy directory is only read. Existing files in the
     new directory are kept unless ``overwrite`` is True. Returns a summary dict.
+    Used by: :func:`import_legacy_if_needed` (automatic, first run) and the
+    settings route (``web/routes/settings.py``, manual re-import button).
     """
     result = {"copied": [], "skipped": [], "source": str(LEGACY_DIR)}
     if not LEGACY_DIR.is_dir():
@@ -123,6 +131,8 @@ def import_legacy_if_needed() -> dict | None:
     Runs only when the new install has no database yet and a legacy install
     with a database exists. Safe to call on every startup — it becomes a no-op
     once the new database is present.
+    Used by: :func:`mediaforge.entry.mediaforge`, once at startup before the
+    WebUI (and its database) initializes.
     """
     if _NEW_DB.is_file():
         return None

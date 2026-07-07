@@ -1,0 +1,177 @@
+/* ===================================================================
+   MediaForge — Home page (hero, site switch, browse rows)
+   The search hero banner, the AniWorld/S.TO site toggle above the
+   search bar, and the horizontally-scrolling "browse" rows of poster
+   cards. The series-detail modal itself lives in shared_modals.css
+   (it's a separate include reused by Advanced Search too).
+   Used by: templates/index.html + static/app.js
+   =================================================================== */
+
+.site-hero {
+  text-align: center;
+  padding: 40px 0 20px;
+}.site-hero h1 {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}.hero-sub {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}.site-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}.site-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color var(--transition);
+  cursor: default;
+}.site-label.active {
+  color: var(--accent);
+  font-weight: 600;
+}.btn-random {
+  height: 46px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+}.btn-random:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}.browse-section {
+  margin-bottom: 40px;
+}.browse-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 10px;
+}.browse-heading {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}.browse-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}.browse-scroll-btns {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}.browse-scroll-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}.browse-scroll-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(124, 58, 237, 0.3);
+}.browse-grid {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS Safari */
+  /* padding-top + equal negative margin-top: gives .browse-card's hover
+     lift (translateY(-4px), see cards.css) room to move without being
+     clipped by this container's overflow-x: auto, while not shifting
+     the row's actual layout position */
+  padding-top: 15px;
+  margin-top: -15px;
+}.browse-grid::-webkit-scrollbar {
+  height: 4px;
+}.browse-grid::-webkit-scrollbar-track {
+  background: transparent;
+}.browse-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}@media (max-width: 480px) {.browse-grid {
+    gap: 10px;
+  }
+
+
+}
+
+/* Provider label above each browse row ("• ANIWORLD", "• SERIENSTREAM", ...).
+   .browse-provider-header carries the dot + text layout; the per-provider
+   modifier classes below (set via renderBrowseCards' sec.cls in app.js)
+   recolor both the text and the ::before dot. hanime's own dot color
+   lives in hanime.css, not here. */
+.browse-provider-block {
+  margin-bottom: 8px;
+}
+
+.browse-provider-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 4px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.browse-provider-header::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.browse-provider-aniworld {
+  color: var(--brand-color);
+}
+.browse-provider-aniworld::before {
+  background: var(--brand-color);
+}
+
+.browse-provider-sto {
+  color: var(--info);
+}
+.browse-provider-sto::before {
+  background: var(--info);
+}
+
+.browse-provider-filmpalast {
+  color: #e8914a;
+}
+.browse-provider-filmpalast::before {
+  background: #e8914a;
+}
+
+.browse-provider-megakino {
+  color: var(--success);
+}
+.browse-provider-megakino::before {
+  background: var(--success);
+}

@@ -10,6 +10,14 @@ except ImportError:  # pragma: no cover
 
 
 class MegakinoSeason:
+    """A MegaKino /watch post IS the season -- there is exactly one season
+    per series (see MegakinoSeries.seasons), episode-numbered via the
+    payload's stream list rather than separate season pages."""
+
+    # MegaKino series posts have no separate movie collection (that's what
+    # MegakinoMovie is for, a wholly separate class/URL shape). Always False;
+    # kept only so shared code paths that branch on `season.are_movies`
+    # (AniWorld-style) don't need to special-case MegaKino.
     are_movies = False
 
     def __init__(self, url=None, series=None, season_number=None, _data=None):

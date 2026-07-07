@@ -1,4 +1,5 @@
 {% extends "base.html" %} {% block title %}{{ _('Encoding') }} — MediaForge{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='settings_rows.css') }}">{% endblock %}
 {% block content %}
 <div class="settings-container">
   <div class="page-header" style="margin-bottom:28px;">

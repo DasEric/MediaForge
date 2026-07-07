@@ -1,3 +1,13 @@
+"""Shared runtime configuration for MediaForge.
+
+Central grab-bag module holding: version/update checks, the package's HTTP
+session (``GLOBAL_SESSION``, thread-local, DoH-aware), provider HTTP headers,
+audio/subtitle language enums and lookup tables, URL-classification regex
+patterns for every supported site (AniWorld, SerienStream, MegaKino,
+hanime.tv), and directory paths (mpv config/scripts). Most other modules in
+the package import from here rather than reading ``os.environ`` directly.
+"""
+
 import os
 import re
 import threading
@@ -21,7 +31,12 @@ except PackageNotFoundError:
 
 
 def is_newest_version() -> bool:
-    """Checks if the installed version is the newest available on PyPI."""
+    """Return True if the installed version is >= the latest on PyPI.
+
+    Also returns False if the package isn't installed (no VERSION) or the
+    PyPI request fails. Not currently called anywhere in the WebUI; kept
+    available for a future update-check feature.
+    """
     if not VERSION:
         return False
 
@@ -35,7 +50,8 @@ def is_newest_version() -> bool:
         return False
 
 
-# AniWorld configuration directory
+# MediaForge's per-user config/data directory (formerly ~/.aniworld before
+# the AniWorld Downloader -> MediaForge rename; see legacy_import.py).
 MEDIAFORGE_CONFIG_DIR = Path.home() / ".mediaforge"
 
 # Load .env file whenever config is imported
@@ -95,30 +111,78 @@ def is_source_unavailable(html: str, status_code: int = 200) -> bool:
     return bool(_SOURCE_UNAVAILABLE_PATTERN.search(html))
 
 
-def check_redirect_available(redirect_url: str, timeout: int = 5) -> bool:
+def _fetch_redirect_page(url: str, timeout: int, referer: str | None = None):
+    """GET *url* and return (html, status_code), preferring curl_cffi (bypasses
+    Cloudflare-style protection) and falling back to GLOBAL_SESSION."""
+    headers = {"Referer": referer} if referer else None
+    try:
+        from curl_cffi import requests as curl_requests
+        resp = curl_requests.get(
+            url, impersonate="chrome120", timeout=timeout,
+            allow_redirects=True, headers=headers,
+        )
+        return resp.text, resp.status_code
+    except ImportError:
+        resp = GLOBAL_SESSION.get(url, allow_redirects=True, timeout=timeout, headers=headers)
+        return resp.text, resp.status_code
+
+
+def check_redirect_available(redirect_url: str, provider_name: str = "", timeout: int = 5) -> bool:
     """Follow a provider redirect and check if the hoster actually has the content.
+
+    Used by: ``web/routes/search.py`` to filter out dead hoster links before
+    they're shown to the user (movies only -- see the WORKING_PROVIDERS
+    filter there).
 
     Does a real GET because many hosters (e.g. VOE) return HTTP 200 even for
     removed videos... they only show the error in the HTML body/title.
     On any network error returns True so the download path can fail with a proper
     message instead of silently hiding the provider.
+
+    VOE embed links first serve a tiny anti-scraper page that does a
+    client-side (JS) redirect to the real CDN page — a plain GET never
+    executes that JS, so it only ever sees the harmless shell and never the
+    actual "video removed" notice on the real page. For VOE we therefore
+    follow that second hop (same regex the VOE extractor itself uses) before
+    deciding, otherwise a removed VOE video always looks "available".
     """
     try:
-        try:
-            from curl_cffi import requests as curl_requests
-            resp = curl_requests.get(
-                redirect_url,
-                impersonate="chrome120",
-                timeout=timeout,
-                allow_redirects=True
-            )
-            return not is_source_unavailable(resp.text, resp.status_code)
-        except ImportError:
-            resp = GLOBAL_SESSION.get(redirect_url, allow_redirects=True, timeout=timeout)
-            return not is_source_unavailable(resp.text, resp.status_code)
+        html, status_code = _fetch_redirect_page(redirect_url, timeout)
     except Exception as e:
         logger.debug(f"Failed to check redirect availability for {redirect_url}: {e}")
         return True
+
+    if is_source_unavailable(html, status_code):
+        return False
+
+    if provider_name.strip().upper() == "VOE":
+        try:
+            from .extractors.provider.voe import (
+                REDIRECT_PATTERN,
+                extract_voe_source_from_html,
+                is_maintenance_page,
+            )
+            # Shell page already has the real source embedded (no JS-redirect
+            # needed) — nothing more to check, it's available.
+            if extract_voe_source_from_html(html):
+                return True
+            match = REDIRECT_PATTERN.search(html)
+            if match:
+                try:
+                    cdn_html, cdn_status = _fetch_redirect_page(
+                        match.group(0), timeout, referer=redirect_url
+                    )
+                except Exception as e:
+                    logger.debug(f"VOE second-hop check failed for {redirect_url}: {e}")
+                    return True
+                if is_source_unavailable(cdn_html, cdn_status) or is_maintenance_page(cdn_html):
+                    return False
+                return bool(extract_voe_source_from_html(cdn_html))
+        except Exception as e:
+            logger.debug(f"VOE-specific availability check failed for {redirect_url}: {e}")
+            return True
+
+    return True
 
 
 def resolve_redirect_url(redirect_url: str, timeout: int = 10) -> str:
@@ -126,6 +190,8 @@ def resolve_redirect_url(redirect_url: str, timeout: int = 10) -> str:
 
     Uses curl_cffi to bypass Cloudflare protection on the target hoster,
     falling back to GLOBAL_SESSION.
+    Used by: ``models/filmpalast_to/episode.py`` to resolve the real hoster
+    URL behind a FilmPalast redirect.
     """
     try:
         try:
@@ -146,7 +212,9 @@ def resolve_redirect_url(redirect_url: str, timeout: int = 10) -> str:
 
 
 def get_video_codec():
-    """Get and validate video codec from environment variable."""
+    """Return the ffmpeg codec name for MEDIAFORGE_VIDEO_CODEC, falling back
+    to "copy" (stream copy, no re-encoding) if the configured value isn't a
+    recognized key in VIDEO_CODEC_MAP."""
     codec = VIDEO_CODEC
     if codec not in VIDEO_CODEC_MAP:
         logger.warning(
@@ -249,6 +317,7 @@ def rebuild_global_session(resolver=None):
     ``None`` to go back to the default (Google DoH).
 
     Each thread will recreate its session on next use with the new resolver.
+    Used by: ``web/dns_patch.py`` when the user changes the DNS setting.
     """
     GLOBAL_SESSION._swap(resolver)
     logger.debug(f"GLOBAL_SESSION rebuilt with resolver={resolver!r}")
@@ -374,6 +443,8 @@ def _chromium_host_map_rules():
 def chromium_dns_args():
     """Chromium args that force the captcha browser onto the project DNS.
 
+    Used by: ``playwright/captcha.py`` when launching the captcha browser.
+
     The DoH command-line switches alone are unreliable: in "secure" mode
     Chromium still bootstraps the DoH server *hostname* via the OS/ISP resolver,
     and some builds/profiles ignore the switch entirely -- so the browser
@@ -407,6 +478,9 @@ _CURL_CFFI_PATCHED = False
 def ensure_curl_cffi_doh():
     """Route the curl_cffi / libcurl backend (used by yt-dlp's ``impersonate``
     downloads, e.g. VeeV) through the project DoH server.
+
+    Used by: ``models/common/common.py`` before starting an impersonated
+    download.
 
     libcurl resolves host names in C and ignores Python's patched
     socket.getaddrinfo, so the only way to keep impersonated downloads on the
@@ -445,6 +519,9 @@ logger.debug("Config initialized successfully")
 # -----------------------------
 # Provider Stuff
 # -----------------------------
+# Hosters actually offered to users. The commented-out names below have a
+# working extractor under extractors/provider/ but are intentionally left
+# disabled here (e.g. unreliable or superseded) -- re-enable by uncommenting.
 SUPPORTED_PROVIDERS = (
     "VOE",
     "Vidmoly",

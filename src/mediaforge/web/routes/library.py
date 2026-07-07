@@ -1,0 +1,1154 @@
+"""Library page/API + scan helpers.
+
+Extracted from create_app as a plain route-registration function
+(no Flask blueprint: endpoint names stay bare so url_for() keeps working).
+"""
+
+from ..db import get_all_library_cache
+from ..db import get_custom_path_by_id
+from ..db import get_custom_paths
+from ..db import get_setting
+from ..db import invalidate_library_cache
+from ..db import set_library_cache
+from ..db import set_library_scanning
+from ..runtime_state import _move_jobs
+from ..runtime_state import _move_jobs_lock
+from flask import jsonify
+from flask import render_template
+from flask import request
+import os
+import re
+import threading
+from ...logger import get_logger
+
+
+logger = get_logger(__name__)
+
+
+_LIB_LANG_FOLDERS = ["german-dub", "english-sub", "german-sub", "english-dub"]
+_LIB_VIDEO_EXTS = {".mkv", ".mp4", ".ts"}
+_LIB_EP_RE = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
+_LIB_FALLBACK_EP_RE = re.compile(r"\bE(\d{2,3})\b", re.IGNORECASE)
+_lib_scan_lock = threading.Lock()
+
+
+def _lib_get_resolution(file_path):
+    """Best-effort resolution label for a single file: try filename keyword/
+    regex hints first, then fall back to an ffprobe height lookup."""
+    fname = file_path.name.lower()
+    if "4k" in fname or "2160p" in fname or "3840x2160" in fname:
+        return "4K"
+    if "2k" in fname or "1440p" in fname or "2560x1440" in fname:
+        return "2K"
+    if "1080p" in fname or "1080i" in fname or "1920x1080" in fname:
+        return "1080p"
+    if "720p" in fname or "1280x720" in fname:
+        return "720p"
+    if "480p" in fname or "854x480" in fname or "640x480" in fname:
+        return "480p"
+    if "360p" in fname or "640x360" in fname:
+        return "360p"
+        
+    m = re.search(r"\b(2160|1440|1080|720|480|360|240)p?\b", fname)
+    if m:
+        val = m.group(1)
+        if val == "2160": return "4K"
+        if val == "1440": return "2K"
+        return val + "p"
+        
+    try:
+        from ..transcoder import probe_file
+        info = probe_file(file_path)
+        if info and info.get("height"):
+            h = info["height"]
+            if h >= 2160: return "4K"
+            if h >= 1440: return "2K"
+            if h >= 1080: return "1080p"
+            if h >= 720: return "720p"
+            if h >= 480: return "480p"
+            if h >= 360: return "360p"
+            return f"{h}p"
+    except Exception:
+        pass
+    return None
+
+
+def _lib_resolve_base():
+    """Resolve the default download-root Path from MEDIAFORGE_DOWNLOAD_PATH,
+    falling back to ~/Downloads."""
+    from pathlib import Path
+    raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+    if raw:
+        dl_base = Path(raw).expanduser()
+        if not dl_base.is_absolute():
+            dl_base = Path.home() / dl_base
+    else:
+        dl_base = Path.home() / "Downloads"
+    return dl_base
+
+
+def _lib_scan_base(base, old_cache_lookup=None):
+    """Walk one library root and build its title/season/episode structure.
+
+    Collects video files (top-level "loose movie" files plus per-title
+    folders, with SxxExx episodes found recursively), resolves each file's
+    resolution/codec info (reusing `old_cache_lookup` or a fast filename
+    match where possible, otherwise probing in parallel via ffprobe), and
+    returns a sorted list of title dicts ready to be cached/served by
+    /api/library."""
+    from pathlib import Path
+    from concurrent.futures import ThreadPoolExecutor
+    lang_folder_set = set(_LIB_LANG_FOLDERS)
+    titles = {}
+    if not base.is_dir():
+        return []
+
+    # Helper to check if file is video
+    def is_video_file(f):
+        if not f.is_file(): return False
+        fname = f.name
+        if fname.startswith(".temp_") or fname.startswith("."): return False
+        if ".part" in fname or fname.endswith(".part"): return False
+        fname_lower = fname.lower()
+        return any(fname_lower.endswith(ext) for ext in _LIB_VIDEO_EXTS)
+
+    # 1. Collect all video files
+    all_videos = []
+    
+    # Zero-th pass candidates
+    for f in base.iterdir():
+        if is_video_file(f):
+            if _LIB_EP_RE.search(f.name) or _LIB_FALLBACK_EP_RE.search(f.name):
+                continue
+            all_videos.append(f)
+
+    # First and Second pass candidates
+    for folder in base.iterdir():
+        if not folder.is_dir():
+            continue
+        name = folder.name
+        if name in lang_folder_set:
+            continue
+        for f in folder.iterdir():
+            if is_video_file(f):
+                if _LIB_EP_RE.search(f.name) or _LIB_FALLBACK_EP_RE.search(f.name):
+                    continue
+                all_videos.append(f)
+        for f in folder.rglob("*"):
+            if is_video_file(f):
+                if _LIB_EP_RE.search(f.name) or _LIB_FALLBACK_EP_RE.search(f.name):
+                    all_videos.append(f)
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_videos = []
+    for f in all_videos:
+        if f not in seen:
+            seen.add(f)
+            unique_videos.append(f)
+
+    # 2. Determine which videos need probing
+    probe_candidates = []
+    resolved_media_data = {} # Path -> {"resolution": ..., "video_codec": ..., "audio_codec": ...}
+    
+    for f in unique_videos:
+        try:
+            fsize = f.stat().st_size
+        except OSError:
+            fsize = 0
+        
+        # Check old cache lookup
+        cached = old_cache_lookup.get((str(f), fsize)) if old_cache_lookup else None
+        if cached and cached.get("video_codec"):
+            resolved_media_data[f] = cached
+            continue
+            
+        # Check filename keywords/regex
+        fname = f.name.lower()
+        res_fast = None
+        if "4k" in fname or "2160p" in fname or "3840x2160" in fname: res_fast = "4K"
+        elif "2k" in fname or "1440p" in fname or "2560x1440" in fname: res_fast = "2K"
+        elif "1080p" in fname or "1080i" in fname or "1920x1080" in fname: res_fast = "1080p"
+        elif "720p" in fname or "1280x720" in fname: res_fast = "720p"
+        elif "480p" in fname or "854x480" in fname or "640x480" in fname: res_fast = "480p"
+        elif "360p" in fname or "640x360" in fname: res_fast = "360p"
+        else:
+            m = re.search(r"\b(2160|1440|1080|720|480|360|240)p?\b", fname)
+            if m:
+                val = m.group(1)
+                if val == "2160": res_fast = "4K"
+                elif val == "1440": res_fast = "2K"
+                else: res_fast = val + "p"
+                
+        vc_fast = None
+        if "hevc" in fname or "x265" in fname or "h.265" in fname: vc_fast = "HEVC"
+        elif "h264" in fname or "x264" in fname or "h.264" in fname or "avc" in fname: vc_fast = "H.264"
+        elif "av1" in fname: vc_fast = "AV1"
+        
+        if res_fast:
+            resolved_media_data[f] = {"resolution": res_fast, "video_codec": vc_fast, "audio_codec": None}
+        else:
+            probe_candidates.append(f)
+
+    # 3. Probe candidates in parallel
+    if probe_candidates:
+        logger.info("[LibraryScan] Probing %d files in parallel...", len(probe_candidates))
+        
+        def probe_one(file_path):
+            try:
+                from ..transcoder import probe_file
+                info = probe_file(file_path)
+                if info:
+                    res = None
+                    if info.get("height"):
+                        h = info["height"]
+                        if h >= 2160: res = "4K"
+                        elif h >= 1440: res = "2K"
+                        elif h >= 1080: res = "1080p"
+                        elif h >= 720: res = "720p"
+                        elif h >= 480: res = "480p"
+                        elif h >= 360: res = "360p"
+                        else: res = f"{h}p"
+                        
+                    vc = info.get("video_codec")
+                    if vc:
+                        vc = vc.lower()
+                        if vc in ["hevc", "x265", "h265"]: vc = "HEVC"
+                        elif vc in ["h264", "x264", "avc"]: vc = "H.264"
+                        elif vc == "av1": vc = "AV1"
+                        else: vc = vc.upper()
+                        
+                    ac = info.get("audio_codec")
+                    if ac:
+                        ac = ac.upper()
+                        
+                    return {"resolution": res, "video_codec": vc, "audio_codec": ac}
+            except Exception:
+                pass
+            return None
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            results = executor.map(probe_one, probe_candidates)
+            for f, res_dict in zip(probe_candidates, results):
+                if res_dict:
+                    resolved_media_data[f] = res_dict
+
+    # 4. Perform the actual build of titles/seasons structure using pre-resolved resolutions
+    # Zero-th pass: video files sitting DIRECTLY in base (no title subfolder).
+    for f in base.iterdir():
+        if not is_video_file(f):
+            continue
+        if _LIB_EP_RE.search(f.name) or _LIB_FALLBACK_EP_RE.search(f.name):
+            continue
+        title_name = f.stem
+        try:
+            fsize = f.stat().st_size
+        except OSError:
+            fsize = 0
+        if title_name not in titles:
+            titles[title_name] = {"folder": title_name, "seasons": {}, "total_size": 0, "is_movie": False}
+        entry = titles[title_name]
+        if "movies" not in entry["seasons"]:
+            entry["seasons"]["movies"] = []
+        if not any(e["file"] == f.name for e in entry["seasons"]["movies"]):
+            mdata = resolved_media_data.get(f) or {}
+            entry["seasons"]["movies"].append({
+                "episode": 1, "file": f.name, "size": fsize, "is_video": True,
+                "is_movie_file": True, "path": str(f),
+                "resolution": mdata.get("resolution"),
+                "video_codec": mdata.get("video_codec"),
+                "audio_codec": mdata.get("audio_codec")
+            })
+            entry["total_size"] += fsize
+            entry["is_movie"] = True
+
+    for folder in base.iterdir():
+        if not folder.is_dir():
+            continue
+        name = folder.name
+        if name in lang_folder_set:
+            continue
+        if name not in titles:
+            titles[name] = {"folder": name, "seasons": {}, "total_size": 0, "is_movie": False}
+        entry = titles[name]
+
+        # First pass: direct video files in the title folder (no season subfolder)
+        for f in folder.iterdir():
+            if not is_video_file(f):
+                continue
+            if _LIB_EP_RE.search(f.name) or _LIB_FALLBACK_EP_RE.search(f.name):
+                continue
+            try:
+                fsize = f.stat().st_size
+            except OSError:
+                fsize = 0
+            skey = "movies"
+            if skey not in entry["seasons"]:
+                entry["seasons"][skey] = []
+            if not any(e["file"] == f.name for e in entry["seasons"][skey]):
+                mdata = resolved_media_data.get(f) or {}
+                entry["seasons"][skey].append({
+                    "episode": 1, "file": f.name, "size": fsize, "is_video": True,
+                    "is_movie_file": True, "path": str(f),
+                    "resolution": mdata.get("resolution"),
+                    "video_codec": mdata.get("video_codec"),
+                    "audio_codec": mdata.get("audio_codec")
+                })
+                entry["total_size"] += fsize
+                entry["is_movie"] = True
+
+        # Second pass: recurse into subfolders for SxxExx episodes
+        for f in folder.rglob("*"):
+            if not is_video_file(f):
+                continue
+            m = _LIB_EP_RE.search(f.name)
+            if m:
+                snum = int(m.group(1))
+                enum = int(m.group(2))
+            else:
+                m2 = _LIB_FALLBACK_EP_RE.search(f.name)
+                if m2:
+                    snum = 1
+                    enum = int(m2.group(1))
+                else:
+                    continue
+            try:
+                fsize = f.stat().st_size
+            except OSError:
+                fsize = 0
+            skey = str(snum)
+            if skey not in entry["seasons"]:
+                entry["seasons"][skey] = []
+            if not any(e["episode"] == enum and e["file"] == f.name for e in entry["seasons"][skey]):
+                mdata = resolved_media_data.get(f) or {}
+                entry["seasons"][skey].append({
+                    "episode": enum, "file": f.name, "size": fsize, "is_video": True,
+                    "path": str(f),
+                    "resolution": mdata.get("resolution"),
+                    "video_codec": mdata.get("video_codec"),
+                    "audio_codec": mdata.get("audio_codec")
+                })
+                entry["total_size"] += fsize
+
+    result = []
+    for entry in sorted(titles.values(), key=lambda x: x["folder"].lower()):
+        if not any(entry["seasons"].values()):
+            continue
+        total_eps = sum(sum(1 for e in eps if e.get("is_video", True)) for eps in entry["seasons"].values())
+        for skey in entry["seasons"]:
+            if skey != "movies":
+                entry["seasons"][skey].sort(key=lambda e: e["episode"])
+        result.append({"folder": entry["folder"], "seasons": entry["seasons"],
+                       "total_episodes": total_eps, "total_size": entry["total_size"],
+                       "is_movie": entry["is_movie"]})
+    return result
+
+
+def _lib_build_scan_targets():
+    """Build the list of (label, custom_path_id, base_path) scan targets:
+    the default download root plus every configured custom path."""
+    from pathlib import Path
+    dl_base = _lib_resolve_base()
+    targets = [("Default", None, dl_base)]
+    for cp in get_custom_paths():
+        cp_base = Path(cp["path"]).expanduser()
+        if not cp_base.is_absolute():
+            cp_base = Path.home() / cp_base
+        targets.append((cp["name"], cp["id"], cp_base))
+    return targets
+
+
+def _lib_do_scan(targets, lang_sep):
+    """Perform a full scan and store results in the cache. Runs in background thread."""
+    from pathlib import Path
+    
+    # Build lookup from old cache to optimize scans
+    old_cache_lookup = {}
+    try:
+        cache = get_all_library_cache()
+        for pk, entry in cache.items():
+            if entry and entry.get("data"):
+                data = entry["data"]
+                t_list = []
+                if data.get("titles"):
+                    t_list.extend(data["titles"])
+                if data.get("lang_folders"):
+                    for lf in data["lang_folders"]:
+                        if lf.get("titles"):
+                            t_list.extend(lf["titles"])
+                for t in t_list:
+                    for skey, eps in t.get("seasons", {}).items():
+                        for ep in eps:
+                            if ep.get("path"):
+                                old_cache_lookup[(ep["path"], ep.get("size"))] = {
+                                    "resolution": ep.get("resolution"),
+                                    "video_codec": ep.get("video_codec"),
+                                    "audio_codec": ep.get("audio_codec")
+                                }
+    except Exception as e:
+        logger.warning("[LibraryScan] Failed to build resolution cache lookup: %s", e)
+
+    for (label, cp_id, base_path) in targets:
+        path_key = "default" if cp_id is None else str(cp_id)
+        set_library_scanning(path_key, True)
+        try:
+            if lang_sep:
+                loc_lang_folders = []
+                for lf in _LIB_LANG_FOLDERS:
+                    lf_titles = _lib_scan_base(base_path / lf, old_cache_lookup)
+                    if lf_titles:
+                        loc_lang_folders.append({"name": lf, "titles": lf_titles})
+                set_library_cache(path_key, {
+                    "label": label, "custom_path_id": cp_id,
+                    "lang_folders": loc_lang_folders, "titles": None,
+                })
+            else:
+                loc_titles = _lib_scan_base(base_path, old_cache_lookup)
+                set_library_cache(path_key, {
+                    "label": label, "custom_path_id": cp_id,
+                    "lang_folders": None, "titles": loc_titles,
+                })
+        except Exception:
+            set_library_scanning(path_key, False)
+        else:
+            # is_scanning is already set to 0 by set_library_cache
+            pass
+
+
+def _lib_trigger_scan_async(targets, lang_sep):
+    """Kick off `_lib_do_scan` on a background daemon thread and return immediately."""
+    import threading
+    t = threading.Thread(target=_lib_do_scan, args=(targets, lang_sep), daemon=True)
+    t.start()
+
+
+def _get_lib_watcher():
+    """Return the (singleton) library file watcher."""
+    from ..library_watcher import get_watcher
+    return get_watcher()
+
+
+def _lib_watcher_scan_callback(path_key: str):
+    """Called by watchdog when files change in a watched folder."""
+    # Find the matching target and rescan only that one
+    targets = _lib_build_scan_targets()
+    lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+    for (label, cp_id, base_path) in targets:
+        pk = "default" if cp_id is None else str(cp_id)
+        if pk == path_key:
+            _lib_do_scan([(label, cp_id, base_path)], lang_sep)
+            break
+
+
+def _lib_assert_within_root(path, root):
+    """Resolve path and verify it stays within root — blocks symlink escapes.
+    Returns the resolved Path on success, raises ValueError on violation."""
+    from pathlib import Path as _P
+    resolved = _P(path).resolve()
+    resolved_root = _P(root).resolve()
+    resolved.relative_to(resolved_root)  # raises ValueError if outside
+    return resolved
+
+
+def _lib_move_resolve_base(cp_id):
+    """Resolve a custom_path_id (or None for default) to an absolute, symlink-free Path."""
+    from pathlib import Path
+    if cp_id:
+        cp = get_custom_path_by_id(cp_id)
+        if not cp:
+            return None
+        p = Path(cp["path"]).expanduser()
+    else:
+        raw = get_setting("download_path") or os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+        p = Path(raw).expanduser() if raw else Path.home() / "Downloads"
+    p = p if p.is_absolute() else Path.home() / p
+    return p.resolve()
+
+
+def _lib_move_worker(job_id, src, dst):
+    """Background thread: copy src→dst with progress tracking, then delete src."""
+    import shutil
+    from pathlib import Path
+    job = _move_jobs[job_id]
+    try:
+        # Calculate total bytes
+        all_files = [f for f in Path(src).rglob("*") if f.is_file()]
+        total = sum(f.stat().st_size for f in all_files)
+        with _move_jobs_lock:
+            job["total_bytes"] = total
+            job["status"] = "running"
+
+        copied = 0
+        dst_path = Path(dst)
+        src_path = Path(src)
+        dst_path.mkdir(parents=True, exist_ok=True)
+
+        for src_file in all_files:
+            rel = src_file.relative_to(src_path)
+            dst_file = dst_path / rel
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+            with _move_jobs_lock:
+                job["current_file"] = str(rel)
+            # buffered copy for progress
+            with open(src_file, "rb") as fin, open(dst_file, "wb") as fout:
+                while True:
+                    buf = fin.read(256 * 1024)  # 256 KB chunks
+                    if not buf:
+                        break
+                    fout.write(buf)
+                    copied += len(buf)
+                    with _move_jobs_lock:
+                        job["copied_bytes"] = copied
+            try:
+                shutil.copystat(str(src_file), str(dst_file))
+            except Exception:
+                pass
+
+        # Also copy empty directories
+        for src_dir in sorted(Path(src).rglob("*")):
+            if src_dir.is_dir():
+                rel = src_dir.relative_to(src_path)
+                (dst_path / rel).mkdir(parents=True, exist_ok=True)
+
+        # Delete source
+        shutil.rmtree(str(src))
+        invalidate_library_cache()
+        with _move_jobs_lock:
+            job["status"] = "done"
+            job["current_file"] = ""
+    except Exception as exc:
+        logger.error("[LibMove] Move job %s failed: %s", job_id, exc, exc_info=True)
+        # Clean up partial destination
+        try:
+            import shutil as _sh
+            _sh.rmtree(str(dst), ignore_errors=True)
+        except Exception:
+            pass
+        with _move_jobs_lock:
+            job["status"] = "error"
+            job["error"] = str(exc)
+
+
+def _lib_move_loose_files_worker(job_id, file_paths, dst_dir):
+    """Background thread: move individual loose files (movies in root) to dst_dir."""
+    import shutil
+    from pathlib import Path
+    job = _move_jobs[job_id]
+    try:
+        files = [Path(p) for p in file_paths]
+        total = sum(f.stat().st_size for f in files if f.exists())
+        with _move_jobs_lock:
+            job["total_bytes"] = total
+            job["status"] = "running"
+
+        dst_path = Path(dst_dir)
+        dst_path.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for src_file in files:
+            if not src_file.exists():
+                continue
+            dst_file = dst_path / src_file.name
+            with _move_jobs_lock:
+                job["current_file"] = src_file.name
+            with open(src_file, "rb") as fin, open(dst_file, "wb") as fout:
+                while True:
+                    buf = fin.read(256 * 1024)
+                    if not buf:
+                        break
+                    fout.write(buf)
+                    copied += len(buf)
+                    with _move_jobs_lock:
+                        job["copied_bytes"] = copied
+            try:
+                shutil.copystat(str(src_file), str(dst_file))
+            except Exception:
+                pass
+            src_file.unlink()
+
+        invalidate_library_cache()
+        with _move_jobs_lock:
+            job["status"] = "done"
+            job["current_file"] = ""
+    except Exception as exc:
+        logger.error("[LibMove] Loose file move job %s failed: %s", job_id, exc, exc_info=True)
+        with _move_jobs_lock:
+            job["status"] = "error"
+            job["error"] = str(exc)
+
+def register_library_routes(app):
+    """Register the Library page and its supporting API routes (listing,
+    refresh/status/watcher polling, delete, media info, rename, move) on
+    the Flask app."""
+    @app.route("/library")
+    def library_page():
+        """Render the Library page. GET /library."""
+        return render_template("library.html")
+    @app.route("/api/library")
+    def api_library():
+        """Return the full library listing across all scan targets (default
+        root + custom paths), triggering an initial background scan for any
+        target that has never been scanned yet. GET /api/library.
+
+        Called from static/library.js's `libFetch()` and
+        static/syncplay_page.js's inline library loader."""
+        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+        targets = _lib_build_scan_targets()
+        cache = get_all_library_cache()
+
+        locations = []
+        any_scanning = False
+        needs_initial_scan = []
+
+        for (label, cp_id, base_path) in targets:
+            path_key = "default" if cp_id is None else str(cp_id)
+            entry = cache.get(path_key)
+            if entry:
+                if entry["is_scanning"]:
+                    any_scanning = True
+                if entry["data"]:
+                    locations.append(entry["data"])
+            else:
+                # Never scanned yet — trigger once
+                needs_initial_scan.append((label, cp_id, base_path))
+
+        if needs_initial_scan and not any_scanning:
+            _lib_trigger_scan_async(needs_initial_scan, lang_sep)
+            any_scanning = True
+
+        # Watcher status
+        watcher = _get_lib_watcher()
+        last_updated = max((e["scanned_at"] for e in cache.values()), default=0)
+
+        return jsonify({
+            "lang_sep": lang_sep,
+            "locations": locations,
+            "is_scanning": any_scanning,
+            "last_updated": last_updated,
+            "watcher": {
+                "available": watcher.available,
+                "active": watcher.active,
+                "watched": watcher.watched,
+            },
+        })
+    @app.route("/api/library/refresh", methods=["POST"])
+    def api_library_refresh():
+        """Invalidate the library cache and trigger a full rescan of all
+        targets, restarting the file watcher against the current target
+        list. POST /api/library/refresh.
+
+        Called from static/library.js's `libLoad()`."""
+        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+        targets = _lib_build_scan_targets()
+        invalidate_library_cache()
+        _lib_trigger_scan_async(targets, lang_sep)
+        # Restart watcher so it picks up any newly configured paths
+        _get_lib_watcher().restart(targets, _lib_watcher_scan_callback)
+        return jsonify({"ok": True, "scanning": True})
+    @app.route("/api/library/status")
+    def api_library_status():
+        """Lightweight endpoint: returns only scanning state + last_updated timestamp.
+        Used by the UI to detect watcher-triggered rescans without transferring location data.
+        GET /api/library/status.
+
+        Called from static/library.js's `libIdlePoll()`/`libPollScan()`."""
+        cache = get_all_library_cache()
+        any_scanning = any(e["is_scanning"] for e in cache.values())
+        last_updated = max((e["scanned_at"] for e in cache.values()), default=0)
+        return jsonify({"is_scanning": any_scanning, "last_updated": last_updated})
+    @app.route("/api/library/watcher")
+    def api_library_watcher():
+        """Return the library file watcher's current availability/active state
+        and watched paths. GET /api/library/watcher. No confirmed frontend
+        caller was found in static/templates (the same data is also embedded
+        in the /api/library response, which the UI reads via
+        `libUpdateWatcherStatus()`)."""
+        watcher = _get_lib_watcher()
+        return jsonify({
+            "available": watcher.available,
+            "active": watcher.active,
+            "watched": watcher.watched,
+        })
+    @app.route("/api/library/delete", methods=["POST"])
+    def api_library_delete():
+        """Delete an entire title, a season, or a single episode from disk
+        (path-traversal-safe), then invalidate the library cache.
+        POST /api/library/delete.
+
+        Called from static/library.js's `libDeleteTitle()`,
+        `libDeleteSeason()`, and `libDeleteEpisode()` (via `libApiPost()`)."""
+        import shutil
+        from pathlib import Path
+
+        data = request.get_json(silent=True) or {}
+        folder = data.get("folder", "")
+        season = data.get("season")  # int or null
+        episode = data.get("episode")  # int or null
+        custom_path_id = data.get("custom_path_id")  # int or null
+
+        # Security: reject dangerous folder names
+        if (
+            not folder
+            or ".." in folder
+            or "/" in folder
+            or "\\" in folder
+            or "\x00" in folder
+        ):
+            return jsonify({"error": "Invalid folder name"}), 400
+
+        # Resolve base path from custom_path_id or default
+        if custom_path_id:
+            cp = get_custom_path_by_id(custom_path_id)
+            if not cp:
+                return jsonify({"error": "Custom path not found"}), 404
+            dl_base = Path(cp["path"]).expanduser()
+            if not dl_base.is_absolute():
+                dl_base = Path.home() / dl_base
+        else:
+            raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+            if raw:
+                dl_base = Path(raw).expanduser()
+                if not dl_base.is_absolute():
+                    dl_base = Path.home() / dl_base
+            else:
+                dl_base = Path.home() / "Downloads"
+
+        # Resolve the base itself to eliminate symlinks in the configured path
+        dl_base = dl_base.resolve()
+
+        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+        lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+        lang_folder = data.get("lang_folder")  # str or null
+
+        if lang_sep and lang_folder:
+            if lang_folder not in lang_folders:
+                return jsonify({"error": "Invalid language folder"}), 400
+            bases = [dl_base / lang_folder]
+        elif lang_sep:
+            bases = [dl_base / lf for lf in lang_folders]
+        else:
+            bases = [dl_base]
+
+        deleted = 0
+        for base in bases:
+            title_path = base / folder
+            # Verify resolved path stays within the allowed base (blocks symlink escapes)
+            try:
+                title_path = _lib_assert_within_root(title_path, base)
+            except ValueError:
+                continue
+            if not title_path.is_dir():
+                continue
+
+            if season is None and episode is None:
+                # Delete entire title
+                shutil.rmtree(title_path, ignore_errors=True)
+                deleted += 1
+            else:
+                # Build regex pattern
+                if episode is not None:
+                    pat = re.compile(
+                        rf"S{int(season):02d}E{int(episode):03d}(?!\d)", re.IGNORECASE
+                    )
+                else:
+                    pat = re.compile(rf"S{int(season):02d}E\d{{2,3}}", re.IGNORECASE)
+
+                for f in list(title_path.rglob("*")):
+                    if f.is_file() and pat.search(f.name):
+                        try:
+                            f.unlink()
+                            deleted += 1
+                        except OSError:
+                            pass
+
+                # Cleanup empty directories bottom-up
+                for dirpath in sorted(
+                    title_path.rglob("*"), key=lambda p: len(p.parts), reverse=True
+                ):
+                    if dirpath.is_dir():
+                        try:
+                            dirpath.rmdir()  # only succeeds if empty
+                        except OSError:
+                            pass
+                # Remove title folder itself if empty
+                try:
+                    title_path.rmdir()
+                except OSError:
+                    pass
+
+        if deleted == 0:
+            return jsonify({"error": "Nothing found to delete"}), 404
+        invalidate_library_cache()
+        return jsonify({"ok": True, "deleted": deleted})
+    @app.route("/api/library/media_info", methods=["POST"])
+    def api_library_media_info():
+        """Run ffprobe on a library file and return parsed video/audio stream
+        details (codec, resolution, bitrate, HDR range, etc.). Path must
+        resolve inside one of the known scan targets. POST /api/library/media_info.
+
+        Called from static/library.js's `libOpenMediaInfo()`."""
+        from pathlib import Path
+        import subprocess
+        import json
+
+        data = request.get_json(silent=True) or {}
+        path = data.get("path")
+        if not path:
+            return jsonify({"error": "Path required"}), 400
+
+        # Security check: check if the path is within any scanned library base
+        targets = _lib_build_scan_targets()
+        path_obj = Path(path).resolve()
+
+        allowed = False
+        for (_, _, base_path) in targets:
+            try:
+                base_resolved = base_path.resolve()
+                path_obj.relative_to(base_resolved)
+                allowed = True
+                break
+            except ValueError:
+                continue
+
+        if not allowed:
+            return jsonify({"error": "Access denied"}), 403
+
+        if not path_obj.is_file():
+            return jsonify({"error": "File not found"}), 404
+
+        # Run ffprobe
+        try:
+            from ..transcoder import _ffprobe_bin
+            ffprobe = _ffprobe_bin()
+            r = subprocess.run(
+                [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", str(path_obj)],
+                capture_output=True, text=True, timeout=15
+            )
+            if r.returncode != 0:
+                return jsonify({"error": "ffprobe failed"}), 500
+            probe_data = json.loads(r.stdout)
+        except Exception as e:
+            return jsonify({"error": f"Failed to run ffprobe: {e}"}), 500
+
+        fmt = probe_data.get("format", {})
+        streams = probe_data.get("streams", [])
+
+        # 1. Basic properties
+        info = {
+            "filename": path_obj.name,
+            "container": path_obj.suffix.lstrip(".").lower(),
+            "path": str(path_obj),
+            "size_bytes": path_obj.stat().st_size,
+        }
+
+        # 2. Extract Video & Audio Streams
+        video = None
+        audio = None
+
+        for s in streams:
+            ct = s.get("codec_type")
+            if ct == "video" and not video:
+                v_codec = s.get("codec_name", "").upper()
+                v_profile = s.get("profile", "Unknown")
+                v_level = s.get("level")
+                v_level_str = str(v_level) if v_level is not None else ""
+
+                # Width x Height
+                w = s.get("width", 0)
+                h = s.get("height", 0)
+                res_str = f"{w}x{h}" if w and h else ""
+
+                # Aspect ratio
+                dar = s.get("display_aspect_ratio", "")
+
+                # Framerate
+                r_fr = s.get("r_frame_rate", "")
+                framerate = ""
+                if r_fr and "/" in r_fr:
+                    try:
+                        num, den = map(int, r_fr.split("/"))
+                        if den > 0:
+                            framerate = f"{round(num / den)}"
+                    except ValueError:
+                        pass
+
+                # Bit depth
+                pix_fmt = s.get("pix_fmt", "")
+                bit_depth = 8
+                if "10" in pix_fmt:
+                    bit_depth = 10
+                elif "12" in pix_fmt:
+                    bit_depth = 12
+
+                # Video range
+                color_tr = s.get("color_transfer", "")
+                v_range = "SDR"
+                if color_tr in ["smpte2084", "arib-std-b67"]:
+                    v_range = "HDR"
+
+                # Bitrate
+                v_br = s.get("bit_rate") or fmt.get("bit_rate")
+                v_bitrate_kbps = ""
+                if v_br:
+                    try:
+                        v_bitrate_kbps = f"{int(v_br) // 1000} kbps"
+                    except ValueError:
+                        pass
+
+                # AVC
+                is_avc = "Yes" if s.get("is_avc") in [True, "true", "1", 1] else "No"
+
+                # Refs & NAL
+                refs = s.get("refs", "")
+                nal = s.get("nal_length_size", "")
+
+                video = {
+                    "codec": v_codec,
+                    "profile": v_profile,
+                    "level": v_level_str,
+                    "resolution": res_str,
+                    "aspect_ratio": dar,
+                    "framerate": framerate,
+                    "bit_depth": f"{bit_depth} bit",
+                    "video_range": v_range,
+                    "pixel_format": pix_fmt,
+                    "bitrate": v_bitrate_kbps,
+                    "avc": is_avc,
+                    "refs": str(refs) if refs != "" else "",
+                    "nal": str(nal) if nal != "" else "",
+                }
+
+            elif ct == "audio" and not audio:
+                a_codec = s.get("codec_name", "").upper()
+                a_profile = s.get("profile", "Unknown")
+
+                # Channels & Layout
+                channels = s.get("channels", "")
+                layout = s.get("channel_layout", "")
+
+                # Language
+                lang = s.get("tags", {}).get("language", "und")
+
+                # Bitrate
+                a_br = s.get("bit_rate")
+                a_bitrate_kbps = ""
+                if a_br:
+                    try:
+                        a_bitrate_kbps = f"{int(a_br) // 1000} kbps"
+                    except ValueError:
+                        pass
+
+                # Sample rate
+                sr = s.get("sample_rate", "")
+                sr_str = f"{sr} Hz" if sr else ""
+
+                # Default / Forced
+                disp = s.get("disposition", {})
+                is_default = "Yes" if disp.get("default") == 1 else "No"
+                is_forced = "Yes" if disp.get("forced") == 1 else "No"
+
+                audio = {
+                    "codec": a_codec,
+                    "profile": a_profile,
+                    "channels": f"{channels} ch" if channels else "",
+                    "layout": layout,
+                    "language": lang,
+                    "bitrate": a_bitrate_kbps,
+                    "sample_rate": sr_str,
+                    "default": is_default,
+                    "forced": is_forced,
+                }
+
+        info["video"] = video
+        info["audio"] = audio
+        return jsonify(info)
+    @app.route("/api/library/rename", methods=["POST"])
+    def api_library_rename():
+        """Rename a title folder, a season folder, or a single episode file
+        (path-traversal-safe), then invalidate the library cache.
+        POST /api/library/rename.
+
+        Called from static/library.js's `libStartRename()` and
+        `libStartEpRename()`."""
+        from pathlib import Path
+        data = request.get_json(silent=True) or {}
+        folder    = data.get("folder", "")
+        new_name  = data.get("new_name", "").strip()
+        season    = data.get("season")      # int → rename season folder; None → rename title folder
+        episode   = data.get("episode")     # int → rename specific episode file; None → season/title level
+        old_file  = data.get("old_file")    # original filename for episode rename
+        custom_path_id = data.get("custom_path_id")
+        lang_folder    = data.get("lang_folder")
+
+        # Validate inputs
+        def _safe(name):
+            return name and ".." not in name and "/" not in name and "\\" not in name and "\x00" not in name
+
+        if not _safe(folder) or not new_name:
+            return jsonify({"error": "Invalid folder or new name"}), 400
+        if not _safe(new_name):
+            return jsonify({"error": "New name contains invalid characters"}), 400
+
+        # Resolve base path
+        if custom_path_id:
+            cp = get_custom_path_by_id(custom_path_id)
+            if not cp:
+                return jsonify({"error": "Custom path not found"}), 404
+            dl_base = Path(cp["path"]).expanduser()
+            if not dl_base.is_absolute():
+                dl_base = Path.home() / dl_base
+        else:
+            raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
+            dl_base = Path(raw).expanduser() if raw else Path.home() / "Downloads"
+            if not dl_base.is_absolute():
+                dl_base = Path.home() / dl_base
+
+        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+        if lang_sep and lang_folder:
+            if lang_folder not in _LIB_LANG_FOLDERS:
+                return jsonify({"error": "Invalid language folder"}), 400
+            base = dl_base / lang_folder
+        else:
+            base = dl_base
+
+        # Resolve base to eliminate symlinks in the configured path
+        base = base.resolve()
+
+        try:
+            title_path = _lib_assert_within_root(base / folder, base)
+        except ValueError:
+            return jsonify({"error": "Path traversal detected"}), 400
+
+        if episode is not None and old_file:
+            # Rename a specific episode file
+            if season is None:
+                return jsonify({"error": "season required for episode rename"}), 400
+            season_path = title_path / ("Staffel " + str(int(season)))
+            if not season_path.is_dir():
+                # Try without Staffel prefix — flat layout
+                season_path = title_path
+            try:
+                src = _lib_assert_within_root(season_path / old_file, base)
+            except ValueError:
+                return jsonify({"error": "Path traversal detected"}), 400
+            if not src.is_file():
+                return jsonify({"error": "File not found"}), 404
+            dst = src.parent / new_name
+            if dst.exists():
+                return jsonify({"error": "Target name already exists"}), 409
+            src.rename(dst)
+        else:
+            # Rename title folder
+            if not title_path.is_dir():
+                return jsonify({"error": "Folder not found"}), 404
+            dst = title_path.parent / new_name
+            if dst.exists():
+                return jsonify({"error": "Target name already exists"}), 409
+            title_path.rename(dst)
+
+        invalidate_library_cache()
+        return jsonify({"ok": True})
+    @app.route("/api/library/move", methods=["POST"])
+    def api_library_move():
+        """Start an async move job. Returns {job_id} immediately.
+
+        POST /api/library/move. Handles both a title folder (series) and
+        loose movie files sitting directly in the base folder, validating
+        source/destination paths against traversal before spawning the
+        background worker thread. Called from static/library.js's
+        `libConfirmMove()`."""
+        import uuid
+        from pathlib import Path
+        data = request.get_json(silent=True) or {}
+        folder      = data.get("folder", "")
+        from_cp_id  = data.get("from_custom_path_id")
+        to_cp_id    = data.get("to_custom_path_id")
+        lang_folder = data.get("lang_folder")
+
+        def _safe(name):
+            return name and ".." not in name and "/" not in name and "\\" not in name and "\x00" not in name
+
+        if not _safe(folder):
+            return jsonify({"error": "Invalid folder name"}), 400
+
+        from_base = _lib_move_resolve_base(from_cp_id)
+        to_base   = _lib_move_resolve_base(to_cp_id)
+        if from_base is None or to_base is None:
+            return jsonify({"error": "Invalid path configuration"}), 400
+
+        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+        if lang_sep and lang_folder:
+            if lang_folder not in _LIB_LANG_FOLDERS:
+                return jsonify({"error": "Invalid language folder"}), 400
+            from_base = from_base / lang_folder
+            to_base   = to_base   / lang_folder
+
+        src = (from_base / folder).resolve()
+        try:
+            src.relative_to(from_base.resolve())
+        except ValueError:
+            return jsonify({"error": "Path traversal detected"}), 400
+
+        # Check if source is a directory (series) or loose files directly in base (movie)
+        loose_files = []
+        if not src.is_dir():
+            # Movie files sitting directly in the base folder (e.g. Film.mkv, Film.srt)
+            loose_files = [f for f in from_base.iterdir()
+                           if f.is_file() and f.stem == folder]
+            if not loose_files:
+                return jsonify({"error": "Source folder not found"}), 404
+
+        if loose_files:
+            # Loose files → move each file to to_base (no subfolder)
+            dst = to_base
+            for lf in loose_files:
+                if (dst / lf.name).exists():
+                    return jsonify({"error": "Ziel existiert bereits am Speicherort"}), 409
+        else:
+            dst = to_base / folder
+            if dst.resolve() == src.resolve():
+                return jsonify({"error": "Quelle und Ziel sind identisch"}), 400
+            if dst.exists():
+                return jsonify({"error": "Ziel existiert bereits am Speicherort"}), 409
+
+        try:
+            to_base.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            return jsonify({"error": f"Zielordner konnte nicht erstellt werden: {exc}"}), 500
+
+        job_id = uuid.uuid4().hex[:12]
+        with _move_jobs_lock:
+            _move_jobs[job_id] = {
+                "status": "starting",
+                "copied_bytes": 0,
+                "total_bytes": 0,
+                "current_file": "",
+                "error": None,
+                "folder": folder,
+            }
+
+        if loose_files:
+            t = threading.Thread(
+                target=_lib_move_loose_files_worker,
+                args=(job_id, [str(f) for f in loose_files], str(dst)),
+                daemon=True,
+            )
+        else:
+            t = threading.Thread(target=_lib_move_worker, args=(job_id, str(src), str(dst)), daemon=True)
+        t.start()
+        return jsonify({"job_id": job_id})
+    @app.route("/api/library/move_status/<job_id>")
+    def api_library_move_status(job_id):
+        """Poll move job progress.
+
+        GET /api/library/move_status/<job_id>. Removes the job entry once
+        its final (done/error) state has been polled once. Called from
+        static/library.js's `libConfirmMove()`."""
+        with _move_jobs_lock:
+            job = _move_jobs.get(job_id)
+            if job is None:
+                return jsonify({"error": "Job nicht gefunden"}), 404
+            result = dict(job)
+            # Clean up finished jobs after first poll of final state
+            if job["status"] in ("done", "error"):
+                _move_jobs.pop(job_id, None)
+        return jsonify(result)

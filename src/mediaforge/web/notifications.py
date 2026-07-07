@@ -396,24 +396,32 @@ def notify_telegram(
     username: str | None = None,
     errors: list | None = None,
 ) -> None:
+    # These are all routine, expected no-ops (not configured / intentionally
+    # disabled), not error conditions — every notify_all() call goes through
+    # here for every user regardless of whether they use Telegram at all, so
+    # this fires constantly for anyone who hasn't set it up. Logging them at
+    # WARNING made an unconfigured Telegram integration look like it was
+    # repeatedly "trying to activate itself" on every download event/restart,
+    # when in fact nothing was ever sent. Keep these at DEBUG, matching the
+    # global-disabled check below.
     if _get_setting("notif_telegram_enabled", "1") == "0":
         logger.debug("[Telegram] Skipping — globally disabled (notif_telegram_enabled=0)")
         return
     bot_token = _get_setting("notif_telegram_bot_token").strip()
     if not bot_token:
-        logger.warning("[Telegram] Skipping — no bot token configured")
+        logger.debug("[Telegram] Skipping — no bot token configured")
         return
     prefs   = _get_user_prefs(username)
     if not _pref_enabled(prefs, "telegram_enabled"):
-        logger.warning("[Telegram] Skipping — telegram_enabled=0 in user prefs (username=%s)", username)
+        logger.debug("[Telegram] Skipping — telegram_enabled=0 in user prefs (username=%s)", username)
         return
     chat_id = prefs.get("telegram_chat_id", "").strip()
     if not chat_id:
-        logger.warning("[Telegram] Skipping — no telegram_chat_id in user prefs (username=%s)", username)
+        logger.debug("[Telegram] Skipping — no telegram_chat_id in user prefs (username=%s)", username)
         return
     _pref_event = "on_sync_hold" if event == "on_sync_resume" else event
     if event and not _pref_enabled(prefs, "telegram_" + _pref_event):
-        logger.warning("[Telegram] Skipping — event %s disabled in user prefs (username=%s)", event, username)
+        logger.debug("[Telegram] Skipping — event %s disabled in user prefs (username=%s)", event, username)
         return
 
     err_text = _format_errors_text(errors or [])
@@ -435,6 +443,12 @@ def notify_telegram(
 
 
 def telegram_detect_chat_id(bot_token: str) -> str | None:
+    """Poll getUpdates for the most recent chat that has messaged the bot,
+    used by the Settings UI to auto-fill a user's chat_id after they send
+    the bot a message (avoids having the user look up the ID manually).
+
+    Used by: routes/push_notifications.py's Telegram chat-id auto-detect API.
+    """
     url = "https://api.telegram.org/bot" + bot_token + "/getUpdates?limit=10&offset=-10"
     req = urllib.request.Request(url)
     try:
@@ -555,7 +569,12 @@ def notify_whatsapp(
 # ---------------------------------------------------------------------------
 
 def send_discord_sync(webhook_url, payload):
-    """Send a Discord webhook synchronously. Returns (http_status, error_msg)."""
+    """Send a Discord webhook synchronously. Returns (http_status, error_msg).
+
+    Used by: routes/push_notifications.py's Discord "send test message" API,
+    which needs the real HTTP status/error to show the admin immediately
+    (unlike notify_discord*, which fire-and-forget on a background thread).
+    """
     import json as _json2
     url = webhook_url.strip()
     if not url:
@@ -680,6 +699,15 @@ def notify_all(
     errors: list | None = None,
     is_movie: bool = False,
 ) -> None:
+    """Fan out one notification to every configured channel (WebPush,
+    Telegram, Pushover, NTFY, WhatsApp, Discord). Each channel is called in
+    its own try/except so one failing/misconfigured service never blocks
+    the others; individual notify_* functions handle their own
+    enabled/pref checks and send asynchronously in a background thread.
+
+    Used by: queue_worker.py (download completion/error/cancel events) and
+    autosync_worker.py (auto-sync found episodes / sync hold / resume).
+    """
     try:
         notify_webpush(title=title, body=body, event=event, username=username)
     except Exception as exc:

@@ -1,0 +1,48 @@
+/* ===================================================================
+   MediaForge — Notifications page
+   Status badges for each notification channel and the "grayed out
+   when not configured" push-prefs state. .service-wip is the
+   "not implemented yet" placeholder panel shared with Encoding.
+   Used by: templates/notifications.html
+   =================================================================== */
+
+.service-wip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}.service-wip svg {
+  width: 36px;
+  height: 36px;
+  stroke: var(--text-muted);
+  opacity: 0.5;
+}.service-wip p {
+  margin: 0;
+  font-size: 0.9rem;
+}.push-prefs-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}.notif-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+}/* "Service status" badge per notification channel (Telegram, Pushover, ntfy,
+   Discord, WhatsApp, ...), toggled between these two classes by JS based on
+   whether that channel is configured. */
+.notif-badge-ok {
+  background: rgba(87, 242, 135, .15);
+  color: #57F287;
+}.notif-badge-warn {
+  background: rgba(254, 231, 92, .12);
+  color: #b8a200;
+}

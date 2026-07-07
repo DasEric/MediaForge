@@ -1,3 +1,24 @@
+"""Cloudflare Turnstile / CAPTCHA solving via a real (patchright) browser.
+
+Streaming sites fronted by Cloudflare (s.to, aniworld.to, filmpalast.to, ...)
+occasionally serve a Turnstile challenge instead of the requested page. This
+module opens a hardened, fingerprint-resistant Chromium context to solve it:
+
+  - is_captcha_page(): cheap HTML/status-code sniff, called by extractors
+    (e.g. mediaforge.extractors.provider.voe) before falling back to a
+    browser-based solve.
+  - solve_captcha(): generic solver for a standalone CAPTCHA page. Runs
+    headed in CLI mode, or streams screenshots/accepts clicks from the Web UI
+    when a queue_id is set (interactive mode).
+  - solve_sto_modal(): s.to-specific flow that clicks a provider's play
+    button to trigger its in-page Turnstile modal, then extracts the
+    resulting player-iframe URL (e.g. voe.sx/e/...).
+
+Also implements ad-overlay removal, network ad-blocking during the solve,
+and fingerprint hardening (WebGL renderer spoof, persistent profile) to keep
+Cloudflare's bot score low.
+"""
+
 import threading as _threading
 import queue as _queue_module
 import time as _time
@@ -6,11 +27,13 @@ import random as _random
 # Threading-local: set queue_id from the web worker to enable interactive mode
 _local = _threading.local()
 
-# Active captcha sessions keyed by queue_id (int)
+# Active captcha sessions keyed by queue_id (int).
+# Used by: mediaforge.web.routes.captcha (polls status, forwards user clicks
+# from the Web UI) and mediaforge.web.routes.settings (busy check).
 _active_sessions = {}
 _active_sessions_lock = _threading.Lock()
 
-# Optional hooks set by app.py to avoid circular imports
+# Optional hooks set by mediaforge.web.app to avoid circular imports
 _on_captcha_start = None  # callable(queue_id: int, url: str)
 _on_captcha_end = None    # callable(queue_id: int)
 
@@ -638,7 +661,11 @@ def _is_captcha_page_dom(page) -> bool:
 
 
 def is_captcha_page(html: str, status_code: int = 200) -> bool:
-    """Detect Cloudflare challenge / CAPTCHA pages."""
+    """Detect Cloudflare challenge / CAPTCHA pages.
+
+    Used by: mediaforge.extractors.provider.voe, to decide when to fall back
+    to solve_captcha().
+    """
     if status_code in (403, 503):
         return True
 
@@ -681,6 +708,9 @@ def solve_captcha(url: str):
     Returns the final URL (str) on success — for redirect-based captchas this is
     the provider URL captured from an iframe.  Returns None on timeout / error.
     Callers that don't need the URL can ignore the return value.
+
+    Used by: mediaforge.extractors.provider.voe, after is_captcha_page()
+    detects a Cloudflare challenge on a VOE response.
     """
     queue_id = getattr(_local, "queue_id", None)
     if queue_id is not None:
@@ -796,14 +826,24 @@ class CaptchaSession:
         self.result_url = None
 
     def get_screenshot(self) -> bytes:
+        """Return the most recent JPEG screenshot of the solving browser.
+
+        Used by: mediaforge.web.routes.captcha (streams this to the Web UI).
+        """
         with self._screenshot_lock:
             return self._screenshot
 
     def _store_screenshot(self, data: bytes):
+        """Store the latest screenshot (called from the solve loop)."""
         with self._screenshot_lock:
             self._screenshot = data
 
     def enqueue_click(self, x: int, y: int):
+        """Queue a user click (page coordinates) to be replayed on the page.
+
+        Used by: mediaforge.web.routes.captcha, forwarding clicks the user
+        makes on the streamed screenshot in the Web UI.
+        """
         self._click_queue.put_nowait((x, y))
 
 
@@ -971,6 +1011,12 @@ def _extract_iframe_url(page, current_url: str) -> str:
 
 
 def playwright_get_page_url(url: str) -> str:
+    """Solve any CAPTCHA on *url*, then return the final resolved URL for it
+    (following redirects) using the shared GLOBAL_SESSION.
+
+    Exported from the package's __init__.py; not currently called elsewhere
+    in the app (available for external/API use).
+    """
     solve_captcha(url)
     from ..config import GLOBAL_SESSION
     return GLOBAL_SESSION.get(url).url
@@ -1004,6 +1050,9 @@ def solve_sto_modal(episode_url: str, provider_name: str, language_label: str,
     immediately without needing to click a provider button first.
 
     Returns the provider URL on success, None on timeout.
+
+    Used by: mediaforge.models.s_to.episode.SerienstreamEpisode, to resolve
+    the player-iframe URL for an episode's chosen provider.
     """
     try:
         from patchright.sync_api import sync_playwright

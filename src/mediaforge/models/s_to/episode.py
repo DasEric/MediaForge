@@ -26,6 +26,12 @@ from ..common.common import (
 # -----------------------------
 # Language Stuff (s.to only)
 # -----------------------------
+# NOTE: these are s.to's own Audio/Subtitles enums, intentionally separate
+# from the ones in mediaforge.config used by AniWorld -- s.to allows an
+# "English audio + German subtitles" combination that AniWorld's LANG_KEY_MAP
+# doesn't model the same way. Because the two enum classes are distinct
+# types, models/common/common.py's download() tells s.to episodes apart from
+# AniWorld ones via hasattr(self, "_normalize_language") rather than isinstance.
 class Audio(Enum):
     """
     Available audio language options (s.to only):

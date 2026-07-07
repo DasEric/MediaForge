@@ -1,0 +1,321 @@
+/* ===================================================================
+   MediaForge — Shared "settings row" UI primitives
+   The card/row/toggle/service-pill layout used to build every
+   settings-style page in the app: a .settings-section card containing
+   stacked .settings-row entries, each with a label/description on the
+   left and a control (.toggle, input, select, button) on the right.
+   Originally written once for the Settings page and then reused
+   as-is by Encoding, Integrations and Notifications instead of each
+   page inventing its own row layout — so this is a genuinely shared
+   component file, not page-specific CSS.
+   Used by: templates/settings.html, templates/encoding.html,
+            templates/integrations.html, templates/notifications.html,
+            templates/autosync.html (.sync-select only)
+   =================================================================== */
+
+/* Mobile padding override for .settings-row further below; placed first
+   because that's where it sat in the original monolithic stylesheet. */
+@media (max-width: 768px) {.settings-row {
+    padding: 8px 12px !important;
+  }
+
+
+}.service-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}.service-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  user-select: none;
+}.service-pill svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}.service-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}.service-pill.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}.service-panel {
+  display: none;
+}.service-panel.active {
+  display: block;
+}.notif-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input, var(--bg-hover));
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color var(--transition);
+}.notif-input:focus {
+  border-color: var(--accent);
+}
+/* -2px nudges the icon up slightly so it optically lines up with the
+   uppercase header text next to it. */
+.settings-section-header svg {
+  vertical-align: -2px;
+}.settings-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 24px;
+}.settings-section-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}.settings-row:last-child {
+  border-bottom: none;
+}.settings-row:hover {
+  background: var(--bg-hover);
+}.settings-row-left {
+  flex: 1;
+  min-width: 0;
+}.settings-row-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}.settings-row-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}.settings-row-right {
+  flex-shrink: 0;
+}
+/* Horizontally-scrolling tab strip: cursor/user-select hint that the tab
+   bar can be drag-scrolled on narrow viewports; scrollbar-width/-color is
+   the Firefox thin-scrollbar styling, the ::-webkit-scrollbar rules below
+   are the equivalent for Chrome/Safari/Edge (no shared standard yet). */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 6px 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
+  cursor: grab;
+}.settings-tabs::-webkit-scrollbar {
+  height: 4px;
+  display: block;
+}.settings-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}.settings-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}.settings-tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--accent, #6366f1);
+}
+/* .settings-tab-btn is a legacy alias — settings.js toggles both classes
+   together, but current templates (settings.html, integrations.html) only
+   ever use .settings-tab. */
+.settings-tab-btn,
+.settings-tab {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+
+  text-decoration: none;
+  position: relative;
+  transition: all 0.3s ease;
+}.settings-tab:hover {
+  transform: translateY(-3px);
+}.settings-tab::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--accent);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.3s ease;
+}.settings-tab:hover::before {
+  transform: scaleY(1);
+}.settings-tab-btn:hover,
+.settings-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}.settings-tab-btn.active,
+.settings-tab.active {
+  color: var(--accent, #6366f1);
+  border-bottom-color: var(--accent, #6366f1);
+  font-weight: 600;
+}.settings-tab-panel {
+  display: none;
+}.settings-tab-panel.active {
+  display: block;
+}.settings-container {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 32px;
+}.settings-container h1 {
+  margin-bottom: 28px;
+}
+/* Duplicate of the .settings-section rule above (same properties); left
+   as-is from the original stylesheet since it's harmless (identical rule
+   just re-declared, no behavior difference). */
+.settings-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 24px;
+}.settings-section h2 {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}.settings-subtitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 22px 4px;
+}
+/* Second .settings-row definition (different gap/padding, no
+   justify-content) — same selector as the row rule near the top of this
+   file; since specificity is equal, these properties win by source order
+   wherever both rules apply. Kept as-is from the original stylesheet. */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+}.settings-row:last-child {
+  border-bottom: none;
+}.settings-row input[type="text"],
+.settings-row input[type="password"] {
+  flex: 1;
+  height: 40px;
+}.settings-row button {
+  height: 35px;
+  padding: 0 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+}.settings-row button:hover {
+  background: var(--accent-hover);
+}.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 140px;
+}.settings-field-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}.settings-hint {
+  padding: 8px 22px 14px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}@media (max-width: 640px) {.settings-container {
+    padding: 12px;
+  }
+
+  .settings-section h2 {
+    padding: 12px 14px;
+  }
+
+  .settings-subtitle {
+    padding: 10px 14px 4px;
+  }
+
+  .settings-hint {
+    padding: 6px 14px 12px;
+  }
+}.settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 4px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}.settings-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}.settings-notice {
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  font-size: 0.85rem;
+  color: var(--info);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}.settings-notice code {
+  font-family: monospace;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}.sync-select {
+  min-width: 130px;
+  max-width: 180px;
+  width: 40%;
+}
+/* Note: the "Import label", "Batch toolbar" and "Sync cards" rules that used to
+   live in this media query were moved to autosync.css during the CSS split;
+   only .sync-select's own mobile override still belongs here. */
+@media (max-width: 640px) {.sync-select{
+      min-width:175px !important;
+    }
+  }

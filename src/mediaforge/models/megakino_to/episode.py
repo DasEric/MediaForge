@@ -22,6 +22,14 @@ except ImportError:  # pragma: no cover
 
 
 class MegakinoEpisode:
+    """One episode of a MegaKino series post (see module docstring for the
+    episode-vs-movie URL convention). NOT a subclass of MegakinoMovie -- see
+    models/megakino_to/__init__.py.
+
+    Used by: mediaforge.providers (Provider(name="Megakino", episode_cls=...))
+    and web/routes/search.py.
+    """
+
     def __init__(self, url=None, series=None, season=None, episode_number=None,
                  title_de=None, title_en=None, provider_data=None, _data=None,
                  selected_path=None, selected_language=None, selected_provider=None):
@@ -88,6 +96,9 @@ class MegakinoEpisode:
 
     @property
     def provider_data(self):
+        """MegaKino has no dub/sub language variants -- every hoster link is
+        filed under a single synthetic "German Dub" key so this class exposes
+        the same {language: {provider: url}} shape as AniWorld/s.to."""
         if self.__provider_data is None:
             hosters = scraper.episode_hosters(self._data, self.episode_number)
             self.__provider_data = {"German Dub": hosters} if hosters else {}
@@ -209,6 +220,9 @@ class MegakinoEpisode:
         return self.__is_downloaded
 
     def download(self, cancel_event=None, **kwargs):
+        """Download this episode; VeeV is routed to its dedicated extractor
+        (TLS-fingerprint gated), everything else goes through the shared
+        models/common/common.py download() pipeline."""
         if self.selected_provider.upper() == "VEEV":
             try:
                 from ...extractors.provider.veev import download_from_veev

@@ -1,3 +1,19 @@
+"""Site-agnostic episode-action implementations shared by every model family.
+
+AniworldEpisode and SerienstreamEpisode assign these directly
+(``download = episode_download`` etc. in their episode.py); FilmPalastEpisode,
+MegakinoEpisode and MegakinoMovie do the same for watch()/syncplay() but wrap
+download() so they can special-case the VeeV provider (which needs a
+dedicated curl_cffi/Playwright path instead of the yt-dlp+ffmpeg pipeline
+here). HanimeEpisode aliases watch()/syncplay() from here too, but has its
+own download() (single HLS stream, no per-language/provider selection).
+
+Also home to the ffmpeg/yt-dlp download pipeline, progress tracking
+(_ffmpeg_progress, polled by the web UI), the codec-options helper that
+reads the user's encoding settings from the SQLite DB, and the
+ProviderData container used by AniWorld/s.to episodes to look up
+per-(Audio, Subtitles) hoster links.
+"""
 import getpass
 import hashlib
 import os
@@ -927,7 +943,17 @@ def _move_with_progress(src, dst, label="", cancel_event=None):
 
 
 def download(self, cancel_event=None):
-    """Download required audio/video streams for an episode (AniWorld + s.to)."""
+    """Download required audio/video streams for an episode and mux them into
+    the final .mkv, skipping any language/track already present on disk.
+
+    Used directly by AniworldEpisode and SerienstreamEpisode (assigned as
+    ``download = episode_download``). FilmPalastEpisode.download() and
+    MegakinoEpisode/MegakinoMovie.download() call this too for every
+    provider except VeeV, which is routed to extractors.provider.veev
+    instead because its CDN validates the browser TLS fingerprint.
+    HanimeEpisode does NOT use this -- it has its own single-stream
+    download() with no language/provider selection to reconcile.
+    """
     if platform.system() == "Windows":
         manager = DependencyManager()
         manager.fetch_binary("ffmpeg")
@@ -948,6 +974,12 @@ def download(self, cancel_event=None):
         url = (getattr(self, "url", "") or "").lower()
         is_serienstream = ("serienstream.to" in url) or ("s.to" in url)
 
+        # s.to (models/s_to/episode.py) defines its own Audio/Subtitles enums,
+        # separate from mediaforge.config's LANG_KEY_MAP/INVERSE_LANG_LABELS used
+        # by AniWorld -- the two enum classes are not interchangeable, so this
+        # function can't just isinstance()-check the episode. `_normalize_language`
+        # only exists on SerienstreamEpisode, so hasattr() is used as the
+        # discriminator between the two language systems.
         if is_serienstream and hasattr(self, "_normalize_language"):
             audio_enum, sub_enum = self._normalize_language(self.selected_language)
             audio_code = {"German": "deu", "English": "eng", "Japanese": "jpn"}.get(
@@ -1327,7 +1359,13 @@ def _maybe_upscale_before_move(src_path, ep_label, cancel_event=None):
 
 
 def watch(self):
-    """Watch the current episode with provider headers."""
+    """Play the stream directly in mpv/IINA (no download to disk).
+
+    Used by AniworldEpisode, SerienstreamEpisode, FilmPalastEpisode,
+    MegakinoEpisode, MegakinoMovie and HanimeEpisode (all alias
+    ``watch = episode_watch``). AniSkip flags are only honoured when the
+    episode object actually has a `skip_times` attribute (AniWorld only).
+    """
 
     print(f"[WATCHING] {self._file_name}")
 
@@ -1362,7 +1400,14 @@ def watch(self):
 
 
 def syncplay(self):
-    """Syncplay an episode (AniWorld + s.to)."""
+    """Watch the current episode in a synced Syncplay room shared with others.
+
+    Used by AniworldEpisode, SerienstreamEpisode, FilmPalastEpisode,
+    MegakinoEpisode, MegakinoMovie and HanimeEpisode (all alias
+    ``syncplay = episode_syncplay``). The room name is derived from the
+    file name (and optionally a shared password), so viewers watching the
+    same episode land in the same room without prior coordination.
+    """
 
     print(f"[Syncplaying] {self._file_name}")
 

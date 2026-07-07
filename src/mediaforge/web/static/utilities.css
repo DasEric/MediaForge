@@ -1,0 +1,361 @@
+/* ===================================================================
+   MediaForge — Utility classes + misc leftovers
+   Small single-purpose helper classes, legacy class-name aliases kept
+   for backward compatibility, and a handful of page-scoped ID-selector
+   rules (e.g. #syncAllBtn, #batchToolbar) that didn't fit any other
+   file here.
+   =================================================================== */
+
+/* ===================================================================
+   UTILITY CLASSES
+   =================================================================== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.mt-1 {
+  margin-top: 4px;
+}
+
+.mt-2 {
+  margin-top: 8px;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.text-sm {
+  font-size: 0.85rem;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* top-bar kept as hidden for pages that might still reference it */
+.top-bar {
+  display: none;
+}
+
+/* Old close button style */
+button.close {
+  float: right;
+  font-size: 1.4rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  transition: color var(--transition);
+}
+
+button.close:hover {
+  color: var(--text-primary);
+}
+
+/* Old modal title */
+.queue-modal-title,
+.captcha-modal-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+/* Old top-bar styles — no-op since .top-bar is hidden */
+.top-bar-brand,
+.top-bar-link,
+.top-bar-user,
+.top-bar-hamburger {
+  display: none;
+}
+
+
+/* Toggle switch (site & settings) */
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-hover);
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 4px;
+  top: 4px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform var(--transition);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.switch input:checked+.slider {
+  background: var(--accent);
+}
+
+.switch input:checked+.slider::before {
+  transform: translateX(20px);
+}
+
+/* Search bar (index page style — input + buttons inline) */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto 28px;
+}
+
+.search-bar input {
+  flex: 1;
+  height: 46px;
+  border-radius: var(--radius-md);
+  padding: 0 16px;
+  font-size: 0.95rem;
+}
+
+.search-bar button,
+.search-bar #searchBtn {
+  height: 46px;
+  padding: 0 22px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+
+.search-bar button:hover,
+.search-bar #searchBtn:hover {
+  background: var(--accent-hover);
+}
+
+
+/* Spinner (text-based loading indicator) — shown/hidden via JS style.display */
+.spinner {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  padding: 24px 0;
+  display: none;
+}
+
+/* Results */
+.results {
+  margin: 0 0 24px;
+}
+
+.results-poster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 480px) {
+  .results-poster-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+/* Mobile-only width tweak for .browse-card; the card component itself is
+   defined in cards.css — this leftover override just lives here because
+   it's a grid-layout tweak rather than part of the card. */
+@media (max-width: 480px) {
+  .browse-card {
+    width: 110px !important;
+  }
+}
+/* ===================================================================
+   SIDEBAR — SETTINGS SUBMENU
+   =================================================================== */
+/* Not referenced by any current template (base.html renders the Settings
+   sidebar entry as a plain .sidebar-link, no nested group) — kept in case
+   a grouped settings submenu is added to the sidebar later. */
+.sidebar-settings-group {
+  margin-top: auto;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  padding-top: 8px;
+}
+
+.sidebar-settings-header {
+  margin-top: 0 !important;
+  border-top: none !important;
+  padding-top: 0 !important;
+}
+
+
+/* ===================================================================
+   SETTINGS PAGE (extended)
+   =================================================================== */
+
+/* Settings-page override: cancels the border-radius that the base
+   .num-step-btn rule sets in forms.css, since here the buttons sit inside
+   a container that already clips corners via overflow:hidden. */
+.num-step-btn {
+  border-radius:unset !important;
+}
+
+
+  
+  
+ 
+  
+  
+ 
+
+
+/* ===================================================================
+   AUTOSYNC PAGE
+   =================================================================== */
+
+
+.autosync-intro {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* ===================================================================
+   GENERIC PAGE HEADER (.page-container/.page-title/.page-subtitle/.page-hint)
+   Despite the old "STATS PAGE" label, these are used across most content
+   pages (library, favourites, history, calendar, stats, etc.) for the
+   page wrapper and title block; .stats-loading and .stat-item further
+   below are the only rules in this group that are actually stats-only.
+   =================================================================== */
+.page-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.page-hint {
+  font-size: 13px;
+  font-style: italic;
+}
+
+.stats-loading {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Stats grid items injected by stats.js */
+.stat-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+/* ===================================================================
+   QUEUE EMPTY STATE
+   =================================================================== */
+.queue-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}

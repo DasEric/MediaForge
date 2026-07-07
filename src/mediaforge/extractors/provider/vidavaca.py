@@ -2,6 +2,11 @@
 
 Vidavaca is a VIDARA clone using the identical jwplayer + /api/stream scheme,
 so extraction is delegated to the shared helpers in vidara.py.
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_vidavaca"); see the provider alias table in
+models/megakino_to/scraper.py (("vidavaca", "Vidavaca")) and the generic
+provider dispatch in models/megakino_to/{episode,movie}.py.
 """
 try:
     from .vidara import get_stream_data as _get_stream_data

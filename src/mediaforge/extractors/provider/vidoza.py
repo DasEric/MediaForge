@@ -1,3 +1,15 @@
+"""Vidoza (videzz.net and other Vidoza mirrors) video hoster extractor.
+
+Strategy: fetch the embed page HTML and, when it contains a "sourcesCode:"
+JW-Player config block, regex out the plain-text ``src: "..."`` video URL
+(and, separately, the ``poster: "..."`` thumbnail URL for previews). No
+JS deobfuscation is required -- the URLs are inline, unobfuscated strings.
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_vidoza"); see the provider alias table in
+models/megakino_to/scraper.py (("vidoza", "Vidoza")) and the generic
+provider dispatch in models/megakino_to/{episode,movie}.py.
+"""
 import re
 
 import niquests
@@ -14,7 +26,7 @@ IMAGE_LINK_PATTERN = re.compile(r'poster:\s*"([^"]+)"')
 
 
 def get_direct_link_from_vidoza(embeded_vidoza_link):
-    """Get direct Vidoza video URL."""
+    """Fetch the Vidoza embed page and return the direct video URL from its JW-Player config."""
     try:
         resp = GLOBAL_SESSION.get(
             embeded_vidoza_link, headers={"User-Agent": DEFAULT_USER_AGENT}
@@ -35,7 +47,7 @@ def get_direct_link_from_vidoza(embeded_vidoza_link):
 
 
 def get_preview_image_link_from_vidoza(embeded_vidoza_link):
-    """Get Vidoza preview image URL."""
+    """Fetch the Vidoza embed page and return its poster/preview image URL."""
     try:
         resp = GLOBAL_SESSION.get(
             embeded_vidoza_link, headers={"User-Agent": DEFAULT_USER_AGENT}

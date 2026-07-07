@@ -1,0 +1,139 @@
+/* ===================================================================
+   MediaForge — shared_modals.html partial (series detail extras)
+   Season accordion spacing and the "paste a direct link" mini-modal,
+   both part of the series-detail/download modal markup that lives in
+   templates/shared_modals.html and is pulled into two different pages
+   via {% include %}. Most of that modal's own styling (buttons,
+   episode rows, language-availability pills, etc.) is intentionally
+   left in style.css because those same classes are reused by other
+   pages' custom modals (Seerr, Library) that don't include this
+   partial.
+   Used by: templates/index.html, templates/advanced_search.html
+            (both via {% include "shared_modals.html" %})
+   =================================================================== */
+
+.season-accordion {
+  margin-bottom: 12px;
+}.season-episodes {
+  padding: 4px 0;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}.directlink-modal {
+    position: relative;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-modal);
+    width: 100%;
+    max-width: 500px;
+    padding: 28px 24px 22px;
+    margin: 0 auto;
+    animation: modal-in 0.2s ease;
+  }.directlink-modal>.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition), color var(--transition);
+  }.directlink-modal>.close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }.dl-title {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }.dl-hint {
+    margin: 0 0 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }.dl-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }.dl-input-row input[type="text"] {
+    flex: 1;
+    height: 44px;
+    border-radius: var(--radius-md);
+    padding: 0 14px;
+    font-size: 0.9rem;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+    font-family: inherit;
+    transition: border-color var(--transition);
+    width: auto;
+  }.dl-input-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }.dl-input-row input[type="text"]::placeholder {
+    color: var(--text-muted);
+  }.dl-input-row #directLinkSearchBtn {
+    flex-shrink: 0;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+    transition: background var(--transition);
+    display: inline-block;
+    width: auto;
+  }.dl-input-row #directLinkSearchBtn:hover {
+    background: var(--accent-hover);
+  }/* toggled visible via JS on a failed direct-link lookup; note the red here
+     is a one-off (#e05555 / rgb(220,53,53)) rather than the shared --error
+     token (#ef4444) */
+  .dl-error {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(220, 53, 53, 0.12);
+    border: 1px solid rgba(220, 53, 53, 0.35);
+    border-radius: var(--radius-md);
+    color: #e05555;
+    font-size: 0.85rem;
+  }@media (max-width: 560px) {.dl-input-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .dl-input-row #directLinkSearchBtn {
+      width: 100%;
+    }
+  }/* Trailer (YouTube embed) and "more like this" recommendations sections
+     within the series-detail modal; not just the directlink mini-modal
+     described in the file header above. */
+.modal-trailer {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000; /* letterbox fallback while the iframe loads */
+  box-shadow: var(--shadow-lg);
+}.modal-trailer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}.modal-recommendations {
+  width: 100%;
+}.trailer-header,
+.recommendations-header {
+  padding: 10px 10px;
+}

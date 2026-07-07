@@ -646,7 +646,14 @@ async function syncAll() {
 }
 
 async function removeJob(id) {
-  if (!await showConfirm(t("Diesen Sync-Job entfernen?", "Remove this sync job?"))) return;
+  // Pass an explicit title/okLabel — without them showConfirm() falls back
+  // to its library-delete defaults ("Delete title?" / "Delete"), which is
+  // confusing here since this isn't deleting a library title.
+  if (!await showConfirm(
+    t("Diesen Sync-Job entfernen?", "Remove this sync job?"),
+    t("Entfernen", "Remove"),
+    t("Sync-Job entfernen?", "Remove sync job?")
+  )) return;
   try {
     const res = await fetch("/api/autosync/" + id, { method: "DELETE" });
     const data = await res.json();

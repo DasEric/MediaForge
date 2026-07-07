@@ -136,7 +136,10 @@ def _repoint_existing_handlers(orig_stdout, orig_stderr) -> None:
 
 
 def install_capture() -> None:
-    """Install the stdout/stderr tee once. Safe to call repeatedly."""
+    """Install the stdout/stderr tee once. Safe to call repeatedly.
+
+    Used by: app.py, called once during create_app() startup.
+    """
     global _installed
     with _install_lock:
         if _installed:
@@ -152,5 +155,8 @@ def install_capture() -> None:
 
 
 def get_console_output(after: int = 0) -> dict:
-    """Return console lines with sequence id greater than ``after``."""
+    """Return console lines with sequence id greater than after.
+
+    Used by: routes/settings.py's console-polling endpoint.
+    """
     return _buffer.get_since(after)

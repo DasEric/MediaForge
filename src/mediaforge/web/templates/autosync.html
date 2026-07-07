@@ -1,5 +1,7 @@
 {% extends "base.html" %} {% block title %}Auto-Sync — MediaForge{% endblock %}
 {% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='settings_rows.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='stats.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='autosync.css') }}">
 {% endblock %}
 {% block content %}

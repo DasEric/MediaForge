@@ -1,3 +1,16 @@
+"""Scraping helpers for AniWorld/s.to search, browse, and homepage sections.
+
+Covers: keyword search and random-pick on aniworld.to/serienstream.to, the
+"new/popular" homepage sections used by the WebUI's browse page, and thin
+pass-through wrappers around the MegaKino and hanime.tv scraper modules
+(``models/megakino_to/scraper.py``, ``models/hanime_tv/scraper.py``).
+
+:func:`search` and :func:`_curses_menu` are a leftover interactive,
+curses-based CLI picker from before the WebUI-only refactor (see
+``arguments.py``); they are not called anywhere in the current app and are
+only reachable by running this module directly or importing it manually.
+"""
+
 try:
     import curses
 except ImportError:
@@ -30,7 +43,11 @@ _series_lock = _threading.Lock()
 
 
 def random_anime():
-    """Fetch a random anime series from Aniworld and return its URL."""
+    """Fetch a random anime series from Aniworld and return its URL.
+
+    Used by: the browse route (``web/routes/browse.py``) "surprise me" action
+    and by :func:`search` when ``MEDIAFORGE_RANDOM_ANIME=1``.
+    """
     data = {"productionStart": "all", "productionEnd": "all", "genres[]": "all"}
 
     try:
@@ -57,7 +74,12 @@ def random_anime():
 
 
 def query(keyword):
-    """Send a search request to Aniworld with given keyword."""
+    """Send a search request to Aniworld with given keyword.
+
+    Returns the raw JSON list of matches (or None on invalid JSON).
+    Used by: ``web/routes/search.py`` and ``web/routes/autosync.py`` (imported
+    there as ``aniworld_query``).
+    """
     response = GLOBAL_SESSION.post(SEARCH_URL, data={"keyword": keyword}, timeout=10)
     try:
         return response.json()  # Returns a list of dicts
@@ -218,7 +240,8 @@ def _extract_cover_list(html, heading):
             continue
         seen_urls.add(url)
 
-        # Title from img alt (better source for the full title instead of title... when name is too long)
+        # Prefer the img alt text over the <h3> title: alt is more reliable
+        # when the displayed title text is truncated in the markup.
         img_match = re.search(r'<img[^>]+alt="([^"]+)"', inner)
         img_alt_text = img_match.group(1).strip() if img_match else ""
         img_alt_text = re.sub(r'(?i)\s+Cover.*$', '', img_alt_text).strip()
@@ -518,7 +541,10 @@ def _normalize_s_to_link(link: str) -> str:
 
 
 def query_s_to(keyword):
-    """Search s.to for the given keyword and return a list of matching series with their URLs."""
+    """Search s.to for the given keyword and return a list of matching series with their URLs.
+
+    Used by: ``web/routes/search.py`` and ``web/routes/autosync.py``.
+    """
     # Use query params to ensure proper URL encoding (spaces, umlauts, etc.)
     url = "https://serienstream.to/api/search/suggest"
     response = GLOBAL_SESSION.get(url, params={"term": keyword}, timeout=10)
@@ -537,13 +563,16 @@ def query_s_to(keyword):
 
 
 def search(is_aniworld=None):
-    """Prompt user for a search keyword and return a single series URL using a curses menu."""
+    """Prompt user for a search keyword and return a single series URL using a curses menu.
+
+    Legacy interactive-CLI helper from before the WebUI-only refactor (see
+    ``arguments.py``): the WebUI does its own search UI and does not call
+    this function. Kept for manual/debug use (``python -m mediaforge.search``).
+    """
     use_random = os.getenv("MEDIAFORGE_RANDOM_ANIME", "0") == "1"
 
     if is_aniworld is None:
         is_aniworld = os.getenv("MEDIAFORGE_USE_STO_SEARCH", "0") != "1"
-
-    # print(f"Using {'Aniworld' if is_aniworld else 's.to'} for search results.\n")
 
     base_url = "https://aniworld.to" if is_aniworld else "https://serienstream.to"
     query_fn = query if is_aniworld else query_s_to
@@ -615,28 +644,49 @@ def search(is_aniworld=None):
 # MegaKino (megakino.to) — thin wrappers around the model-package scraper
 # ---------------------------------------------------------------------------
 def _megakino_scraper():
+    """Lazily import the megakino scraper module (avoids a hard dependency
+    at package-import time for a site most installs won't use)."""
     from .models.megakino_to import scraper
     return scraper
 
 
 def megakino_search(keyword):
-    """Search megakino and return a list of {title, url, poster_url, ...}."""
+    """Search megakino and return a list of {title, url, poster_url, ...}.
+
+    Used by: ``web/routes/search.py`` and ``web/routes/autosync.py``.
+    """
     return _megakino_scraper().search(keyword)
 
 
 def fetch_megakino_new_movies():
+    """Fetch MegaKino's 'new movies' homepage section.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _megakino_scraper().fetch_new_movies()
 
 
 def fetch_megakino_popular_movies():
+    """Fetch MegaKino's 'popular movies' homepage section.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _megakino_scraper().fetch_popular_movies()
 
 
 def fetch_megakino_new_series():
+    """Fetch MegaKino's 'new series' homepage section.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _megakino_scraper().fetch_new_series()
 
 
 def fetch_megakino_popular_series():
+    """Fetch MegaKino's 'popular series' homepage section.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _megakino_scraper().fetch_popular_series()
 
 
@@ -644,20 +694,33 @@ def fetch_megakino_popular_series():
 # hanime.tv (adult / 18+) — thin wrappers around the model-package scraper
 # ---------------------------------------------------------------------------
 def _hanime_scraper():
+    """Lazily import the hanime.tv scraper module (adult content is
+    gated/disabled by default in the UI, so avoid loading it eagerly)."""
     from .models.hanime_tv import scraper
     return scraper
 
 
 def hanime_search(keyword):
-    """Search hanime and return a list of franchise cards."""
+    """Search hanime and return a list of franchise cards.
+
+    Used by: ``web/routes/search.py`` and ``web/routes/autosync.py``.
+    """
     return _hanime_scraper().search(keyword)
 
 
 def fetch_hanime_new(show_censored=True, show_uncensored=True):
+    """Fetch hanime.tv's 'new' listing, optionally filtering censored/uncensored.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _hanime_scraper().fetch_new(show_censored=show_censored, show_uncensored=show_uncensored)
 
 
 def fetch_hanime_trending(show_censored=True, show_uncensored=True):
+    """Fetch hanime.tv's 'trending' listing, optionally filtering censored/uncensored.
+
+    Used by: the browse route (``web/routes/browse.py``).
+    """
     return _hanime_scraper().fetch_trending(show_censored=show_censored, show_uncensored=show_uncensored)
 
 

@@ -1,3 +1,12 @@
+"""Environment-variable and ``.env`` file handling.
+
+Two independent jobs live here: (1) mirroring legacy ``ANIWORLD_*``
+environment variables onto their ``MEDIAFORGE_*`` equivalents, and (2)
+merging a user's existing ``.env`` file against the shipped
+``.env.example`` template so new config keys get their defaults while the
+user's existing values are preserved.
+"""
+
 import os
 import re
 from pathlib import Path
@@ -29,6 +38,17 @@ def mirror_legacy_env():
 
 
 def merge_env(example_path: Path, env_path: Path):
+    """Merge *env_path* against the *example_path* template, in place.
+
+    For every ``KEY=value`` line in the template, keeps the user's existing
+    value from *env_path* if present, otherwise takes the template default.
+    Non-key lines (comments/blank lines) are copied through unchanged so the
+    template's formatting survives. Does nothing if *env_path* does not
+    exist yet (fresh installs are configured entirely through the WebUI).
+
+    Used by: ``entry.py`` and ``config.py``, both called once at import/
+    startup time with (``.env.example``, ``~/.mediaforge/.env``).
+    """
     # Always mirror legacy variables first so setups that configure everything
     # through the real environment (e.g. Docker) keep working even without a
     # .env file on disk.
@@ -41,7 +61,7 @@ def merge_env(example_path: Path, env_path: Path):
     env_path.parent.mkdir(parents=True, exist_ok=True)
     example_lines = example_path.read_text().splitlines()
 
-    # Load existing values from old env
+    # Load existing values from the user's current .env file
     existing_values = {}
     if env_path.exists():
         for line in env_path.read_text().splitlines():

@@ -225,3 +225,4 @@ Check.txt
 # Security Check Findings File
 FINDINGS.txt
 /.claude
+_backups/

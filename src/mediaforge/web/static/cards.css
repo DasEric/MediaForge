@@ -1,0 +1,676 @@
+/* ===================================================================
+   MediaForge — Card components
+   The generic .card/.series-card building blocks plus every card
+   family the frontend JS renders into the DOM at runtime: media
+   cards, browse cards (renderBrowseCards), search result cards
+   (renderResults), favorites cards (renderFavourites), and episode
+   accordion items (buildAccordion) — grouped here because they all
+   share the same "poster + title + meta" visual language.
+   =================================================================== */
+
+/* ===================================================================
+   CARDS
+   =================================================================== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Series / media cards
+   Note: .series-grid/.series-card are not referenced by any current
+   template or JS file (grid rendering now goes through .browse-card via
+   renderBrowseCards) — kept in case they're wired back up, not dead-code
+   cleanup material for a comments-only pass. */
+.series-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .series-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+  }
+}
+
+.series-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+}
+
+.series-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.series-card img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-elevated);
+}
+
+.series-card-info {
+  padding: 10px 12px;
+}
+
+.series-card-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.series-card-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+/* ===================================================================
+   MEDIA CARD
+   Note: like .series-card above, .media-card has no current callers in
+   app.js/templates (browse grids use .browse-card, search results use
+   .card inside .results) — kept for now, not touched in this pass.
+   =================================================================== */
+.media-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+}
+
+.media-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.media-card img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  background: var(--bg-elevated);
+  display: block;
+}
+
+.media-card-title {
+  padding: 9px 10px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+/* Result item (search result list)
+   Note: not currently referenced by app.js/templates either — search
+   results render via .results .card below (renderResults). Kept as-is. */
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition);
+  border: 1px solid transparent;
+}
+
+.result-row:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.result-row img {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.result-row-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ===================================================================
+   BROWSE CARDS (renderBrowseCards in app.js → div.browse-card)
+   =================================================================== */
+.browse-card {
+  /* flex-shrink:0 + fixed width + scroll-snap-align pair with the parent
+     .browse-grid's horizontal scroll-snap carousel (index.css) */
+  flex-shrink: 0;
+  width: 140px;
+  scroll-snap-align: start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+}
+
+.browse-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.browse-hover-overlay {
+  /* Covers only the poster (aspect-ratio 2/3, same as .browse-card img),
+     not the whole card — .browse-info (title/genre/badge line) below stays
+     visible and un-darkened on hover, matching the original design. Hovering
+     over that visible title area still counts as hovering .browse-card
+     (CSS :hover applies to the whole element incl. descendants), so the
+     overlay stays engaged either way.
+     overflow:hidden caps this box at the poster's height even if the tag
+     list inside is longer than that — .browse-hover-content below then
+     scrolls internally instead of the overlay growing past the poster (the
+     bug this used to have) or the tags getting silently clipped away. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.85) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.browse-card:hover .browse-hover-overlay {
+  opacity: 1;
+}
+
+.browse-hover-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Bottom-anchored (justify-content:flex-end on the parent) content that
+     can outgrow the card (long tag lists) scrolls within its own box
+     instead of pushing the overlay taller or getting cut off. */
+  scrollbar-width: thin;
+}
+
+.browse-hover-content::-webkit-scrollbar {
+  width: 4px;
+}
+.browse-hover-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.browse-hover-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+}
+
+.browse-hover-content>* {
+  transform: translateX(-15px);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+}
+
+.browse-card:hover .browse-hover-content>* {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.browse-card:hover .browse-hover-content>*:nth-child(1) {
+  transition-delay: 0.05s;
+}
+
+.browse-card:hover .browse-hover-content>*:nth-child(2) {
+  transition-delay: 0.1s;
+}
+
+.hover-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.hover-genres span {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #fff;
+  /* A long tag ("Action & Adventure", hanime's multi-word tags, ...) can be
+     wider than the whole card (140px) — let it wrap onto a second line
+     inside its own pill instead of being clipped at the card edge. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.browse-card img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  background: var(--bg-elevated);
+  display: block;
+}
+
+.browse-info {
+  padding: 9px 10px 11px;
+}
+
+.browse-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.browse-genre {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Downloaded badge on cards */
+.downloaded-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  background: var(--success);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  line-height: 1.5;
+}
+
+
+/* ===================================================================
+   SEARCH RESULT CARDS (renderResults in app.js → div.card)
+   =================================================================== */
+.results .card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.results .card:hover {
+  background: var(--bg-hover);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.results .card img {
+  width: 42px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.results .card .info {
+  flex: 1;
+  min-width: 0;
+}
+
+.results .card .title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Provider-colored pill; the .provider-* modifiers below aren't currently
+   applied by app.js (unrelated to the similarly-named .browse-provider-*
+   classes used for the Browse tab's provider sections) — kept as-is. */
+.result-source-pill {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.result-source-pill.provider-aniworld {
+  color: var(--accent);
+}
+
+.result-source-pill.provider-sto {
+  color: var(--info);
+}
+
+.result-source-pill.provider-filmpalast {
+  color: #e8914a;
+}
+
+/* ===================================================================
+   FAVOURITES LIST + RESULT CARDS (renderFavourites → div.result-card)
+   =================================================================== */
+.fav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.result-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition), background var(--transition);
+  min-width: 0;
+}
+
+.result-card:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: var(--bg-hover);
+}
+
+.result-poster-wrap {
+  flex-shrink: 0;
+  width: 52px;
+  height: 74px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.result-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.result-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.result-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .result-card {
+    flex-wrap: wrap;
+  }
+
+  .result-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ===================================================================
+   EPISODE ITEMS (buildAccordion in app.js → div.episode-item)
+   =================================================================== */
+.episode-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.episode-item:hover {
+  background: var(--bg-elevated);
+}
+
+.episode-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ep-num {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.ep-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.ep-downloaded {
+  color: var(--success);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.ep-langs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Per-episode "stream now" button (stream-from-source) */
+.ep-stream-btn {
+  flex-shrink: 0;
+  margin-left: 6px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent, #4ea1ff);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--accent, #4ea1ff);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ep-stream-btn:hover {
+  background: var(--accent, #4ea1ff);
+  color: #fff;
+}
+.ep-stream-btn svg {
+  width: 13px;
+  height: 13px;
+}
+@media (max-width: 640px) {
+  .ep-stream-btn { width: 34px; height: 34px; min-width: 34px; } /* larger tap target on touch widths */
+}
+
+/* ── While the video player is open: pause background animations / glow
+   effects and disable expensive compositing so they don't compete with video
+   decoding and cause browser-wide stutter. The player overlay keeps its own
+   animations (e.g. the loading spinner). ── */
+body.player-open * {
+  animation-play-state: paused !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  scroll-behavior: auto !important;
+}
+body.player-open #playerOverlay,
+body.player-open #playerOverlay * {
+  animation-play-state: running !important;
+}
+
+.ep-lang-flag {
+  width: 20px;
+  height: 14px;
+  object-fit: cover;
+  border-radius: 2px;
+  opacity: 0.85;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Season styles */
+.season-section {
+  margin-bottom: 6px;
+}
+
+.season-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition);
+}
+
+.season-header:hover {
+  background: var(--bg-hover);
+}
+
+.season-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.season-arrow {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+  display: inline-block;
+}
+
+.season-header.expanded .season-arrow {
+  transform: rotate(90deg);
+}
+
+.season-downloaded {
+  color: var(--success);
+  font-size: 0.8rem;
+}
+
+.season-all-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.season-all-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.season-body {
+  display: none;
+  padding: 4px 0;
+}
+
+.season-body.expanded {
+  display: block;
+}

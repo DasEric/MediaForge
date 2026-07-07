@@ -1,3 +1,13 @@
+"""Authentication for the web UI: local username/password login, first-run
+setup token flow, optional OIDC/SSO login, the login_required/admin_required
+decorators, session helpers, and the admin user-management API.
+
+The `auth_bp` blueprint defined here is registered by create_app() in app.py
+only when auth_enabled=True. login_required/admin_required are applied to
+every other registered view function dynamically (not via decorator) at the
+end of create_app(), based on the `_exempt`/`_admin_only` endpoint sets.
+"""
+
 import os
 import re
 import secrets
@@ -54,6 +64,9 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[],
 
 
 def get_oidc_config():
+    """Read OIDC settings (DB first, then env var fallback). Returns None if
+    issuer/client_id/client_secret aren't all configured, meaning SSO login
+    is unavailable."""
     try:
         from .db import get_setting as _gs
     except ImportError:
@@ -78,6 +91,12 @@ def get_oidc_config():
 
 
 def init_oidc(app, force_sso=False):
+    """Register the OIDC client with Authlib and set the app.config OIDC_*
+    flags used by templates and routes. If get_oidc_config() returns None
+    (SSO not configured), OIDC is left disabled and local login stays active.
+
+    Used by: create_app() in app.py, when sso_enabled=True.
+    """
     cfg = get_oidc_config()
     if cfg is None:
         app.config["OIDC_ENABLED"] = False
@@ -105,6 +124,8 @@ def init_oidc(app, force_sso=False):
 
 
 def get_or_create_secret_key():
+    """Return the persistent Flask secret key, generating and saving one
+    (mode 0600) on first run so sessions survive process restarts."""
     MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if _SECRET_KEY_PATH.exists():
         return _SECRET_KEY_PATH.read_bytes()
@@ -118,6 +139,13 @@ def get_or_create_secret_key():
 
 
 def get_current_user():
+    """Return the logged-in user's {id, username, role} from the session, or
+    None if not logged in.
+
+    Used by: app.py's context processors (current_user template var),
+    request_context.py's get_current_user_info(), and routes/favourites.py
+    and routes/queue.py to attribute actions to the current user.
+    """
     uid = session.get("user_id")
     if uid is None:
         return None
@@ -150,6 +178,13 @@ def refresh_session_role():
 
 
 def login_required(f):
+    """Decorator: require a logged-in session; JSON 401 for API/XHR callers,
+    redirect to the login page otherwise.
+
+    Used by: create_app() in app.py, which wraps every registered view
+    function not in `_exempt`/`_admin_only` with this at startup (rather
+    than via per-route decorators).
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         if session.get("user_id") is None:
@@ -162,6 +197,13 @@ def login_required(f):
 
 
 def admin_required(f):
+    """Decorator: require an admin-role session, re-verifying the role from
+    the DB on every call (not just trusting the session) since role changes
+    should take effect immediately for sensitive admin routes.
+
+    Used by: the /admin/* routes in this module directly, and by create_app()
+    in app.py which applies it to the endpoints listed in `_admin_only`.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         uid = session.get("user_id")

@@ -86,7 +86,10 @@ def _s(key: str, default: str = "") -> str:
 
 
 def is_enabled() -> bool:
-    """Master switch: Fernsehserien integration active and importable."""
+    """Master switch: Fernsehserien integration active and importable.
+
+    Used by: web/routes/integrations.py.
+    """
     return _IMPORT_OK and _s("enabled", "0") == "1"
 
 
@@ -114,7 +117,10 @@ def _get_scraper() -> Any:
 
 
 def invalidate_cache() -> None:
-    """Drop all cached slug lookups (call after settings change / manual clear)."""
+    """Drop all cached slug lookups (call after settings change / manual clear).
+
+    Used by: web/routes/integrations.py, web/routes/search.py.
+    """
     clear_provider_cache(_PROVIDER_CACHE_NS)
 
 
@@ -157,6 +163,8 @@ def test_connection() -> Dict[str, Any]:
     Public scraping is inherently fragile (site layout / bot-blocking can
     change any time), so this just confirms the current build still parses a
     real page rather than validating any credentials (there are none).
+
+    Used by: web/routes/integrations.py (settings UI "test connection").
     """
     if not _IMPORT_OK:
         return {"ok": False, "error": "library_unavailable", "detail": _IMPORT_ERR or ""}
@@ -238,6 +246,8 @@ def get_provider_info(title: str) -> Dict[str, Any]:
     AND that page names a streaming provider — a page existing without
     streaming-premiere data (e.g. TV-only shows) does not produce a pill,
     since there'd be nothing useful to show.
+
+    Used by: web/routes/integrations.py, is_available() below.
     """
     empty = {"available": False, "provider": None, "date": None}
     title = (title or "").strip()

@@ -1,0 +1,123 @@
+/* ===================================================================
+   MediaForge — Buttons
+   The native <button> reset plus .btn and its variants
+   (primary/secondary/ghost/danger/sm/lg) and the square icon-only
+   .btn-icon.
+   =================================================================== */
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+/* ===================================================================
+   BUTTONS
+   =================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition), opacity var(--transition);
+  border: none;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--error);
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 6px 13px;
+  font-size: 0.82rem;
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 0.95rem;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--radius); /* note: --radius is not defined in variables.css (only --radius-sm/md/lg/xl exist), so this currently resolves to the browser default (0) */
+  background: var(--bg-elevated, var(--bg-hover));
+  /* !important on border/color guards against more specific selectors in
+     later-loaded files (cards.css, tables.css, etc.) unintentionally
+     overriding this button's look when it's nested inside them */
+  border: 1px solid var(--border) !important;
+  color: var(--text-secondary) !important;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background var(--transition), color var(--transition);
+}
+
+.btn-icon:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.btn-icon svg {
+  /* forces a consistent icon size regardless of the source SVG's own width/height attributes */
+  width: 15px !important;
+  height: 15px !important;
+  flex-shrink: 0;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  overflow: visible;
+}

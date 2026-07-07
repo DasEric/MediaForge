@@ -12,6 +12,12 @@ except ImportError:  # pragma: no cover
 
 
 class HanimeSeries:
+    """A hanime franchise/title, identified by one of its video slugs.
+
+    Used by: mediaforge.providers and web/routes/search.py (imported directly,
+    same pattern as FilmPalastEpisode/MegakinoSeries -- see models/__init__.py).
+    """
+
     def __init__(self, url=None):
         if not HANIME_SERIES_PATTERN.match(url or ""):
             raise ValueError(f"Invalid hanime series URL: {url}")
@@ -68,6 +74,8 @@ class HanimeSeries:
 
     @property
     def seasons(self):
+        """Always exactly one season -- hanime franchises are not split into
+        numbered seasons like AniWorld/s.to."""
         if self.__seasons is None:
             self.__seasons = [HanimeSeason(url=self.url, series=self, _detail=self._detail)]
         return self.__seasons

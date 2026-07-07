@@ -93,6 +93,8 @@
 .batch-clear:hover { color: var(--text-primary); }
 .batch-clear svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* 2-row grid: row 1 holds the status/path selects + delete button, row 2
+   (.bg-group) spans the full width beneath them. */
 .batch-actions {
   display: grid;
   grid-template-columns: auto auto 1fr;
@@ -161,6 +163,9 @@
 .autosync-group-header:hover {
   border-color: var(--accent);
 }
+/* Chevron glyph (▸) points right by default; rotated 90deg to point down
+   when the group is expanded. .collapsed is toggled by autosync.js on
+   header click and persisted to localStorage. */
 .autosync-group-chevron {
   display: inline-block;
   font-size: 0.8rem;
@@ -253,3 +258,245 @@
     min-width: 0;
   }
 }
+
+/* ===== Moved from style.css: autosync-item cards, edit modal, sync-card widgets (Auto-Sync run table), and misc modal helpers ===== */
+/* Narrow the edit-run modal (base 520px, set further below) and drop the
+   hint's label-aligned indent on small screens where there's no room for it. */
+@media (max-width: 768px) {.editModal {
+    max-width: 320px !important;
+  }
+
+  .editModalHint{
+    padding: unset !important;
+  }
+
+  
+
+
+}.autosync-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color var(--transition);
+}.autosync-item:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+}.autosync-item-thumb {
+  width: 48px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}.autosync-item-body {
+  flex: 1;
+  min-width: 0;
+}.autosync-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}.autosync-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}.autosync-item-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* Widen the generic .modal for the multi-field edit-run form (narrowed again below 768px above). */
+.editModal{
+ max-width: 520px !important;
+}
+/* calc(80px + 12px) aligns the hint text with the form's field values: the
+   .settings-field-label columns in the edit modal (autosync.html) are 80px wide + a 12px gap. */
+.editModalHint{
+ margin-bottom:18px;padding:0 0 0 calc(80px + 12px);font-size:0.78rem;color:var(--text-muted);line-height:1.5;
+}.autoSyncHeader{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+/* Cancels the global label { margin-bottom: 6px } (forms.css) since this
+   label is styled as an inline header button, not a stacked form field. */
+label.btn.btn-ghost.autosync-hdr-btn.autosync-import-lbl{
+  margin-bottom: 0px !important;
+}.modal-btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 14px;
+}.modal-info-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}.autosync-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px;
+}.autosync-table-wrap {
+  /* No overflow needed — cards wrap naturally */
+}.sync-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}.sync-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}.sync-card:hover {
+  border-color: var(--border-focus);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}.sync-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}.sync-card-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+  /* Allow wrapping so full title is visible */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}.sync-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}.sync-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}.sync-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8rem;
+}.sync-stat-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}.sync-stat-value {
+  color: var(--text-secondary);
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}.sync-stat-new {
+  color: var(--success, #4ade80);
+  font-weight: 600;
+}.sync-stat-neutral {
+  color: var(--text-muted);
+}.sync-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}.sync-card-btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}.sync-card-btn-sync {
+  color: var(--accent) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}.sync-card-btn-sync:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+/* @keyframes spin is defined in feedback.css (shared loading-spinner animation). */
+.sync-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(124, 58, 237, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}@media (max-width: 640px) {.autosync-container {
+      padding: 12px;
+    }
+
+    /* Header: stack title + buttons */
+    .autosync-container .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .autosync-container .page-header>div:last-child {
+      width: 100%;
+    }
+
+    .autosync-container .page-header>div:last-child button,
+    .autosync-container .page-header>div:last-child label.btn {
+      flex: 1;
+      justify-content: center;
+      min-width: 100% !important;
+      min-height: 40px !important;
+    }
+
+    
+
+    
+
+    .autoSyncHeader{
+      flex-direction: column !important;
+    }
+
+    /* Import label: same height as the Export button */
+    .autosync-container label.btn {
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    /* Sync cards: single column */
+    .sync-card-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }.autosync-hdr-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    cursor: pointer;
+    white-space: nowrap;
+  }.autosync-import-lbl {
+    cursor: pointer;
+  }.sync-card-cb-wrap {
+    display: flex;
+    align-items: flex-start;
+    padding-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  /* Base size/color for the card-select checkbox; it also carries the
+     .chb-main class (forms.css), which layers the custom check mark on top. */
+  .sync-card-cb-wrap input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent, #6366f1);
+    cursor: pointer;
+  }

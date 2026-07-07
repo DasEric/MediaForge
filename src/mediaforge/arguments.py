@@ -1,3 +1,11 @@
+"""Command-line argument parsing for the ``mediaforge`` launcher.
+
+The standalone interactive CLI was removed in the WebUI-only refactor; the
+only options left configure how the WebUI itself is started (host/port/
+browser) plus a debug-logging switch. Parsed once by :func:`parse_args`,
+called from :func:`mediaforge.entry.mediaforge` at startup.
+"""
+
 import argparse
 import logging
 import os
@@ -8,6 +16,16 @@ logger = get_logger(__name__)
 
 
 def parse_args():
+    """Parse CLI arguments for launching the WebUI.
+
+    If ``--debug`` is given, also applies it immediately: sets
+    ``MEDIAFORGE_DEBUG_MODE``/``MEDIAFORGE_DEBUG_FORCED`` and raises every
+    already-created logger to DEBUG, so debug logging is active before the
+    WebUI starts rather than waiting for a settings round-trip.
+
+    Returns the parsed ``argparse.Namespace``.
+    Used by: :func:`mediaforge.entry.mediaforge`.
+    """
     parser = argparse.ArgumentParser(
         prog="mediaforge",
         description=(

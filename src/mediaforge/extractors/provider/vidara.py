@@ -7,6 +7,12 @@ The VIDARA embed page fetches the actual stream from a small JSON API:
 Unlike the original single-domain implementation, the API host is taken from
 the embed URL itself, so every VIDARA mirror domain works (VIDARA rotates
 domains frequently). The same scheme powers the Vidavaca clone (vidavaca.py).
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_vidara"); see the provider alias table in
+models/megakino_to/scraper.py (("vidara", "Vidara"), ("vidaar", "Vidara")
+for vidaarax.* mirrors) and the generic provider dispatch in
+models/megakino_to/{episode,movie}.py.
 """
 import json
 import logging
@@ -64,6 +70,11 @@ def get_stream_data(embed_url, headers=None, timeout=20):
 
 
 def _stream_from_data(data, embed_url, name="VIDARA"):
+    """Pull the stream URL out of a /api/stream JSON response, trying known key names.
+
+    Shared with vidavaca.py's near-identical clone API, hence the caller-supplied
+    ``name`` used only for error messages.
+    """
     streaming_url = (data or {}).get("streaming_url") or (data or {}).get("file") or (data or {}).get("url")
     if not streaming_url:
         raise ValueError(

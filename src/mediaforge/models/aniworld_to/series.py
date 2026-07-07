@@ -29,7 +29,8 @@ class AniworldSeries:
         age_rating:     "16"
         rating:         "4/5"
         imdb:           "tt1596341"
-        mal_id:         [8074] # TODO: Highschool DxD entries broken yet others prob non nsfw work
+        mal_id:         [8074]  # TODO: lookup is unreliable for some ecchi/adult-adjacent
+                                # titles (e.g. Highschool DxD) even though most other series work.
         has_movies:     true
         seasons:        [<mediaforge.models.aniworld_to.season.AniworldSeason object at 0x10afe5fd0>, [...]]
         season_count:   4
@@ -39,6 +40,11 @@ class AniworldSeries:
         download()
         watch()
         syncplay()
+
+    Used by:
+        mediaforge.providers (Provider(name="AniWorld", series_cls=AniworldSeries));
+        web/routes/search.py resolves series metadata (title/poster/cast/etc.) through
+        this class for the AniWorld result cards and detail modal.
     """
 
     def __init__(self, url: str):
@@ -202,12 +208,14 @@ class AniworldSeries:
     # -----------------------------
 
     def __extract_mal_id(self):
+        """Look up this series' MyAnimeList season ids by title (used for AniSkip)."""
         from ...aniskip import get_all_seasons_by_query
 
         return get_all_seasons_by_query(self.title)
 
     def __extract_title(self):
-        """
+        """Extract the series title from the header block. Sample markup:
+
         <div class="series-title">
             <h1 itemprop="name" title="Animes Stream: 哥布林猎人, Goburin Sureiyā, 고블린슬레이어, Goblin Katili" data-alternativetitles="哥布林猎人, Goburin Sureiyā, 고블린슬레이어, Goblin Katili"><span>Goblin Slayer</span></h1>
             <small> (<span itemprop="startDate"><a href="https://aniworld.to/animes/jahr/2018">2018</a></span> - <span itemprop="endDate"><a href="https://aniworld.to/animes/jahr/2023">2023</a></span>)</small>
@@ -235,7 +243,8 @@ class AniworldSeries:
         return title
 
     def __extract_description(self):
-        """
+        """Extract the full (unclamped) description from the data-full-description attribute. Sample markup:
+
         <p class="seri_des" itemprop="accessibilitySummary" data-description-type="review" data-full-description="Goblins - die schwächsten aller Monster. Mit der Stärke und dem Verstand von kleinen Kindern ausgestattet, können sie lediglich ihre immerwährende Überzahl zu ihren Stärken zählen. Doch so dumm die Goblins auch sein mögen, sie sind keine Narren und ihr kindliches Denken schlägt schnell ins Grausame und Brutale um, wenn sie glauben, dass ihnen Unrecht geschieht. Eine junge Priesterin, gerade einmal 15 Jahre alt, beschließt, ihren Tempel zu verlassen und als Abenteuerin die Welt etwas sicherer zu machen. Jeder fängt klein an und so schließt sie sich spontan einer Gruppe Abenteurer an, die gerade einen Quest angenommen hat, der sie gegen eben diese schwächsten aller Monster führt: Ein paar Mädchen wurden von Goblins entführt und bevor diese zu deren Spielzeugen werden, gilt es, die Goblins zu töten und die Mädchen zu retten!">Goblins - die schwächsten aller Monster. Mit der Stärke und dem Verstand von kleinen Kindern ausgestattet, können sie lediglich ihre immerwährende Überzahl zu ihren Stärken zählen. Doch so dumm die Goblins auch sein mögen, sie sind keine Narren und ihr kindliches Denken schlägt schnell ins...<span class="showMore">mehr anzeigen</span></p>
         """
         logger.debug("extracting description...")
@@ -261,7 +270,8 @@ class AniworldSeries:
         return description
 
     def __extract_genres(self):
-        """
+        """Extract the genre tag list. Sample markup:
+
         <div class="genres">
             <ul data-main-genre="action">
                 <li><a href="/genre/action" class="genreButton clearbutton" itemprop="genre">Action</a></li>
@@ -316,7 +326,9 @@ class AniworldSeries:
         return genres
 
     def __extract_release_year(self):
-        """
+        """Extract the start/end air-year range (e.g. "2012-2018") from the
+        <small> block next to the title. Sample markup:
+
         <div class="series-title">
             <h1 itemprop="name" title="Animes Stream: 哥布林猎人, Goburin Sureiyā, 고블린슬레이어, Goblin Katili" data-alternativetitles="哥布林猎人, Goburin Sureiyā, 고블린슬레이어, Goblin Katili"><span>Goblin Slayer</span></h1>
             <small> (<span itemprop="startDate"><a href="https://aniworld.to/animes/jahr/2018">2018</a></span> - <span itemprop="endDate"><a href="https://aniworld.to/animes/jahr/2023">2023</a></span>)</small>
@@ -375,7 +387,9 @@ class AniworldSeries:
         return f"{start_year}-{end_year}"
 
     def __extract_poster_url(self):
-        """
+        """Extract the cover image URL, preferring the lazy-loaded data-src
+        over the (possibly placeholder) src attribute. Sample markup:
+
         <div class="seriesCoverBox"><img src="/public/img/cover/sentenced-to-be-a-hero-stream-cover-R6nfhysg9tvuw9XnflBmesyEmaLPrtp1_220x330.png" data-src="/public/img/cover/sentenced-to-be-a-hero-stream-cover-R6nfhysg9tvuw9XnflBmesyEmaLPrtp1_220x330.png" alt="Sentenced to Be a Hero, Cover, HD, Anime Stream, ganze Folge" itemprop="image" title="Cover Sentenced to Be a Hero AniWorld" class="loaded" data-was-processed="true"><noscript><img src="/public/img/cover/sentenced-to-be-a-hero-stream-cover-R6nfhysg9tvuw9XnflBmesyEmaLPrtp1_220x330.png" alt="Sentenced to Be a Hero, Cover, HD, Anime Stream, ganze Folge" itemprop="image" title="Cover Sentenced to Be a Hero AniWorld"></noscript></div>
         """
         logger.debug("extracting poster url...")
@@ -409,7 +423,8 @@ class AniworldSeries:
         return f"https://aniworld.to{rel_url}"
 
     def __extract_directors(self):
-        """
+        """Extract the director list. Sample markup:
+
         <li class="seriesDirector"><strong>Regisseure:</strong>
             <ul>
                 <li itemprop="director" itemscope="" itemtype="http://schema.org/Person"><a href="/animes/regisseur/mitsutoshi-ogura" itemprop="url"><span itemprop="name">Mitsutoshi Ogura</span></a></li>
@@ -455,7 +470,9 @@ class AniworldSeries:
         return directors
 
     def __extract_actors(self):
-        """
+        """Extract the actor list, including entries hidden behind the
+        "& N weitere" (show more) toggle. Sample markup:
+
         <li><strong style="float: left;" class="seriesActor">Schauspieler:</strong>
             <ul class="showHiddenArea">
                 <li itemprop="actor" itemscope="" itemtype="http://schema.org/Person"><a href="/animes/schauspieler/yichir-umehara" itemprop="url"><span itemprop="name">Yūichirō Umehara</span></a></li>
@@ -511,7 +528,9 @@ class AniworldSeries:
         return actors
 
     def __extract_producer(self):
-        """
+        """Extract the producer/studio list, comma-joined into one string.
+        Sample markup:
+
         <li><strong style="float: left;" class="seriesProducer">Produzent:</strong>
             <ul>
                 <li itemprop="creator" itemscope="" itemtype="http://schema.org/Organization"><a href="/animes/produzent/white-fox" itemprop="url"><span itemprop="name">White Fox</span></a></li>
@@ -555,7 +574,8 @@ class AniworldSeries:
         return ", ".join(producers) if producers else None
 
     def __extract_country(self):
-        """
+        """Extract the country of origin (first entry only). Sample markup:
+
         <li><strong style="float: left;" class="seriesCountry">Land:</strong>
             <ul>
                 <li data-content-type="country" itemprop="countryOfOrigin" itemscope="" itemtype="http://schema.org/Country"><a href="/animes/aus/japan" itemprop="url"><span itemprop="name">Japan</span></a></li>
@@ -591,7 +611,9 @@ class AniworldSeries:
         return ul_html[name_start:name_end].strip()
 
     def __extract_age_rating(self):
-        """
+        """Extract the FSK (German age rating) value from the data-fsk attribute.
+        Sample markup:
+
         <div title="Empfohlene Altersfreigabe: 16 Jahre" data-fsk="16" class="fsk fsk16">Ab: <span>16</span></div>
         """
         logger.debug("extracting age rating...")
@@ -611,6 +633,8 @@ class AniworldSeries:
         return html[start:end].strip()
 
     def __extract_rating(self):
+        """Extract the "ratingValue/bestRating" pair (e.g. "4/5") from the
+        schema.org rating markup."""
         logger.debug("extracting rating...")
 
         html = self._html
@@ -654,8 +678,12 @@ class AniworldSeries:
         return None
 
     def __extract_movies(self):
-        """
-        Detects if the series has movies by looking for the Filme link
+        """Detect whether this series has a movie collection, by checking for
+        the "Filme" nav link. Does not confirm movie *count* -- __extract_seasons
+        appends a single AniworldSeason(f"{url}/filme") entry when this is True,
+        and that season's own episode list is what actually enumerates the movies.
+        Sample markup:
+
         <li><a href="/anime/stream/goblin-slayer/filme" title="Alle Filme">Filme</a></li>
         """
         logger.debug("checking for movies...")
@@ -671,10 +699,12 @@ class AniworldSeries:
         return has_movies
 
     def __extract_seasons(self):
-        """
-        Extracts:
-          - Staffel-X seasons
-          - Optional /filme container (NOT a season)
+        """Build the ordered list of AniworldSeason objects: one per numbered
+        "staffel-N" link found on the page, plus (if has_movies) one extra
+        AniworldSeason for the /filme collection -- which is a season-shaped
+        object (it has `are_movies=True` and its own `episodes`), not a real
+        numbered season, hence the sort key `(s.are_movies, s.season_number)`
+        below pushes it to the end.
         """
         logger.debug("extracting seasons...")
 
@@ -707,6 +737,8 @@ class AniworldSeries:
         return seasons
 
     def __extract_season_count(self):
+        """Number of numbered seasons, excluding the synthetic /filme entry
+        (if has_movies)."""
         if self.has_movies:
             return len(self.seasons) - 1
 
@@ -717,16 +749,19 @@ class AniworldSeries:
     # -----------------------------
 
     def download(self):
+        """Download every episode of every season (including movies, if any)."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.download()
 
     def watch(self):
+        """Watch every episode of every season, sequentially."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.watch()
 
     def syncplay(self):
+        """Syncplay every episode of every season, sequentially."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.syncplay()

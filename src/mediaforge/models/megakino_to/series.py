@@ -12,6 +12,14 @@ except ImportError:  # pragma: no cover
 
 
 class MegakinoSeries:
+    """A MegaKino series (tv=1 payload). Always exactly one season -- see
+    MegakinoSeason -- since MegaKino doesn't split a show into separate
+    season pages the way AniWorld/s.to do.
+
+    Used by: mediaforge.providers and web/routes/search.py (imported directly,
+    same as HanimeSeries/FilmPalastEpisode -- see models/__init__.py).
+    """
+
     def __init__(self, url=None, _data=None):
         if not MEGAKINO_SERIES_PATTERN.match(url or ""):
             raise ValueError(f"Invalid MegaKino series URL: {url}")
@@ -63,6 +71,7 @@ class MegakinoSeries:
 
     @property
     def seasons(self):
+        """Always exactly one season, wrapping this same /watch payload."""
         if self.__seasons is None:
             self.__seasons = [MegakinoSeason(url=self.url, series=self, _data=self._data)]
         return self.__seasons

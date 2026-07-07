@@ -28,6 +28,17 @@ HANIME_LANGUAGE = "Japanese Dub"
 
 
 class HanimeEpisode:
+    """One video within a hanime franchise (see HanimeSeason).
+
+    No hoster/provider selection (hanime has a single HLS source per video)
+    and no `is_movie`/`skip_times` (hanime has no movie concept and no
+    AniSkip integration). `selected_provider` is hard-coded to "hanime" only
+    for API-shape compatibility with the other episode classes.
+
+    Used by: mediaforge.providers (Provider(episode_cls=HanimeEpisode)) and
+    web/routes/search.py (via HanimeSeries -> HanimeSeason.episodes).
+    """
+
     def __init__(self, url=None, series=None, season=None, episode_number=None,
                  episode_slug=None, title_de=None, title_en=None, censored="",
                  selected_path=None, selected_language=None, selected_provider=None):
@@ -136,6 +147,9 @@ class HanimeEpisode:
     # --- stream resolution (via extractor) ---
     @property
     def stream_url(self):
+        """Resolve the signed HLS (.m3u8) URL via the hanime extractor, which
+        drives a headless browser to click play and capture the request
+        (see hanime_tv/browser.py)."""
         if self.__stream_url is None:
             try:
                 from ...extractors.provider.hanime import get_direct_link_from_hanime
@@ -212,6 +226,10 @@ class HanimeEpisode:
 
     # --- actions ---
     def download(self, cancel_event=None, **kwargs):
+        """Download the single HLS stream for this video. Unlike the other
+        site families, this does NOT go through models/common/common.py's
+        download() -- there is no per-language/provider track selection to
+        reconcile, so a dedicated single-stream downloader is used instead."""
         try:
             from ...extractors.provider.hanime import download_from_hanime
         except ImportError:

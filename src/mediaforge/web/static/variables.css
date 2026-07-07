@@ -1,0 +1,110 @@
+/* ===================================================================
+   MediaForge — Theme tokens (CSS custom properties)
+   Dark/light color palette, spacing radii, shadows, and layout
+   constants, all switched via [data-theme] on <html>. This is the
+   first stylesheet loaded (see base.html) since every other file
+   below depends on these var(--...) references.
+   =================================================================== */
+
+
+
+/* ===== CSS Variables ===== */
+:root,
+[data-theme="dark"] {
+  --bg-base: #0d0d14;
+  --bg-surface: #13131e;
+  --bg-elevated: #1a1a28;
+  --bg-hover: #22223a;
+  --brand-color: #7c3aed;
+  --bg-card: #16162a;
+
+  --sidebar-bg: #0f0f1a;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.15);
+  --accent-glow: rgba(124, 58, 237, 0.35);
+
+  --text-primary: #f0f0f8;
+  --text-secondary: #9191b0;
+  --text-muted: #55556a;
+  --text-link: #8b8bff;
+  --text-link-hover: #a0a0ff;
+
+  --border: rgba(255, 255, 255, 0.07);
+  --border-focus: rgba(124, 58, 237, 0.6);
+
+  --input-bg: #1e1e30;
+  --input-border: rgba(255, 255, 255, 0.1);
+
+  --badge-bg: #ef4444;
+  --badge-text: #fff;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.8);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+
+  --transition: 0.18s ease;
+  --transition-slow: 0.3s ease;
+
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg-base: #f4f4f8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8f8fc;
+  --bg-hover: #ececf6;
+  --bg-card: #ffffff;
+  --brand-color: #7c3aed;
+
+  --sidebar-bg: #ffffff;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.08);
+  --accent-glow: rgba(124, 58, 237, 0.2);
+
+  --text-primary: #18181f;
+  --text-secondary: #5c5c78;
+  --text-muted: #9999b0;
+  --text-link: #6d28d9;
+  --text-link-hover: #5b21b6;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-focus: rgba(124, 58, 237, 0.5);
+
+  --input-bg: #f0f0f8;
+  --input-border: rgba(0, 0, 0, 0.12);
+
+  --badge-bg: #ef4444;
+  --badge-text: #fff;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --error: #dc2626;
+  --info: #2563eb;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.25);
+
+  color-scheme: light;
+}

@@ -275,7 +275,28 @@
 
 /* ── Embedded player stage (not a fullscreen modal) ────────── */
 .sp-stage { width: 100%; margin-bottom: 16px; position: relative; }
-/* While embedded, the shared overlay backdrop must not cov
+/* While embedded, the shared overlay backdrop must not cover the page:
+   #playerContainer gets JS-relocated out of #playerOverlay and into
+   .sp-stage (see syncplay_page.js _embedPlayer()), so the now-empty
+   overlay just needs to stop rendering as a fixed, full-viewport
+   backdrop, and the container needs to flow at the stage's width
+   instead of keeping its fixed modal sizing (inline styles, hence
+   the !important overrides below). */
+body.sp-embed #playerOverlay {
+  display: none !important;
+}
+#playerContainer.sp-embed {
+  width: 100% !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  aspect-ratio: 16 / 9;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+#playerContainer.sp-embed #playerVideoWrap {
+  flex: none;
+  height: 100%;
+}
 
 /* ── Host-lock: disable the timeline + play control for non-hosts ───────────── */
 body.sp-locked #playerSeekWrap,

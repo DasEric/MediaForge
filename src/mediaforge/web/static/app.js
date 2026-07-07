@@ -38,6 +38,16 @@ const hanimeTrendingGrid = document.getElementById("hanimeTrendingGrid");
 let currentSeasons = [];
 let currentSeriesTitle = "";
 let currentSeriesUrl = "";
+// Bumped by every openSeries() call; each call captures its own value and
+// checks it against this after every await before writing to the modal DOM.
+// Without this, opening series B while series A's fetches (openSeries,
+// buildAccordion, enrichModalWithTmdb — several independent async chains,
+// none awaited by the others) are still in flight lets A's late-arriving
+// response overwrite fields A wrote before B took over — a genuine bug seen
+// in production (mixed titles/genres/episodes from two different series in
+// one modal). Any continuation whose captured value no longer matches this
+// counter belongs to a superseded openSeries() call and must bail out.
+let _seriesLoadSeq = 0;
 // Provider data per language label
 let availableProviders = null;
 let langSeparationEnabled = false;
@@ -1232,6 +1242,18 @@ function renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResu
       addSyncBadge(card, r.url);
       grid.appendChild(card);
       loadPoster(r.url, card.querySelector("img"));
+      // hanime is adult content and isn't in TMDB's database, so — same as
+      // the dedicated hanime Browse tab (renderBrowseCards' skipTmdb option)
+      // — skip the TMDB/Crunchyroll/Fernsehserien lookup chain entirely here
+      // too; it would just be a wasted (or wrong-match) request per card.
+      // Genre/FSK hover info still works, fed from hanime's own tags.
+      if (sec.key === "hanime") {
+        const hanimeTags = (r.tags && r.tags.length)
+          ? r.tags
+          : (r.genre ? r.genre.split(",").map(g => g.trim()).filter(Boolean) : []);
+        renderBrowseHoverCards(card, null, hanimeTags, 18);
+        return;
+      }
       enrichCardWithTmdb(card, r.title);
     });
 
@@ -1284,12 +1306,15 @@ async function loadPoster(url, imgEl) {
 }
 
 async function openSeries(url) {
+  // Claim this load — see _seriesLoadSeq above for why this exists.
+  const _mySeq = ++_seriesLoadSeq;
   if (!generalSettings || Object.keys(generalSettings || {}).length === 0) {
     await loadGeneralSettings();
   }
   if (!cineinfoSettings || Object.keys(cineinfoSettings || {}).length === 0) {
     await loadCineinfoSettings();
   }
+  if (_mySeq !== _seriesLoadSeq) return; // superseded by a newer openSeries() call
   _currentSeriesUrl = url;
   overlay.style.display = "block";
   document.body.style.overflow = "hidden";
@@ -1355,6 +1380,7 @@ async function openSeries(url) {
   currentSeriesTitle = "";
   _updateUpscaleCheckbox(url);
   await checkLangSeparation();
+  if (_mySeq !== _seriesLoadSeq) return; // superseded while awaiting settings
   rebuildLanguageSelect();
   resetProviderDropdown();
   loadCustomPaths();
@@ -1366,6 +1392,7 @@ async function openSeries(url) {
     ]);
     const seriesData = await seriesResp.json();
     const seasonsData = await seasonsResp.json();
+    if (_mySeq !== _seriesLoadSeq) return; // a newer series was opened meanwhile — discard this response
     document.getElementById("modal").classList.remove("skeleton");
     document.getElementById("modalPoster").style.opacity = "";
 
@@ -1391,11 +1418,11 @@ async function openSeries(url) {
     // hanime — adult content isn't in TMDB's database, so this would just be
     // a wasted lookup (or a wrong match).
     if (!/hanime\.tv/i.test(url)) {
-      enrichModalWithTmdb(currentSeriesTitle, seriesData.imdb_id || null);
+      enrichModalWithTmdb(currentSeriesTitle, seriesData.imdb_id || null, _mySeq);
     }
 
     currentSeasons = seasonsData.seasons || [];
-    buildAccordion(currentSeasons);
+    buildAccordion(currentSeasons, _mySeq);
 
     // For FilmPalast movies: populate provider dropdown from movie metadata
     const isMovie = !!seriesData.is_movie;
@@ -1428,6 +1455,7 @@ async function openSeries(url) {
           "/api/autosync/check?url=" + encodeURIComponent(url),
         );
         const syncData = await syncResp.json();
+        if (_mySeq !== _seriesLoadSeq) return; // superseded while checking autosync
         if (syncData.exists && syncData.job) _currentSyncJob = syncData.job;
         _updateSyncConfigBtn();
       } catch (e) {
@@ -1436,6 +1464,7 @@ async function openSeries(url) {
     }
 
     // Check if this series is a favourite
+    if (_mySeq !== _seriesLoadSeq) return; // superseded — don't touch the favourite button either
     _updateFavouriteBtn(url, seriesData.title, seriesData.poster_url || "");
   } catch (e) {
     document.getElementById("modal").classList.remove("skeleton");
@@ -1444,7 +1473,7 @@ async function openSeries(url) {
   }
 }
 
-function buildAccordion(seasons) {
+function buildAccordion(seasons, _seq) {
   seasonAccordion.innerHTML = "";
   episodeSpinner.style.display = "block";
   selectAllCb.checked = false;
@@ -1458,6 +1487,9 @@ function buildAccordion(seasons) {
   );
 
   Promise.all(fetches).then((results) => {
+    // openSeries() may have moved on to a different series while these
+    // per-season episode fetches were in flight — see _seriesLoadSeq.
+    if (_seq !== undefined && _seq !== _seriesLoadSeq) return;
     episodeSpinner.style.display = "none";
     let firstProviderUrl = null;
 
@@ -1612,6 +1644,13 @@ function renderLangAvailBanner(results) {
     banner.style.display = "none";
     return;
   }
+  // hanime has exactly one language (Japanese Dub, burned-in subs — see
+  // HANIME_LANGUAGE in models/hanime_tv/episode.py), so a Ger./Eng.
+  // Dub/Sub availability breakdown is meaningless there.
+  if ((currentSeriesUrl || "").includes("hanime.tv")) {
+    banner.style.display = "none";
+    return;
+  }
 
   const isSto = (currentSeriesUrl || "").includes("s.to") || (currentSeriesUrl || "").includes("serienstream.to");
   const LANG_ORDER = ["German Dub", "English Sub", "German Sub", "English Dub"];
@@ -1749,12 +1788,17 @@ function updateProviderDropdown() {
       providerSelect.appendChild(opt);
     });
   } else {
-    staticProviders.forEach((p) => {
-      const opt = document.createElement("option");
-      opt.value = p;
-      opt.textContent = p;
-      providerSelect.appendChild(opt);
-    });
+    // The backend already checked (extractor support +, for movies, live
+    // availability) and came back empty for this language — don't fall back
+    // to the unfiltered static list, that would just offer sources we know
+    // are dead. (A fetch that never happened / failed is handled above by
+    // the "if (!availableProviders) return;" guard, which leaves whatever
+    // was already rendered — usually the static list — untouched.)
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = t("Keine Quelle verfügbar", "No Source available");
+    opt.disabled = true;
+    providerSelect.appendChild(opt);
   }
   selectDefaultProvider();
 }
@@ -1836,6 +1880,10 @@ async function streamEpisode(episodeUrl, title, langOptions) {
   }
   const language = languageSelect ? languageSelect.value : "German Dub";
   const provider = providerSelect ? providerSelect.value : "VOE";
+  if (!provider) {
+    showToast(t("Keine Quelle verfügbar", "No Source available"));
+    return;
+  }
   // Available languages: this episode's, else fall back to the page selector.
   let langs = (langOptions && langOptions.length) ? langOptions.slice() : [];
   if (!langs.length && languageSelect) {
@@ -1864,6 +1912,10 @@ async function startDownload(all) {
 
   const language = languageSelect.value;
   const provider = providerSelect.value;
+  if (!provider) {
+    showToast(t("Keine Quelle verfügbar", "No Source available"));
+    return;
+  }
 
   // Detect selected episodes that do not offer the chosen language. This is a
   // manual-download safeguard only — it never runs for Auto-Sync.
@@ -2288,12 +2340,18 @@ async function _cardProviderChain(card, d) {
   if (!crAdded) await _fsCardPill(card, d);
 }
 
-async function enrichModalWithTmdb(title, imdbId) {
+async function enrichModalWithTmdb(title, imdbId, _seq) {
   const provEl = document.getElementById('tmdbProviders');
   if (!provEl) return;
+  // openSeries() may already have moved on to a different series by the time
+  // any of the awaits below resolve — see _seriesLoadSeq. Bail rather than
+  // write stale-series data (genres, rating, FSK, trailer, recommendations,
+  // provider pills) into the now-current modal.
+  const _stale = () => _seq !== undefined && _seq !== _seriesLoadSeq;
   if (!cineinfoSettings || !cineinfoSettings.tmdb_api_key) {
     // TMDB is off entirely — start the chain at Crunchyroll.
     const crAdded = await _crProviderPill(title, provEl);
+    if (_stale()) return;
     if (!crAdded) await _fsProviderPill(title, provEl);
     return;
   }
@@ -2302,6 +2360,7 @@ async function enrichModalWithTmdb(title, imdbId) {
     if (imdbId) tmdbUrl += '&imdb_id=' + encodeURIComponent(imdbId).replace(/'/g, "%27");
     const resp = await fetch(tmdbUrl);
     const d = await resp.json();
+    if (_stale()) return;
     console.log("[CineInfo] Full Modal Data for", title, ":", d);
     console.log("[CineInfo] Settings Debug - General:", generalSettings, "CineInfo:", cineinfoSettings);
     const sTrailer = cineinfoSettings?.show_trailer ?? "1";
@@ -2310,6 +2369,7 @@ async function enrichModalWithTmdb(title, imdbId) {
     if (!d.found) {
       // No TMDB data at all — start the chain at Crunchyroll.
       const crAdded = await _crProviderPill(title, provEl);
+      if (_stale()) return;
       if (!crAdded) await _fsProviderPill(title, provEl);
       return;
     }
@@ -2354,7 +2414,9 @@ async function enrichModalWithTmdb(title, imdbId) {
     // or conflicting pill next to TMDB's own list.
     if (!tmdbHasProviders) {
       const crAdded = await _crProviderPill((d && d.title) || title, provEl);
+      if (_stale()) return;
       if (!crAdded) await _fsProviderPill((d && d.title) || title, provEl);
+      if (_stale()) return;
     }
     // TMDB Genres — ersetze die Seiten-Genres wenn aktiviert
     if (cineinfoSettings.show_genres === '1' && d.genres && d.genres.length) {

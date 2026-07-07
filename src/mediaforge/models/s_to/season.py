@@ -27,7 +27,10 @@ class SerienstreamSeason:
         syncplay()
 
     Attributes That Do Not Exists as on Aniworld:
-        are_movies
+        are_movies (s.to has no separate movie collection to distinguish)
+
+    Used by:
+        mediaforge.providers (Provider(name="SerienStream", season_cls=SerienstreamSeason)).
     """
 
     def __init__(self, url, series=None):
@@ -106,7 +109,9 @@ class SerienstreamSeason:
         return int(self.url.rstrip("/").split("-")[-1])
 
     def __extract_episode_count(self):
-        """
+        """Count episode links for this season number on the season page.
+        Sample markup (one <a> per episode):
+
         <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-1"
                     <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-2"
                     <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-3"
@@ -125,7 +130,10 @@ class SerienstreamSeason:
         return len(matches)
 
     def __extract_episodes(self):
-        """
+        """Build SerienstreamEpisode objects for every episode link matching
+        this season number (both absolute and relative hrefs are supported;
+        the site currently serves both forms). Sample markup:
+
         <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-1"
                     <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-2"
                     <a href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1/episode-3"
@@ -158,13 +166,16 @@ class SerienstreamSeason:
     # PUBLIC METHODS
     # -----------------------------
     def download(self):
+        """Download every episode in this season."""
         for episode in self.episodes:
             episode.download()
 
     def watch(self):
+        """Watch every episode in this season, sequentially."""
         for episode in self.episodes:
             episode.watch()
 
     def syncplay(self):
+        """Syncplay every episode in this season, sequentially."""
         for episode in self.episodes:
             episode.syncplay()

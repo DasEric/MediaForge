@@ -1,3 +1,12 @@
+"""URL classification and provider registry.
+
+Maps a stream/series/season URL to the site it belongs to (AniWorld,
+SerienStream, FilmPalast, MegaKino, hanime.tv) and to the model classes
+that know how to scrape that site. :func:`resolve_provider` is the single
+entry point everything else in the app uses to turn a raw URL into a
+concrete ``*Episode``/``*Season``/``*Series`` model class.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -44,6 +53,10 @@ FILMPALAST_EPISODE_PATTERN = _re.compile(
 
 @dataclass(frozen=True)
 class Provider:
+    """A streaming site: the regexes that recognize its URLs and the model
+    classes that scrape each URL kind. Any field can be None -- e.g.
+    FilmPalast has no series/season concept, only episode_pattern/episode_cls."""
+
     name: str
     series_pattern: Optional[Pattern[str]] = None
     season_pattern: Optional[Pattern[str]] = None
@@ -113,6 +126,8 @@ PROVIDERS = [
 
 
 def normalize_url(url: str) -> str:
+    """Normalize a URL to the canonical form the provider regexes expect:
+    resolves the /serie/stream/<slug> alias and strips a trailing slash."""
     if not url:
         return url
 
@@ -135,6 +150,12 @@ def normalize_url(url: str) -> str:
 
 
 def resolve_provider(url: str) -> Provider:
+    """Return the Provider whose series/season/episode pattern matches *url*.
+
+    Raises ValueError if no provider recognizes the URL.
+    Used by: ``web/routes/{browse,search,stream}.py``, ``web/queue_worker.py``
+    and ``web/autosync_worker.py`` to pick the right scraper model for a URL.
+    """
     url = normalize_url(url)
 
     for provider in PROVIDERS:

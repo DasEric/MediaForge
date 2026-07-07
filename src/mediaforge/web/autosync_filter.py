@@ -25,6 +25,9 @@ Semantics
 
 Movies / specials (``are_movies`` collection) are controlled solely by
 ``include_movies`` and are never episode-filtered.
+
+Used by: autosync_worker.py, which calls parse_filter() once per job and then
+movie_included()/episode_included() per candidate item while syncing.
 """
 
 import json

@@ -439,13 +439,41 @@ def parse_meta(detail):
 
 
 def franchise_episodes(detail):
-    """Ordered episode dicts {slug, name, censored} from the normalised detail."""
+    """Ordered episode dicts {slug, name, censored} from the normalised detail.
+
+    browser.py's page scrape collects every ``a[href*="/videos/hentai/"]``
+    link on the video page, which also picks up unrelated "related/
+    recommended videos" widgets elsewhere on the page — not just the real
+    franchise episode list. That pollutes the ordered list this returns, and
+    since HanimeEpisode.episode_slug indexes into it by position (`eps[idx]`),
+    a stray unrelated link doesn't just look wrong in the UI, it can make
+    "Episode 1" actually resolve to and stream/download a completely
+    different video.
+
+    Guard against this the same way listing hits are grouped into franchise
+    cards (see franchise_key()/_EP_SUFFIX_RE above): strip a trailing episode
+    number off both the series' own title and each candidate's name, and only
+    keep entries whose stripped base title agrees with the series' — this
+    doesn't depend on hanime's exact page markup, just on titles matching
+    once episode numbering is ignored. If the series title is missing
+    (extraction failed) nothing is filtered, since guessing wrong would drop
+    real episodes.
+    """
+    detail = detail or {}
+    series_title = _clean(detail.get("title") or "")
+    series_base = _EP_SUFFIX_RE.sub("", series_title).strip().lower()
+
     out = []
-    for v in (detail or {}).get("episodes") or []:
+    for v in detail.get("episodes") or []:
         slug = v.get("slug")
-        if slug:
-            out.append({"slug": slug, "name": _clean(v.get("name")),
-                        "censored": v.get("censored") or ""})
+        if not slug:
+            continue
+        name = _clean(v.get("name"))
+        ep_base = _EP_SUFFIX_RE.sub("", name).strip().lower()
+        if series_base and ep_base and series_base != ep_base \
+                and ep_base not in series_base and series_base not in ep_base:
+            continue  # different franchise entirely — drop it
+        out.append({"slug": slug, "name": name, "censored": v.get("censored") or ""})
     return out
 
 

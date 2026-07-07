@@ -11,7 +11,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <!-- Former style.css, split by function for easier editing (see style.css
+       itself for the full breakdown). Order matters: variables first (everything
+       else references var(--...)), base second (reset that others build on). -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='variables.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='appearance.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='shell.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='forms.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='buttons.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='cards.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='tabs-badges.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='modals.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='tables.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='feedback.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='detail-page.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='queue.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='utilities.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='autosync_filter.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='selfupdate.css') }}" />
   {% block styles %}{% endblock %}
@@ -606,6 +622,7 @@
   </script>
   <script src="{{ url_for('static', filename='autosync_filter.js') }}"></script>
   <script src="{{ url_for('static', filename='selfupdate.js') }}"></script>
+  <script src="{{ url_for('static', filename='number_input.js') }}"></script>
   {% block scripts %}{% endblock %}
   <script>
     // ===== Sidebar =====

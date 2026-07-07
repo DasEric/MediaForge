@@ -20,6 +20,12 @@ Design:
 
 The pure helpers (``effective_position``, ``snapshot`` builders) avoid I/O so
 they can be unit-tested.
+
+Used by: nearly every public function here is called from
+``web/routes/syncplay.py`` (the HTTP/SSE endpoints for room actions).
+``room_for_token`` is also used by ``web/routes/stream.py`` to derive a
+shared-transcode key for SyncPlay viewers, and ``ensure_room`` is called
+from ``web/app.py`` at startup to restore rooms saved before a restart.
 """
 
 from __future__ import annotations
@@ -55,6 +61,8 @@ class RoomError(Exception):
 # ── Member ──────────────────────────────────────────────────────────────────
 
 class Member:
+    """One connected participant in a Room (host or guest)."""
+
     def __init__(self, token: str, name: str, is_guest: bool, device: str = "", ip: str = ""):
         self.token = token
         self.name = name
@@ -97,6 +105,9 @@ class Member:
 # ── Room ────────────────────────────────────────────────────────────────────
 
 class Room:
+    """A single watch-party room: membership, canonical playstate, chat,
+    history and moderation settings. All mutation happens under ``self.lock``."""
+
     def __init__(self, name: str):
         self.name = name
         self.created_at = time.time()
@@ -339,6 +350,7 @@ def get_snapshot(token: str) -> dict | None:
 
 
 def room_for_token(token: str) -> Room | None:
+    """Resolve a member token to its Room, or None if unknown/expired."""
     name = _token_index.get((token or "").strip())
     if not name:
         return None
@@ -346,10 +358,13 @@ def room_for_token(token: str) -> Room | None:
 
 
 def valid_token(token: str) -> bool:
+    """True if ``token`` currently maps to a live room membership."""
     return (token or "").strip() in _token_index
 
 
 def leave(token: str) -> None:
+    """Remove a member from their room and notify the rest (host reassigned
+    automatically if needed — see ``Room.remove_member``)."""
     token = (token or "").strip()
     room = room_for_token(token)
     if not room:
@@ -364,6 +379,8 @@ def leave(token: str) -> None:
 
 
 def control(token: str, action: str, position: float | None) -> bool:
+    """Apply a play/pause/seek action from a member and broadcast the new
+    playstate. Honors ``host_lock`` and the ready/buffering gate."""
     room = room_for_token(token)
     if not room:
         return False
@@ -409,6 +426,8 @@ def control(token: str, action: str, position: float | None) -> bool:
 
 def report(token: str, position: float, paused: bool, buffering: bool = False,
            file: str | None = None) -> bool:
+    """Record a member's locally-observed playback state; auto-pauses the
+    room (gated) if someone starts buffering during playback."""
     room = room_for_token(token)
     if not room:
         return False
@@ -437,6 +456,7 @@ def report(token: str, position: float, paused: bool, buffering: bool = False,
 
 
 def set_ready(token: str, ready: bool) -> bool:
+    """Mark a member ready/not-ready; resumes a gated room once everyone is."""
     room = room_for_token(token)
     if not room:
         return False
@@ -454,6 +474,7 @@ def set_ready(token: str, ready: bool) -> bool:
 
 
 def chat(token: str, text: str) -> bool:
+    """Post a chat message (truncated to 2000 chars) to the room."""
     text = (text or "").strip()
     if not text:
         return False
@@ -514,6 +535,7 @@ def start_countdown(token: str, media: dict | None, seconds: int = 10) -> bool:
 
 
 def heartbeat(token: str) -> bool:
+    """Keep a member's ``last_seen`` fresh so ``_reap`` doesn't drop them."""
     room = room_for_token(token)
     if not room:
         return False
@@ -526,6 +548,7 @@ def heartbeat(token: str) -> bool:
 
 
 def subscribe(token: str) -> "Queue[dict] | None":
+    """Return the member's event queue for an SSE stream to drain."""
     room = room_for_token(token)
     if not room:
         return None
@@ -561,6 +584,8 @@ def _try_resume_gate(room: "Room", by_name: str) -> bool:
 # ── History helper ──────────────────────────────────────────────────────────
 
 def _push_history(room: "Room", media: dict | None) -> None:
+    """Append ``media`` to the room's watch history, deduping consecutive
+    plays of the same file and capping the list at 100 entries."""
     if not media:
         return
     f = media.get("file")
@@ -575,6 +600,8 @@ def _push_history(room: "Room", media: dict | None) -> None:
 
 
 def _find_by_name(room: "Room", name: str) -> "Member | None":
+    """Look up a member by display name (moderation actions address members
+    by name rather than token)."""
     for m in room.members.values():
         if m.name == name:
             return m
@@ -584,6 +611,8 @@ def _find_by_name(room: "Room", name: str) -> "Member | None":
 # ── Host moderation (host-only) ─────────────────────────────────────────────
 
 def _host_room(token: str) -> "Room | None":
+    """Return the room only if ``token`` belongs to its current host — guard
+    used by all host-only moderation actions below."""
     room = room_for_token(token)
     if room and token == room.host_token:
         return room
@@ -591,6 +620,7 @@ def _host_room(token: str) -> "Room | None":
 
 
 def kick(host_token: str, target_name: str) -> bool:
+    """Host-only: disconnect a member without banning them."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -607,6 +637,8 @@ def kick(host_token: str, target_name: str) -> bool:
 
 
 def ban(host_token: str, target_name: str, by_ip: bool = True) -> bool:
+    """Host-only: kick a member and blacklist their name (and IP by default)
+    from rejoining this room."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -626,6 +658,7 @@ def ban(host_token: str, target_name: str, by_ip: bool = True) -> bool:
 
 
 def transfer_host(host_token: str, target_name: str) -> bool:
+    """Host-only: hand host privileges to another member by name."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -640,6 +673,7 @@ def transfer_host(host_token: str, target_name: str) -> bool:
 
 
 def close_room(host_token: str) -> bool:
+    """Host-only: disband the room immediately, evicting all members."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -654,6 +688,7 @@ def close_room(host_token: str) -> bool:
 
 
 def set_host_lock(host_token: str, locked: bool) -> bool:
+    """Host-only: toggle whether only the host may drive playback."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -665,6 +700,7 @@ def set_host_lock(host_token: str, locked: bool) -> bool:
 
 
 def set_max(host_token: str, n: int | None) -> bool:
+    """Host-only: cap member count (``n`` falsy/invalid = unlimited)."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -678,6 +714,7 @@ def set_max(host_token: str, n: int | None) -> bool:
 
 
 def set_password(host_token: str, pw: str | None) -> bool:
+    """Host-only: set or clear the room's join password."""
     room = _host_room(host_token)
     if not room:
         return False
@@ -690,6 +727,7 @@ def set_password(host_token: str, pw: str | None) -> bool:
 # ── Presence / social ───────────────────────────────────────────────────────
 
 def set_away(token: str, away: bool) -> bool:
+    """Mark a member away/back, broadcasting only on an actual change."""
     room = room_for_token(token)
     if not room:
         return False
@@ -705,6 +743,7 @@ def set_away(token: str, away: bool) -> bool:
 
 
 def typing(token: str, is_typing: bool) -> bool:
+    """Relay a chat typing-indicator to every other member (not persisted)."""
     room = room_for_token(token)
     if not room:
         return False
@@ -722,6 +761,7 @@ def typing(token: str, is_typing: bool) -> bool:
 
 
 def reaction(token: str, emoji: str) -> bool:
+    """Broadcast a short emoji reaction from a member (not persisted)."""
     emoji = (emoji or "").strip()[:8]
     if not emoji:
         return False
@@ -789,6 +829,7 @@ def close_by_name(name: str) -> bool:
 
 
 def all_room_names() -> list[str]:
+    """All current room names (used to persist the room list across restarts)."""
     with _registry_lock:
         return list(_rooms.keys())
 

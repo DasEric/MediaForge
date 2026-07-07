@@ -1,3 +1,23 @@
+"""VOE (voe.sx and related mirrors) video hoster extractor.
+
+VOE embeds its player config as a JSON-encoded string inside a
+``<script type="application/json">`` tag, but the string itself is put
+through a multi-step, reversible obfuscation chain before being JSON-parsed
+(see decode_voe_string() for the full ROT13 + junk-removal + double
+base64 + byte-shift + reversal sequence). If that inline JSON is missing or
+the page shows a maintenance notice / captcha, we fall back to following a
+plain HTTP(S) redirect URL found in the page and retry there. A shared
+captcha-solving helper (playwright.captcha) is used whenever either the
+initial page or the redirect target challenges us with a captcha.
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_voe"); see the provider alias table in
+models/megakino_to/scraper.py (("voe", "VOE")) and the generic provider
+dispatch in models/s_to/episode.py, models/filmpalast_to/episode.py,
+models/aniworld_to/episode.py, and models/megakino_to/{episode,movie}.py --
+VOE is the default provider ("MEDIAFORGE_PROVIDER" fallback) for most of
+these model classes.
+"""
 import base64
 import binascii
 import json
@@ -32,7 +52,11 @@ JUNK_PARTS = ["@$", "^^", "~@", "%?", "*~", "!!", "#&"]
 # Helper functions
 # -----------------------------
 def shift_letters(input_str):
-    """Apply ROT13 cipher to alphabetic characters."""
+    """Apply the ROT13 cipher to alphabetic characters (step 1 of decode_voe_string).
+
+    Non-alphabetic characters (digits, punctuation, junk markers) pass
+    through unchanged so later steps can still find and strip them.
+    """
     result = []
     for c in input_str:
         code = ord(c)
@@ -45,19 +69,43 @@ def shift_letters(input_str):
 
 
 def replace_junk(input_str):
-    """Replace junk patterns with underscores."""
+    """Replace VOE's junk filler substrings with underscores (step 2 of decode_voe_string).
+
+    VOE sprinkles fixed decoy tokens (see JUNK_PARTS) throughout the
+    ROT13'd payload purely to break naive base64 decoding; swapping each one
+    for "_" (later stripped) restores a valid base64 string.
+    """
     for part in JUNK_PARTS:
         input_str = input_str.replace(part, "_")
     return input_str
 
 
 def shift_back(s, n):
-    """Shift characters back by n positions."""
+    """Shift every character's code point down by n (step 4 of decode_voe_string).
+
+    This undoes a simple Caesar-style shift VOE applies to the first-stage
+    base64-decoded text before it can be base64-decoded a second time.
+    """
     return "".join(chr(ord(c) - n) for c in s)
 
 
 def decode_voe_string(encoded):
-    """Decode VOE encoded string to a JSON object."""
+    """Reverse VOE's multi-step string obfuscation and parse the result as JSON.
+
+    The encoded string travels through 5 reversible transforms, applied here
+    in reverse of how VOE's JS produced it:
+      1. ROT13 the letters back to their original case/position.
+      2. Strip VOE's junk filler tokens (see JUNK_PARTS) that were inserted
+         to make the string look non-base64 at a glance.
+      3. Base64-decode the now-clean string (first encoding layer).
+      4. Shift every byte back by 3 (undoes a Caesar shift applied before
+         the second base64 pass).
+      5. Reverse the string and base64-decode again (second encoding layer)
+         to recover the final JSON text, which is then parsed.
+    Each step exists purely to defeat naive scraping; none of it is
+    cryptographically secure, it's just enough obfuscation to slow down
+    simple regex-based extractors.
+    """
     try:
         step1 = shift_letters(encoded)
         step2 = replace_junk(step1).replace("_", "")
@@ -70,7 +118,9 @@ def decode_voe_string(encoded):
 
 
 def extract_voe_source_from_html(html):
-    """Extract VOE video source using regex + decode_voe_string"""
+    """Find each ``<script type="application/json">`` block in the page and
+    try to decode it via decode_voe_string() until one yields a "source" URL.
+    """
     try:
         script_blocks = re.findall(
             r'<script\s+type=["\']application/json["\']>(.*?)</script>', html, re.DOTALL

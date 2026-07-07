@@ -1,3 +1,14 @@
+"""Streamtape video hoster extractor.
+
+Not implemented yet: both functions below are stubs that always raise
+NotImplementedError. Recognized as a valid provider name (see the
+"streamtape" -> "Streamtape" alias in models/megakino_to/scraper.py),
+but selecting it as the active provider will currently fail at download
+time.
+
+Used by: dispatched generically via extractors.provider_functions
+(key "get_direct_link_from_streamtape") once selected as a provider by
+models/megakino_to/{episode,movie}.py or similar model code."""
 try:
     from ...config import DEFAULT_USER_AGENT
 except ImportError:
@@ -5,12 +16,12 @@ except ImportError:
 
 
 def get_direct_link_from_streamtape(embeded_streamtape_link, headers=None):
-    """Get direct Streamtape video URL."""
+    """Get direct Streamtape video URL. Not implemented: always raises NotImplementedError."""
     raise NotImplementedError("get_direct_link_from_streamtape is not implemented yet.")
 
 
 def get_preview_image_link_from_streamtape(embeded_streamtape_link, headers=None):
-    """Get Streamtape preview image URL."""
+    """Get Streamtape preview image URL. Not implemented: always raises NotImplementedError."""
     raise NotImplementedError(
         "get_preview_image_link_from_streamtape is not implemented yet."
     )

@@ -37,13 +37,22 @@ except ImportError:
         watch as episode_watch,
     )
 
+# NOTE: this local pattern is only used for this class's own URL validation;
+# it is intentionally looser than mediaforge.providers.FILMPALAST_EPISODE_PATTERN
+# (used for provider-routing). Keep both in sync if the site's URL scheme changes.
 FILMPALAST_EPISODE_PATTERN = re.compile(r"^https?://filmpalast\.to/stream/.+")
 
 
-# TODO: update docstring with actual properties and methods of this class, and example values
 class FilmPalastEpisode:
     """
-    Represents a single episode of an FilmPalast series.
+    Represents a single FilmPalast movie page.
+
+    FilmPalast is a movie-only site: there is no series/season concept here.
+    A single "episode" URL (``/stream/<slug>``) IS the movie -- this class
+    doubles as both the episode and the movie metadata holder (title, cast,
+    IMDb rating, etc. are all read directly off this page). Callers that need
+    to special-case movie-only sites check `prov.name == "FilmPalast"` rather
+    than an `is_movie` attribute (see web/routes/search.py).
 
     Parameters:
         url:                Required. The FilmPalast URL for this episode, e.g.,
@@ -89,6 +98,11 @@ class FilmPalastEpisode:
         download()
         watch()
         syncplay()
+
+    Used by:
+        mediaforge.providers (Provider(name="FilmPalast", episode_cls=FilmPalastEpisode))
+        and web/routes/search.py, which imports this class directly (there is no
+        FilmPalastSeries/FilmPalastSeason -- see module docstring above).
     """
 
     def __init__(
@@ -396,8 +410,12 @@ class FilmPalastEpisode:
     # -----------------------------
     # PRIVATE EXTRACTION FUNCTIONS
     # -----------------------------
+    # Each of these does a single regex search/findall against the raw movie
+    # page HTML and caches the result on the matching private attribute; the
+    # public @property wrappers above call them lazily on first access.
 
     def __extract_title_de(self):
+        """Extract the German title from the <em itemprop="name"> tag."""
         match = re.search(r'<em itemprop="name">(.*?)</em>', self._html)
         if match:
             self.__title_de = match.group(1).strip()

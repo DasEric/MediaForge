@@ -1,3 +1,19 @@
+"""Anime4K GLSL shader pipeline: fetching/installing shader packs and
+upscaling video files (via mpv encode-mode or ffmpeg's libplacebo filter).
+
+Two independent code paths live here:
+  - upscale_file() and friends: the current on-demand upscaling flow used by
+    the web UI (mediaforge.web.routes.upscale, mediaforge.web.upscale_worker),
+    which renders through bundled/downloaded GLSL shaders without touching
+    the user's mpv config.
+  - anime4k() and friends (get_anime4k_urls, download_anime4k,
+    extract_anime4k, setup_anime4k, remove_anime4k_lines, detect_current_mode):
+    a legacy mode that installs shaders and config snippets directly into the
+    user's mpv config directory. download_anime4k()/extract_anime4k() are
+    still reused by the web upscale route to fetch shader packs; anime4k()
+    itself is not currently called from the web app.
+"""
+
 import re
 import shutil
 import subprocess
@@ -83,7 +99,8 @@ RESOLUTION_MAP = {
 }
 
 # ---------------------------------------------------------------------------
-# Live progress tracking (mirrors _ffmpeg_progress in common.py)
+# Live progress tracking (mirrors _ffmpeg_progress in
+# mediaforge.models.common.common, the download/encode pipeline module)
 # ---------------------------------------------------------------------------
 
 _upscale_progress_lock = threading.Lock()
@@ -99,6 +116,12 @@ _upscale_progress = {
 
 
 def get_upscale_progress():
+    """Return a snapshot dict of the current upscale progress state.
+
+    Used by: mediaforge.web.routes.upscale (progress-poll endpoint),
+    mediaforge.web.upscale_worker, and mediaforge.models.common.common
+    (mirrored into the download-queue progress display during upscaling).
+    """
     with _upscale_progress_lock:
         return dict(_upscale_progress)
 
@@ -168,7 +191,11 @@ def get_shader_paths(preset_key, quality="high"):
 
 
 def list_available_shaders(quality="high"):
-    """List all .glsl files in the shaders directory."""
+    """List all .glsl files in the shaders directory.
+
+    Used by: mediaforge.web.routes.upscale (populates the shader list shown
+    in the upscale settings UI).
+    """
     shader_dir = get_shader_dir(quality)
     if not shader_dir:
         return []
@@ -220,7 +247,11 @@ def check_libplacebo_support():
 
 
 def get_available_engines():
-    """Return dict: {engine_name: bool}."""
+    """Return dict: {engine_name: bool}.
+
+    Used by: upscale_file() to auto-select an engine, and
+    mediaforge.web.routes.upscale (reports available engines to the UI).
+    """
     return {
         "mpv":        check_mpv_encode_support(),
         "libplacebo": check_libplacebo_support(),
@@ -272,6 +303,9 @@ def upscale_file(
         out_vcodec  : "libx264" | "libx265" | "copy"  (default "libx264")
         out_crf     : int  (default 18)
         out_preset  : str  (default "medium")
+
+    Used by: mediaforge.web.upscale_worker and
+    mediaforge.models.common.common (post-download upscale step).
     """
     if settings is None:
         settings = {}
@@ -586,7 +620,11 @@ def get_anime4k_urls():
 
 
 def download_anime4k(target_dir=None, mode="high"):
-    """Download Anime4K GLSL assets only if not already extracted."""
+    """Download Anime4K GLSL assets only if not already extracted.
+
+    Used by: mediaforge.web.routes.upscale (fetches a shader pack on demand)
+    and anime4k() below (legacy mpv-config setup).
+    """
     target_dir = Path(target_dir or MEDIAFORGE_CONFIG_DIR) / "Anime4K"
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -622,7 +660,10 @@ def download_anime4k(target_dir=None, mode="high"):
 
 
 def extract_anime4k(files, target_dir=None):
-    """Extract downloaded zip files and clean up."""
+    """Extract downloaded zip files and clean up.
+
+    Used by: mediaforge.web.routes.upscale and anime4k() below.
+    """
     target_dir = Path(target_dir or MEDIAFORGE_CONFIG_DIR) / "Anime4K"
     extracted_dirs = []
 
@@ -720,7 +761,13 @@ def remove_anime4k_lines(file_path):
 
 
 def anime4k(mode="high"):
-    """Main entry point for Anime4K mpv-config setup and removal."""
+    """Legacy entry point: install/remove Anime4K shaders + config snippets
+    directly in the user's mpv config directory (mode "high"/"low"/"remove").
+
+    Not currently called from the web app, which instead uses upscale_file()
+    to render through shaders on demand without touching the mpv config.
+    Kept for CLI/manual use (see the __main__ block below).
+    """
     mpv_shaders_dir = MPV_CONFIG_DIR / "shaders"
     if mode not in ("high", "low", "remove"):
         raise ValueError(f"Invalid mode '{mode}'. Use 'high', 'low', or 'remove'.")

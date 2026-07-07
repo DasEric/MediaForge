@@ -1,3 +1,16 @@
+"""Doodstream (dood.li and dood.* mirrors) extractor.
+
+Strategy: fetch the embed page HTML and regex out two values that Doodstream
+embeds in inline JS: the "pass_md5" signing-API URL and a "token". Calling
+the pass_md5 URL returns a base CDN URL; the final direct link is assembled
+by appending a random string, the token, and the current Unix timestamp as
+an expiry -- this matches Doodstream's own short-lived signed-link scheme.
+
+Used by: dispatched generically via extractors.provider_functions
+(key "get_direct_link_from_doodstream"); see the provider alias table in
+models/megakino_to/scraper.py (("dood", "Doodstream")) and the generic
+provider dispatch in models/megakino_to/episode.py and movie.py.
+"""
 import logging
 import random
 import re
@@ -60,7 +73,11 @@ def _get_embed_page(embed_url, headers=None):
 
 
 def _get_pass_md5_url(embed_html, embed_url):
-    """Extract the pass_md5 URL from embed HTML."""
+    """Extract the pass_md5 signing-API URL embedded in the embed page's inline JS.
+
+    The embed page calls this URL client-side (via jQuery ``$.get``) to fetch
+    the base CDN URL used to build the final direct link.
+    """
     pass_md5_url = _extract_regex(
         PASS_MD5_PATTERN, embed_html, "pass_md5 URL", embed_url
     )
@@ -70,7 +87,11 @@ def _get_pass_md5_url(embed_html, embed_url):
 
 
 def _get_token(embed_html, embed_url):
-    """Extract the token from embed HTML."""
+    """Extract the signing token embedded in the embed page's inline JS.
+
+    This token is appended as a query parameter on the final direct link and
+    is validated server-side against the requested expiry.
+    """
     return _extract_regex(TOKEN_PATTERN, embed_html, "token", embed_url)
 
 
@@ -78,7 +99,12 @@ def _get_token(embed_html, embed_url):
 # Main Doodstream Functions
 # -----------------------------
 def get_direct_link_from_doodstream(embed_url):
-    """Extract the direct video link from a Doodstream embed URL."""
+    """Resolve a Doodstream embed URL into a direct, time-limited video URL.
+
+    Steps: fetch the embed page, pull the pass_md5 URL and token out of its
+    inline JS, call pass_md5 to get the CDN base URL, then append a random
+    string + token + expiry timestamp to build the final signed link.
+    """
     if not embed_url:
         raise ValueError("Embed URL cannot be empty")
 

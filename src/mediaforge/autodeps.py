@@ -1,3 +1,14 @@
+"""Auto-install and path-resolution helpers for external binaries.
+
+Covers three things MediaForge needs but doesn't vendor as a Python
+dependency: the mpv/iina video player, Syncplay, and a virtual display
+(Xvfb) for the headless captcha browser on Linux. Each helper tries, in
+order, a system-wide install, a previously downloaded copy in the user's
+MediaForge folder, the OS package manager, and finally a direct download —
+so the app works out of the box on a fresh machine without requiring the
+user to install anything manually first.
+"""
+
 import os
 import platform
 import shutil
@@ -61,7 +72,12 @@ deps = {
 # Dependency Manager
 # -----------------------------
 class DependencyManager:
-    """Manage binaries with system package manager or direct download."""
+    """Resolve or install a named binary via system PATH, a cached local
+    download, the OS package manager, or a direct download — in that order.
+
+    Used by :func:`get_player_path` (mpv) and :func:`get_syncplay_path`
+    (syncplay) as the fallback once a bundled/system binary isn't found.
+    """
 
     def __init__(self, install_folder=None):
         self.deps = deps
@@ -78,6 +94,12 @@ class DependencyManager:
         self.logger.debug(f"Dependency folder: {self.install_folder}")
 
     def fetch_binary(self, name: str) -> Path:
+        """Return a usable path to binary *name*, installing it if necessary.
+
+        Resolution order: system PATH, cached download in the install
+        folder, OS package manager (winget/brew/apt/pacman), then a direct
+        download from the URL configured in ``deps``.
+        """
         dep_info = self.deps.get(name, {}).get(PLATFORM, {})
 
         # System-wide first
@@ -117,6 +139,13 @@ class DependencyManager:
         return local_path
 
     def _install_with_package_manager(self, name: str) -> bool:
+        """Try to install *name* via the platform's native package manager.
+
+        Windows: winget. macOS: brew. Linux: apt (Debian/Ubuntu) or pacman
+        (Arch), whichever is present. Returns False (never raises) if no
+        package is configured for this platform or the install fails, so
+        the caller can fall through to the direct-download path.
+        """
         dep_info = self.deps.get(name, {}).get(PLATFORM, {})
         pkg_name = dep_info.get("package")
         if not pkg_name:
@@ -169,12 +198,22 @@ def _bundled_mpv() -> Path | None:
 
 
 def get_mpv_download_status() -> dict:
-    """Return current mpv auto-download status dict."""
+    """Return current mpv auto-download status dict.
+
+    Used by: the upscale route (``web/routes/upscale.py``) to show download
+    progress in the WebUI while ``_download_mpv_windows`` runs in the
+    background.
+    """
     return dict(_mpv_download_status)
 
 
 def ensure_mpv_windows_async() -> None:
-    """Start a background thread that downloads mpv.exe if missing on Windows."""
+    """Start a background thread that downloads mpv.exe if missing on Windows.
+
+    No-op on non-Windows platforms and when a bundled/cached mpv.exe already
+    exists. Called once during WebUI startup (``web/app.py``) so the first
+    playback request doesn't have to block on the download.
+    """
     if PLATFORM != "Windows":
         return
     if _bundled_mpv():
@@ -191,7 +230,14 @@ def ensure_mpv_windows_async() -> None:
 
 
 def _download_mpv_windows() -> None:
-    """Download mpv.exe from softarchiv.com into bin/windows/."""
+    """Download mpv.exe from softarchiv.com into bin/windows/.
+
+    Runs in a background thread started by :func:`ensure_mpv_windows_async`;
+    reports progress via the module-level ``_mpv_download_status`` dict
+    (read by :func:`get_mpv_download_status`). Downloads to a temp file first
+    and renames on completion so a half-finished download is never mistaken
+    for a valid binary.
+    """
     import urllib.request
     dest = Path(__file__).parent / "bin" / "windows" / "mpv.exe"
     tmp  = dest.with_suffix(".download_tmp")
@@ -225,6 +271,9 @@ def get_player_path() -> Path:
     Priority:
       1. Bundled binary shipped with the package (src/mediaforge/bin/<platform>/mpv)
       2. System PATH (Docker, manual system install)
+
+    Used by: ``models/common/common.py`` and ``anime4k/anime4k.py`` to build
+    the mpv/iina launch command for watch/syncplay playback.
     """
     use_iina = os.getenv("MEDIAFORGE_USE_IINA") == "1"
     use_aniskip = os.getenv("MEDIAFORGE_ANISKIP") == "1"
@@ -282,6 +331,11 @@ def get_player_path() -> Path:
 
 
 def get_syncplay_path() -> Path:
+    """Return the path to the Syncplay binary, installing it if necessary.
+
+    Used by: ``models/common/common.py`` to launch synchronized playback
+    sessions.
+    """
     if PLATFORM == "Darwin":
         syncplay_path = Path("/Applications/Syncplay.app/Contents/MacOS/Syncplay")
         if syncplay_path.exists():
@@ -303,6 +357,9 @@ def _ensure_xvfb() -> None:
     In Docker the entrypoint already starts Xvfb and exports DISPLAY=:99, so
     this is a fast no-op.  On a bare Linux desktop/server with no display it
     spins up a virtual framebuffer so headless=False Chromium can run.
+
+    Used by: ``playwright/captcha.py`` before launching the visible captcha
+    browser on Linux.
     """
     global _xvfb_proc
     if platform.system() != "Linux":
@@ -337,7 +394,12 @@ def _ensure_xvfb() -> None:
 # Ensure browser
 # -----------------------------
 def ensure_patchright_chromium():
-    """Install the patchright Chromium browser if not already present."""
+    """Install the patchright Chromium browser if not already present.
+
+    Skipped inside Docker (the image already bundles it). Best-effort: any
+    failure is logged and swallowed so it never blocks startup.
+    Used by: :func:`mediaforge.entry.mediaforge` during startup.
+    """
     _log = get_logger(__name__)
     try:
         import patchright  # noqa: F401

@@ -149,7 +149,18 @@ def fetch_video(slug, want_stream=False, timeout_ms=_NAV_TIMEOUT):
                 page.goto(f"{_BASE}/videos/hentai/{slug}", wait_until="domcontentloaded", timeout=timeout_ms)
             except Exception as e:
                 logger.debug("hanime goto failed: %s", e)
-            page.wait_for_timeout(_SETTLE_MS)
+            # The SPA hydrates the ld+json block + episode links asynchronously
+            # after domcontentloaded, so *some* wait is unavoidable. Rather than
+            # always blocking for the full _SETTLE_MS regardless of how fast the
+            # page actually loaded, wait for the ld+json tag specifically (the
+            # earliest reliable "hydration happened" signal) and only fall back
+            # to the fixed settle time if it never shows up — this is a real
+            # speedup on a fast connection without weakening the slow-page case.
+            try:
+                page.wait_for_selector('script[type="application/ld+json"]', timeout=_SETTLE_MS)
+                page.wait_for_timeout(300)  # let the episode-links section catch up
+            except Exception:
+                page.wait_for_timeout(_SETTLE_MS)
             try:
                 detail = page.evaluate(_EXTRACT_JS) or {}
             except Exception as e:

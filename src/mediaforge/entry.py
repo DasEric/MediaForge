@@ -1,8 +1,19 @@
+"""Application entry point.
+
+Defines :func:`mediaforge`, the function invoked by:
+  - the installed ``mediaforge`` console script (see ``pyproject.toml``),
+  - ``python -m mediaforge`` (see ``__main__.py``),
+  - the PyInstaller build (``_pyinstaller_entry.py``).
+
+It always starts the WebUI directly -- the standalone CLI was removed (see
+``arguments.py``) -- and returns a process exit code instead of raising.
+"""
+
 import sys
 import warnings
 from pathlib import Path
 
-# authlib internally uses its deprecated jose module — suppress until they fix it
+# authlib internally uses its deprecated jose module -- suppress until they fix it
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="authlib")
 try:
     from authlib.deprecate import AuthlibDeprecationWarning
@@ -25,14 +36,27 @@ logger = get_logger(__name__)
 
 
 def set_terminal_title():
-    """Set the terminal title if running in a TTY"""
+    """Set the terminal title to "MediaForge v.<version>" if running in a TTY.
+
+    No-op when stdout is redirected/piped (no terminal to update).
+    Called once from :func:`mediaforge` before the WebUI starts.
+    """
     if sys.stdout.isatty():
         title = f"MediaForge v.{VERSION}"
         print(f"\033]0;{title}\007", end="", flush=True)
 
 
-def mediaforge():
-    """Main entry point — always starts the WebUI directly."""
+def mediaforge() -> int:
+    """Main entry point -- always starts the WebUI directly.
+
+    Runs pre-flight setup (terminal title, Chromium/mpv dependency checks,
+    one-time legacy ``~/.aniworld`` data import), then blocks inside
+    :func:`mediaforge.web.start_web_ui` until the server stops.
+
+    Returns a process exit code: 0 on normal shutdown, 130 on Ctrl-C, 1 on an
+    unhandled error. Used as the target of the ``mediaforge`` console script,
+    ``python -m mediaforge``, and the PyInstaller build.
+    """
     try:
         logger.debug("Starting WebUI...")
         set_terminal_title()

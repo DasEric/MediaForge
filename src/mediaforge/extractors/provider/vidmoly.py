@@ -1,3 +1,19 @@
+"""Vidmoly (vidmoly.net / vidmoly.biz / vidmoly.to) video hoster extractor.
+
+Strategy: fetch the embed page HTML, concatenate the contents of all
+<script> tags, and regex out the JW-Player-style ``file: '...m3u8...'``
+source URL (and, separately, the ``image: '...'`` poster URL for previews).
+No JS deobfuscation is needed here -- the URLs sit in plain inline JS.
+
+Some callers hand in a Vidmoly *view* URL instead of an embed URL; see
+_normalize_embed_url() below for how that is rewritten first.
+
+Used by: dispatched generically via extractors.provider_functions (key
+"get_direct_link_from_vidmoly"); see the provider alias table in
+models/megakino_to/scraper.py (("vidmoly", "Vidmoly")) and the generic
+provider dispatch used by models/megakino_to/{episode,movie}.py and
+models/aniworld_to/episode.py.
+"""
 import re
 
 try:
@@ -48,6 +64,7 @@ _VIDMOLY_VIEW_PATTERN = re.compile(r"https?://vidmoly\.[a-z]+/v/([a-z0-9]+)", re
 
 
 def _normalize_embed_url(url):
+    """Rewrite a Vidmoly *view* URL (vidmoly.<tld>/v/<id>) to its embed-page equivalent."""
     if not url:
         return url
     m = _VIDMOLY_VIEW_PATTERN.match(url)

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ _('Favorites') }} — MediaForge{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='favourites.css') }}">{% endblock %}
 
 {% block content %}
 <div class="page-container">

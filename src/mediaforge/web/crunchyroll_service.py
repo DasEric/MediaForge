@@ -91,7 +91,12 @@ def _s(key: str, default: str = "") -> str:
 
 
 def is_enabled() -> bool:
-    """Master switch: Crunchyroll integration active and importable."""
+    """Master switch: Crunchyroll integration active and importable.
+
+    Used by: routes/integrations.py's provider-pill endpoint directly, and
+    internally by :func:`is_available`, :func:`get_simulcast_titles`, and
+    :func:`get_simulcast_seasons`.
+    """
     return _IMPORT_OK and _s("enabled", "0") == "1"
 
 
@@ -234,7 +239,10 @@ def get_client() -> Any:
 
 
 def invalidate_client() -> None:
-    """Drop the cached client (call after credential/setting changes)."""
+    """Drop the cached client (call after credential/setting changes).
+
+    Used by: routes/integrations.py after Crunchyroll settings are saved.
+    """
     global _client, _client_signature, _client_logged_in_at
     with _client_lock:
         _client = None
@@ -249,12 +257,17 @@ def invalidate_availability_cache() -> None:
 
     Lighter-weight than :func:`invalidate_client` — used by the manual
     "clear cache" button so it doesn't also force a fresh login.
+
+    Used by: routes/search.py's manual cache-clear action.
     """
     clear_provider_cache(_PROVIDER_CACHE_NS)
 
 
 def list_account_profiles() -> List[Dict[str, Any]]:
-    """Return the account's profiles (id, name, is_primary) for the UI selector."""
+    """Return the account's profiles (id, name, is_primary) for the UI selector.
+
+    Used by: routes/integrations.py's profile-list endpoint.
+    """
     client = get_client()
     if client is None:
         return []
@@ -278,6 +291,8 @@ def test_connection(email: str, password: str, locale: str, anon: bool,
     Returns ``{ok: bool, ...}``. On success includes ``mode`` and, for an
     account login, the primary ``profile`` name and whether ``premium`` features
     look available.
+
+    Used by: routes/integrations.py's connection-test endpoint (Settings UI).
     """
     if not _IMPORT_OK:
         return {"ok": False, "error": "library_unavailable", "detail": _IMPORT_ERR or ""}
@@ -354,6 +369,8 @@ def is_available(title: str) -> bool:
     Cached persistently (SQLite) for :data:`_AVAIL_TTL`, same mechanism as the
     TMDB cache — survives restarts. Used to add a "Crunchyroll" provider pill
     in the detail modal — especially for new simulcasts TMDB doesn't list yet.
+
+    Used by: routes/integrations.py's provider-availability endpoint.
     """
     title = (title or "").strip()
     if not title or not is_enabled():

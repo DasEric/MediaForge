@@ -22,6 +22,15 @@ except ImportError:  # pragma: no cover
 
 
 class MegakinoMovie:
+    """A standalone MegaKino movie page (megakino.to /watch/<slug>/<id>,
+    no ``?episode=`` query param). NOT a superclass of MegakinoEpisode --
+    they are distinguished purely by URL shape, see models/megakino_to/__init__.py.
+
+    Used by: mediaforge.providers (Provider(name="MegakinoFilm", episode_cls=...))
+    and web/routes/search.py (which also uses `isinstance(ep, MegakinoMovie)`
+    to branch its live-availability check).
+    """
+
     def __init__(self, url, selected_path=None, selected_language=None,
                  selected_provider=None, _data=None):
         if not MEGAKINO_MOVIE_PATTERN.match(url or ""):
@@ -202,6 +211,9 @@ class MegakinoMovie:
         return self.__is_downloaded
 
     def download(self, cancel_event=None, **kwargs):
+        """Download this movie; VeeV is routed to its dedicated extractor
+        (TLS-fingerprint gated), everything else goes through the shared
+        models/common/common.py download() pipeline."""
         if self.selected_provider.upper() == "VEEV":
             try:
                 from ...extractors.provider.veev import download_from_veev

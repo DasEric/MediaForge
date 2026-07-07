@@ -1,0 +1,414 @@
+/* ===================================================================
+   MediaForge — Form controls
+   Custom checkboxes, text/search/number inputs, <select>, the themed
+   number-input stepper pill (see static/number_input.js), the index-
+   page search bar, and the reusable "icon + input + clear button"
+   search-input-wrap plus its results/list layout.
+   =================================================================== */
+
+/* Checkboxes */
+.chb-main {
+  /* Reset native checkbox rendering so the custom shapes below can take over. */
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 16px;
+  min-height: 16px;
+  border: 2px solid var(--bg-hover, #6b7280);
+  border-radius: 6px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  margin: 0;
+  transition: background-color 0.3s, border-color 0.3s;
+  border-color: var(--text-primary) !important;
+}
+
+/* Larger checkmark for the "select all" checkbox in the Auto-Sync batch
+   toolbar (templates/autosync.html) — overrides the default .chb-main::after
+   checkmark size/position below. */
+.chb-autosync-all::after {
+  height: 34px !important;
+  width: 44px !important;
+  margin-top:-5px !important;
+  margin-left: -8px !important;
+}
+
+.chb-main:hover {
+  border-color: var(--accent, #8b5cf6);
+}
+
+.chb-main::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: var(--accent, #8b5cf6);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* Checkmark icon (SVG data URI). clip-path starts collapsed to a single point
+   so it stays invisible until :checked, when draw-check below wipes it in. */
+.chb-main::after {
+  content: '';
+  position: absolute;
+  width: 17px;
+  height: 30px;
+  margin-left:-1px;
+  margin-top:-14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 32'%3E%3Cpath d='M2 14 L8 20 L24 4' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center bottom;
+  
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.2s, transform 0.2s;
+  
+  clip-path: polygon(0 0, 0 0, 0 0, 0 0);
+}
+
+/* Bigger checkmark variant for checkboxes inside custom multi-select dropdown
+   items (built by app.js) and SyncPlay toggle rows (templates/syncplay.html). */
+.custom-select-item .chb-main::after,.sp-toggle-row .chb-main::after{
+  content: '';
+  position: absolute;
+  width: 25px;
+  height: 35px;
+  margin-left: 2px;
+  margin-top: -8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 32'%3E%3Cpath d='M2 14 L8 20 L24 4' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center bottom;
+  
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.2s, transform 0.2s;
+  
+  clip-path: polygon(0 0, 0 0, 0 0, 0 0);
+}
+
+.chb-main:checked {
+  background-color: var(--accent, #8b5cf6) !important; 
+  border-color: var(--accent, #8b5cf6) !important;    
+  animation: wave-bounce 0.4s ease;
+}
+
+.chb-main:checked::before {
+  transform: translate(-50%, -50%) scale(3.5);
+  opacity: 0;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.chb-main:checked::after {
+  opacity: 1;
+  transform: scale(1);
+  
+  animation: draw-check 0.3s ease-out forwards;
+  transition-delay: 0.1s;
+}
+
+.chb-main:focus-visible {
+  outline: 2px solid var(--accent, #8b5cf6);
+  outline-offset: 4px;
+}
+
+/* Smaller checkboxes for the per-slot / whole-series ignore list in the
+   incomplete-items modal (rendered by static/stats.js). */
+.ign-slot, .ign-series {
+  height: 16px !important;
+  width: 16px !important;
+}
+
+/* Checked-state animations: wave-bounce squashes the box on click (triggered
+   by .chb-main:checked above), draw-check wipes the checkmark in via clip-path. */
+@keyframes wave-bounce {
+  50% {
+    transform: scale(0.85);
+  }
+}
+
+@keyframes draw-check {
+  0% { clip-path: polygon(0 0, 0 0, 0 0, 0 0); }
+  40% { clip-path: polygon(0 40%, 100% 40%, 100% 100%, 0 100%); }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+/* ===================================================================
+   SEARCH BAR
+   =================================================================== */
+.search-bar {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ===================================================================
+   FORM ELEMENTS
+   =================================================================== */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="time"],
+select,
+textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+/* Native select arrow is removed (cross-browser, hence the prefixes) and
+   replaced with a custom SVG chevron drawn as a background image. */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c4c4d4'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 18px !important;
+  padding-right: 30px !important;
+}
+
+/* ===================================================================
+   NUMBER INPUT STEPPER
+   Native browser spin buttons (the classic tiny up/down arrows) don't
+   match the app's theme, so they're hidden here and replaced with a
+   themed [ − ][ 999 ][ + ] pill — same idea as the <select> arrow above,
+   just a quantity-stepper layout instead of stacked chevrons. The pill is
+   built by static/number_input.js (progressive enhancement: it wraps
+   every input[type=number] in .num-input-wrap with a .num-step-btn on
+   each side, so no template markup had to change).
+   =================================================================== */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.num-input-wrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  /* Fixed (not min-) width so every pill is identical regardless of digit
+     count ("2" vs "15") or leftover per-page input sizing (e.g. the
+     uptime settings' .integ-num width/padding/text-align in
+     integrations.css) — see .num-input-wrap input[type=number] below,
+     which uses !important to make sure this wrapper's sizing always wins. */
+  width: 120px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  overflow: hidden;
+  vertical-align: middle;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.num-input-wrap:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.num-input-wrap input[type="number"] {
+  flex: 1 1 auto;
+  width: 100% !important;
+  min-width: 0;
+  text-align: center !important;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 8px 2px !important;
+}
+.num-input-wrap input[type="number"]:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+.num-step-btn {
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.num-step-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.num-step-btn:active:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.num-step-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.num-step-btn svg {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 6px;
+}
+/* ===================================================================
+   SEARCH INPUT (index page)
+   =================================================================== */
+.search-wrap {
+  position: relative;
+  margin-bottom: 32px;
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrap .search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* padding-left leaves room for .search-icon (left:14px, 18px wide); padding-right
+   leaves room for .search-clear-btn on the right. */
+.search-input-wrap input {
+  padding-left: 44px;
+  padding-right: 50px;
+  height: 48px;
+  font-size: 0.95rem;
+  border-radius: var(--radius-lg);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 14px;
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 99px;
+  transition: background var(--transition), color var(--transition);
+}
+
+.search-clear-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.search-clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ===================================================================
+   RESULTS / LISTS
+   =================================================================== */
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition);
+  border: 1px solid transparent;
+}
+
+.result-item:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.result-item-thumb {
+  width: 44px;
+  height: 62px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.result-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.result-item-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.result-item-arrow svg {
+  width: 16px;
+  height: 16px;
+}

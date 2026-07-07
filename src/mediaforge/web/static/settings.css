@@ -1,0 +1,287 @@
+/* ===================================================================
+   MediaForge — Settings page (page-specific)
+   Everything here is exclusive to the Settings page: the read-only
+   web console mirror (+ its ANSI color classes for converted log
+   output), the REST API endpoint reference table, the DNS
+   connectivity test panel, and the user-management add/list table.
+   The generic settings-row/card layout these panels sit inside lives
+   in settings_rows.css (shared with other settings-style pages).
+   Used by: templates/settings.html + static/settings.js
+   =================================================================== */
+
+/* Settings-page sidebar submenu (active-state highlighting is driven by
+   settings.js via .sidebar-sub-link[data-settings-tab]); no template
+   currently renders this markup, so these rules are presently dormant. */
+.sidebar-sub {
+  padding-left: 12px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}.sidebar-sub-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 24px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm, 6px);
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+}.sidebar-sub-link::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}.sidebar-sub-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}.sidebar-sub-link:hover::before {
+  opacity: 0.8;
+}.sidebar-sub-link.active {
+  color: var(--accent, #6366f1);
+  background: var(--accent-bg, rgba(99, 102, 241, 0.08));
+}.sidebar-sub-link.active::before {
+  background: var(--accent, #6366f1);
+  opacity: 1;
+}.web-console-wrap {
+  margin: 0 22px 18px;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0c0c0c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}.web-console-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2b2b2b;
+  font-size: 0.78rem;
+  color: #cfcfcf;
+}.web-console-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 6px #3ddc84;
+  flex: 0 0 auto;
+}.web-console-title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e6e6e6;
+}.web-console-status {
+  color: #8a8a8a;
+  font-size: 0.72rem;
+}.web-console-autoscroll {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #cfcfcf;
+  cursor: pointer;
+  user-select: none;
+}.web-console-autoscroll input {
+  margin: 0;
+}.web-console-output {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: 420px;
+  min-height: 160px;
+  overflow: auto;
+  background: #0c0c0c;
+  color: #e6e6e6;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+}.web-console-output::-webkit-scrollbar { width: 10px; height: 10px; }.web-console-output::-webkit-scrollbar-track { background: #0c0c0c; }.web-console-output::-webkit-scrollbar-thumb { background: #333; border-radius: 6px; }.web-console-line { display: block; min-height: 1.1em; }
+/* ANSI color-code -> CSS class mapping (ansi-<code>) used to render terminal
+   colors when converting captured log output for the web console mirror. */
+.ansi-30 { color: #555; }.ansi-31 { color: #ff5f56; }.ansi-32 { color: #3ddc84; }.ansi-33 { color: #f1c40f; }.ansi-34 { color: #4ea1ff; }.ansi-35 { color: #c678dd; }.ansi-36 { color: #56b6c2; }.ansi-37 { color: #e6e6e6; }.ansi-90 { color: #777; }.ansi-91 { color: #ff7b72; }.ansi-92 { color: #7ee787; }.ansi-93 { color: #ffd966; }.ansi-94 { color: #79c0ff; }.ansi-95 { color: #d2a8ff; }.ansi-96 { color: #56d4dd; }.ansi-97 { color: #ffffff; }.ansi-bold { font-weight: 700; }.ansi-bg-41 { background: #b3261e; color: #fff; }@media (max-width: 640px) {.web-console-wrap { margin: 0 12px 14px; }
+  .web-console-output { max-height: 300px; font-size: 0.74rem; padding: 10px; }
+  .web-console-toolbar { flex-wrap: wrap; }
+}.api-endpoints-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.81rem;
+}.api-endpoints-table td {
+  padding: 5px 12px 5px 0;
+  vertical-align: middle;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}.api-endpoints-table td:last-child {
+  white-space: normal;
+  color: var(--text-muted);
+  width: 100%;
+}.api-endpoints-table code {
+  font-size: 0.8rem;
+}.api-endpoints-table tr:not(:last-child) td {
+  border-bottom: 1px solid var(--border);
+}.api-param {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}.dns-test-panel {
+  margin: 0 22px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.84rem;
+}.dns-test-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}.dns-test-rerun {
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}.dns-test-rerun:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}.dns-test-rerun:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}.dns-test-block {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}.dns-test-block:last-child {
+  border-bottom: none;
+}.dns-test-block-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}.dns-test-status-row {
+  line-height: 1.5;
+}.dns-test-site-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+}.dns-test-site-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 90px;
+  flex-shrink: 0;
+}.dns-test-site-result {
+  flex: 1;
+}.dns-test-ok {
+  color: var(--success, #4caf50);
+}.dns-test-warn {
+  color: var(--warning, #ff9800);
+}.dns-test-fail {
+  color: var(--error, #f44336);
+}.dns-test-idle {
+  color: var(--text-muted);
+}.dns-test-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}.dns-test-err-btn {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.75;
+  vertical-align: middle;
+}.dns-test-err-btn:hover {
+  opacity: 1;
+}.dns-test-err-detail {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--text-muted);
+  word-break: break-all;
+  white-space: pre-wrap;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+}.add-user-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 22px 16px;
+}.add-user-row input,
+.add-user-row select {
+  flex: 1;
+  min-width: 120px;
+  height: 40px;
+}.add-user-row button {
+  height: 40px;
+  padding: 0 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+}.add-user-row button:hover {
+  background: var(--accent-hover);
+}.user-table {
+  margin: 0;
+}.user-table th {
+  padding: 10px 22px;
+}.user-table td {
+  padding: 10px 22px;
+  font-size: 0.85rem;
+}@media (max-width: 640px) {.api-endpoints-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .api-param {
+    display: none;
+  }
+}
+/* Re-declares .user-table th/td with tighter padding (10px 14px vs the
+   10px 22px set earlier) — same selector/specificity, so this later rule
+   wins by source order and is what actually renders. */
+.user-table th {
+  padding: 10px 14px;
+}.user-table td {
+  padding: 10px 14px;
+}@media (max-width: 640px) {.user-table {
+    min-width: 560px;
+  }
+
+  .user-table th,
+  .user-table td {
+    padding: 8px 10px;
+    white-space: nowrap;
+    font-size: 0.8rem;
+  }
+}

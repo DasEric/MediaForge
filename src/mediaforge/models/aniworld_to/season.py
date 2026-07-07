@@ -28,6 +28,11 @@ class AniworldSeason:
         download()
         watch()
         syncplay()
+
+    Used by:
+        mediaforge.providers (Provider(name="AniWorld", season_cls=AniworldSeason));
+        web/routes/search.py and web/autosync_worker.py read `are_movies` to tell
+        numbered seasons apart from the /filme movie collection.
     """
 
     def __init__(self, url, series=None):
@@ -156,7 +161,13 @@ class AniworldSeason:
         raise ValueError(f"Could not extract season number from URL: {self.url}")
 
     def __extract_episodes(self):
-        """
+        """Parse each episode row of the season page into an AniworldEpisode.
+
+        Movies and numbered episodes share the same schema/episode markers
+        (rows scoped to a shared schema.org/Episode itemtype) but differ in
+        where the episode number, URL and titles are found, hence the
+        `self.are_movies` branches below. Sample markup for a numbered season:
+
             <tbody id="season1">
             <tr class="" data-episode-id="2311" data-episode-season-id="1" itemprop="episode" itemscope="" itemtype="http://schema.org/Episode">
                 <td class="season1EpisodeID">
@@ -326,13 +337,16 @@ class AniworldSeason:
         return count
 
     def download(self):
+        """Download every episode in this season (or every movie, if are_movies)."""
         for episode in self.episodes:
             episode.download()
 
     def watch(self):
+        """Watch every episode in this season sequentially."""
         for episode in self.episodes:
             episode.watch()
 
     def syncplay(self):
+        """Syncplay every episode in this season sequentially."""
         for episode in self.episodes:
             episode.syncplay()

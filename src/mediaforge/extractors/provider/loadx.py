@@ -1,3 +1,13 @@
+"""LoadX video hoster extractor.
+
+Not implemented yet: both functions below are stubs that always raise
+NotImplementedError. Recognized as a valid provider name (see the
+"loadx" -> "LoadX" alias in models/megakino_to/scraper.py), but
+selecting it as the active provider will currently fail at download time.
+
+Used by: dispatched generically via extractors.provider_functions
+(key "get_direct_link_from_loadx") once selected as a provider by
+models/megakino_to/{episode,movie}.py or similar model code."""
 try:
     from ...config import DEFAULT_USER_AGENT
 except ImportError:
@@ -5,12 +15,12 @@ except ImportError:
 
 
 def get_direct_link_from_loadx(embeded_loadx_link, headers=None):
-    """Get direct LoadX video URL."""
+    """Get direct LoadX video URL. Not implemented: always raises NotImplementedError."""
     raise NotImplementedError("get_direct_link_from_loadx is not implemented yet.")
 
 
 def get_preview_image_link_from_loadx(embeded_loadx_link, headers=None):
-    """Get LoadX preview image URL."""
+    """Get LoadX preview image URL. Not implemented: always raises NotImplementedError."""
     raise NotImplementedError(
         "get_preview_image_link_from_loadx is not implemented yet."
     )

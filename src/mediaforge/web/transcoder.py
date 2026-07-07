@@ -1,3 +1,12 @@
+"""HLS transcoding via ffmpeg: encoder detection, ffprobe metadata, and
+session lifecycle (start / share / stop) backing the in-browser player.
+
+Used by: ``web/routes/stream.py`` drives sessions via ``start_session`` /
+``start_or_join_session`` / ``get_session`` / ``stop_session`` / ``active_count``
+and calls ``probe_file`` / ``detect_available_encoders`` / ``get_best_encoder``
+directly; ``web/routes/library.py`` also calls ``probe_file`` for media info.
+"""
+
 import os
 import json
 import uuid
@@ -224,6 +233,13 @@ def probe_file(file_path: str, headers: dict | None = None) -> dict | None:
         "width":       0,
         "height":      0,
         "format":      Path(file_path).suffix.lstrip(".").upper(),
+        # Pixel + display aspect ratio, e.g. "1:1" / "12:5". Kept separate from
+        # width/height so callers can force the correct DAR back onto a
+        # re-encode — some hardware encoders (VAAPI/NVENC via hwupload) drop
+        # or reset SAR, which pillarboxes/stretches the picture even though
+        # the coded width/height never changed.
+        "sample_aspect_ratio":  None,
+        "display_aspect_ratio": None,
     }
     fmt = data.get("format", {})
     info["duration"] = float(fmt.get("duration") or 0)
@@ -233,6 +249,8 @@ def probe_file(file_path: str, headers: dict | None = None) -> dict | None:
             info["video_codec"] = s.get("codec_name", "unknown")
             info["width"]  = int(s.get("width",  0) or 0)
             info["height"] = int(s.get("height", 0) or 0)
+            info["sample_aspect_ratio"]  = s.get("sample_aspect_ratio")
+            info["display_aspect_ratio"] = s.get("display_aspect_ratio")
         elif ct == "audio" and not info["audio_codec"]:
             info["audio_codec"] = s.get("codec_name", "unknown")
     return info
@@ -241,9 +259,13 @@ def probe_file(file_path: str, headers: dict | None = None) -> dict | None:
 # ── TranscodeSession ───────────────────────────────────────────────────────
 
 class TranscodeSession:
+    """One ffmpeg HLS transcode (or remux) process writing segments to a temp
+    directory, plus the bookkeeping needed to share it between viewers
+    (``refs`` / ``share_key``) and detect readiness/failure."""
+
     def __init__(self, token: str, file_path: str, encoder: str, start_pos: float = 0.0,
                  headers: dict | None = None, copy_video: bool = False,
-                 copy_audio: bool = False):
+                 copy_audio: bool = False, display_aspect_ratio: str | None = None):
         self.token       = token
         self.file_path   = str(file_path)
         self.encoder     = encoder
@@ -255,6 +277,11 @@ class TranscodeSession:
         # source is already browser-compatible H.264 / AAC).
         self.copy_video  = bool(copy_video)
         self.copy_audio  = bool(copy_audio)
+        # Source DAR (e.g. "12:5"), from ffprobe. Only used when re-encoding
+        # (copy_video is False) — forced back onto the output via -aspect so
+        # hardware encoders (VAAPI/NVENC) can't silently reset a non-square
+        # SAR to 1:1 and pillarbox/stretch the picture.
+        self.display_aspect_ratio = display_aspect_ratio or None
         self.tmp_dir     = None
         self.process     = None
         self.playlist_path = None
@@ -321,6 +348,16 @@ class TranscodeSession:
                 "-pix_fmt", "yuv420p",
             ]
             seg_time = "2"
+
+        # ── Aspect ratio safety net (re-encode only) ──
+        # Some hardware encoder paths (VAAPI's hwupload, NVENC) don't reliably
+        # carry a non-square sample_aspect_ratio through to the output, which
+        # silently changes the displayed shape even though width/height are
+        # untouched. Forcing -aspect from the probed source DAR pins the
+        # container-level display ratio regardless of what the encoder does
+        # with SAR internally. Not needed (or safe) in copy mode.
+        if not self.copy_video and self.display_aspect_ratio:
+            cmd += ["-aspect", self.display_aspect_ratio]
 
         # ── Audio ──
         if self.copy_audio:
@@ -431,12 +468,16 @@ class TranscodeSession:
 # ── Public API ─────────────────────────────────────────────────────────────
 
 def start_session(file_path: str, start_pos: float = 0.0, headers: dict | None = None,
-                  copy_video: bool = False, copy_audio: bool = False) -> tuple:
+                  copy_video: bool = False, copy_audio: bool = False,
+                  display_aspect_ratio: str | None = None) -> tuple:
     """Create + start a session. Returns (token, session) or raises RuntimeError.
 
     ``headers`` marks the input as a remote URL (stream-from-source) and is
     forwarded to ffmpeg as HTTP request headers. ``copy_video`` / ``copy_audio``
     remux instead of re-encoding when the source is already compatible.
+    ``display_aspect_ratio`` (from ffprobe) is forced back onto the output via
+    -aspect when re-encoding, so hardware encoders can't reset a non-square
+    SAR and change the displayed shape.
     """
     with _sessions_lock:
         if len(_sessions) >= MAX_TRANSCODE_SESSIONS:
@@ -452,7 +493,8 @@ def start_session(file_path: str, start_pos: float = 0.0, headers: dict | None =
         )
     token   = uuid.uuid4().hex
     session = TranscodeSession(token, file_path, encoder, start_pos, headers=headers,
-                               copy_video=copy_video, copy_audio=copy_audio)
+                               copy_video=copy_video, copy_audio=copy_audio,
+                               display_aspect_ratio=display_aspect_ratio)
     with _sessions_lock:
         _sessions[token] = session
     ok = session.start()
@@ -466,13 +508,14 @@ def start_session(file_path: str, start_pos: float = 0.0, headers: dict | None =
 
 def start_or_join_session(file_path: str, start_pos: float = 0.0, share_key: str | None = None,
                           headers: dict | None = None, copy_video: bool = False,
-                          copy_audio: bool = False) -> tuple:
+                          copy_audio: bool = False, display_aspect_ratio: str | None = None) -> tuple:
     """Like ``start_session`` but, when ``share_key`` is given, viewers asking
     for the same file at (nearly) the same position reuse ONE transcode session
     instead of each spawning ffmpeg. Refcounted; released via ``stop_session``."""
     if not share_key:
         return start_session(file_path, start_pos, headers=headers,
-                             copy_video=copy_video, copy_audio=copy_audio)
+                             copy_video=copy_video, copy_audio=copy_audio,
+                             display_aspect_ratio=display_aspect_ratio)
     fp = str(file_path)
     sp = max(0.0, float(start_pos))
     with _share_lock(share_key):
@@ -487,7 +530,8 @@ def start_or_join_session(file_path: str, start_pos: float = 0.0, share_key: str
         # No compatible shared session — create one. ffmpeg launch is slow, so it
         # runs under the per-key lock only (not the global _sessions_lock).
         token, session = start_session(fp, sp, headers=headers,
-                                       copy_video=copy_video, copy_audio=copy_audio)
+                                       copy_video=copy_video, copy_audio=copy_audio,
+                                       display_aspect_ratio=display_aspect_ratio)
         session.share_key = share_key
         with _sessions_lock:
             _shared[share_key] = token

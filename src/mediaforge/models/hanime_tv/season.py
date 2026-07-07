@@ -10,6 +10,13 @@ except ImportError:  # pragma: no cover
 
 
 class HanimeSeason:
+    """A hanime franchise is modelled as exactly one season containing its
+    ordered episode list (see scraper.franchise_episodes)."""
+
+    # hanime has no movie concept. This is always False; it exists purely so
+    # shared code paths that branch on `season.are_movies` (e.g. AniWorld/
+    # MegaKino-style season handling in web/autosync_worker.py) don't need to
+    # special-case hanime with a hasattr() check.
     are_movies = False
 
     def __init__(self, url=None, series=None, season_number=None, _detail=None):
@@ -44,6 +51,8 @@ class HanimeSeason:
 
     @property
     def episodes(self):
+        """Build HanimeEpisode objects for every video in the franchise,
+        1-indexed in the order the site lists them."""
         if self.__episodes is None:
             eps_meta = scraper.franchise_episodes(self._detail)
             eps = []

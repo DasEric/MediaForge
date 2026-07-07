@@ -17,6 +17,11 @@ a small *detached helper script* (``.sh`` on POSIX, ``.bat`` on Windows):
 
 A small set of state files in ``~/.mediaforge`` let the *new* process and the
 frontend follow the progress across the restart.
+
+Used by: ``routes/update.py`` (the ``/api/update/*`` endpoints call
+``detect_install``, ``start_update``, ``read_status`` and ``ack_status``) and
+``app.py``'s ``create_app()``, which calls ``finalize_after_restart()`` once at
+startup to resolve the state left behind by a just-completed helper run.
 """
 
 from __future__ import annotations
@@ -64,7 +69,9 @@ def _is_frozen() -> bool:
 def _is_pipx() -> bool:
     """True when running from a pipx-managed virtualenv."""
     if os.environ.get("PIPX_HOME") or os.environ.get("PIPX_BIN_DIR"):
-        # Only trust these if our prefix actually lives under a pipx venv.
+        # Presence of these env vars alone isn't proof (they can leak into a
+        # subshell that isn't actually the pipx venv), so we don't branch on
+        # them here -- just fall through to the prefix check below.
         pass
     probe = (sys.prefix + os.sep + (sys.executable or "")).replace("\\", "/").lower()
     parts = set(probe.split("/"))
@@ -349,6 +356,12 @@ fi
 
 
 def _win_quote(arg: str) -> str:
+    """Quote a single argument for ``cmd.exe``-style command lines.
+
+    Note: no current caller uses this (the Windows helper script is generated
+    with ``_ps_quote``/``_ps_array`` for PowerShell instead); kept as a small
+    utility rather than removed since this is a comments-only pass.
+    """
     if not arg:
         return '""'
     if any(c in arg for c in ' \t"&|<>^()'):

@@ -37,7 +37,11 @@ class SerienstreamSeries:
         syncplay()
 
     Attributes That Do Not Exists as on Aniworld:
-        rating, mal_id, has_movies
+        rating, mal_id (no AniSkip integration for s.to), has_movies (s.to
+        has no separate movie collection -- see SerienstreamSeason)
+
+    Used by:
+        mediaforge.providers (Provider(name="SerienStream", series_cls=SerienstreamSeries)).
     """
 
     def __init__(self, url: str):
@@ -174,7 +178,8 @@ class SerienstreamSeries:
     # -----------------------------
 
     def __extract_title(self):
-        """
+        """Extract the series title from the page <h1>. Sample markup:
+
         <h1 class="h2 mb-1 fw-bold">
             American Horror Story
         </h1>
@@ -191,7 +196,8 @@ class SerienstreamSeries:
 
     # TODO: description is clamped in html and loaded via js
     def __extract_description(self):
-        """
+        """Extract the (possibly truncated) description text. Sample markup:
+
         <span class="description-text">„American Horror Story“ ist eine US-amerikanische Horror - Fernsehserie. Jede ihrer Staffel setzt sich mit einem anderen Thema auseinander. Während die erste Staffel von einem Geisterhaus handelt, in welches die Familie Harmon unwissend einzieht, schildert die zweite Staffel die Geschehnisse in einer Nervenklinik im Jahre 1964. Die dritte Staffel beschäftigt sich mit einer kleinen </span>
         """
 
@@ -207,7 +213,8 @@ class SerienstreamSeries:
         return None
 
     def __extract_genres(self):
-        """
+        """Extract the genre list. Sample markup:
+
         <li class="series-group">
             <strong class="me-1">Genre:</strong>
             <a href="https://serienstream.to/genre/horror" class="link-light">Horror</a>
@@ -231,7 +238,9 @@ class SerienstreamSeries:
         return []
 
     def __extract_release_year(self):
-        """
+        """Extract the release year from the year link under the title.
+        Sample markup:
+
         <p class="small text-muted mb-2">
             <a class="small text-muted" href="/jahr/2011">2011</a> -
             <span class="small text-muted">NA</span> • FSK 16 •
@@ -254,7 +263,9 @@ class SerienstreamSeries:
         return None
 
     def __extract_poster_url(self):
-        """
+        """Extract the desktop cover image URL (src or data-src, whichever the
+        current page version uses). Sample markup:
+
         <div class="col-3 col-md-3 col-lg-2 d-none d-md-block">
             <picture>
                 <source type="image/avif" data-srcset="
@@ -304,7 +315,9 @@ class SerienstreamSeries:
         return None
 
     def __extract_directors(self):
-        """
+        """Extract the director list, including names hidden behind the
+        "& N mehr" (show more) toggle. Sample markup:
+
         <li class="series-group">
             <strong class="me-1">Regisseur:</strong>
 
@@ -363,7 +376,9 @@ class SerienstreamSeries:
         return []
 
     def __extract_actors(self):
-        """
+        """Extract the cast list, including names hidden behind the
+        "& N mehr" (show more) toggle. Sample markup:
+
         <li class="series-group">
             <strong class="me-1">Besetzung:</strong>
 
@@ -423,7 +438,8 @@ class SerienstreamSeries:
         return []
 
     def __extract_producer(self):
-        """
+        """Extract the producer list. Sample markup:
+
         <li class="series-group">
             <strong class="me-1">Produzent:</strong>
 
@@ -468,7 +484,8 @@ class SerienstreamSeries:
         return []
 
     def __extract_country(self):
-        """
+        """Extract the (first) country of origin. Sample markup:
+
         <li class="series-group">
             <strong class="me-1">Land:</strong>
 
@@ -495,7 +512,9 @@ class SerienstreamSeries:
         return None
 
     def __extract_age_rating(self):
-        """
+        """Extract the FSK age rating (or "NA") from the year/rating line.
+        Sample markup:
+
         <p class="small text-muted mb-2">
 
             <a class="small text-muted" href="https://serienstream.to/jahr/2011">2011</a> -
@@ -517,7 +536,8 @@ class SerienstreamSeries:
         return None
 
     def __extract_imdb(self):
-        """
+        """Extract the IMDb id from the IMDb link. Sample markup:
+
         <a href="https://www.imdb.com/title/tt1844624/"
         """
 
@@ -532,7 +552,11 @@ class SerienstreamSeries:
         return None
 
     def __extract_seasons(self):
-        """
+        """Build SerienstreamSeason objects for every staffel-N link on the
+        page. Both absolute and relative hrefs are supported and normalized
+        to absolute URLs; no /filme-style movie collection exists on s.to.
+        Sample markup:
+
         <meta property="og:url" content="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1">
                     href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1"
                     href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-2"
@@ -564,7 +588,8 @@ class SerienstreamSeries:
         return seasons_list
 
     def __extract_season_count(self):
-        """
+        """Highest staffel-N number linked on the page. Sample markup:
+
         <meta property="og:url" content="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1">
                     href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-1"
                     href="https://serienstream.to/serie/american-horror-story-die-dunkle-seite-in-dir/staffel-2"
@@ -588,16 +613,19 @@ class SerienstreamSeries:
     # PUBLIC METHODS
     # -----------------------------
     def download(self):
+        """Download every episode of every season."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.download()
 
     def watch(self):
+        """Watch every episode of every season, sequentially."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.watch()
 
     def syncplay(self):
+        """Syncplay every episode of every season, sequentially."""
         for season in self.seasons:
             for episode in season.episodes:
                 episode.syncplay()

@@ -181,9 +181,15 @@ class LibraryWatcher:
         self._watched = []
 
 
-# Module-level singleton — imported by app.py
+# Module-level singleton so app.py and routes/library.py share one observer.
 _watcher = LibraryWatcher()
 
 
 def get_watcher() -> LibraryWatcher:
+    """Return the process-wide LibraryWatcher instance.
+
+    Used by: app.py (initial start() during create_app) and
+    routes/library.py's _get_lib_watcher() (restart()/status lookups after
+    settings changes).
+    """
     return _watcher

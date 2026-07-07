@@ -42,9 +42,17 @@ _sessions: dict = {}
 _lock = threading.Lock()
 
 
-# ── Session registry ────────────────────────────────────────────────────────
+# ── Session registry ─────────────────────────────────────────────────────────────────────
+# In-memory token -> {headers, last-access} map. Tokens are short-lived and
+# tied to a single playback session; they let the proxy route (routes/stream.py)
+# re-attach the provider's Referer/User-Agent to every playlist/segment
+# request without exposing those headers to the browser.
 
 def create_proxy_session(headers: dict | None) -> str:
+    """Create a new proxy session for the given provider headers and return its token.
+
+    Used by: routes/stream.py when starting a stream-from-source playback.
+    """
     _reap()
     token = uuid.uuid4().hex
     with _lock:
@@ -53,6 +61,7 @@ def create_proxy_session(headers: dict | None) -> str:
 
 
 def get_proxy_session(token: str) -> dict | None:
+    """Look up a session by token, refreshing its last-access time (keeps it alive)."""
     with _lock:
         s = _sessions.get(token)
         if s:
@@ -61,31 +70,39 @@ def get_proxy_session(token: str) -> dict | None:
 
 
 def close_proxy_session(token: str):
+    """Explicitly drop a session, e.g. when playback ends."""
     with _lock:
         _sessions.pop(token, None)
 
 
 def _reap():
+    """Evict sessions that haven't been accessed within _SESSION_TIMEOUT."""
     now = time.time()
     with _lock:
         for t in [t for t, s in _sessions.items() if now - s["last"] > _SESSION_TIMEOUT]:
             _sessions.pop(t, None)
 
 
-# ── URL (de)serialisation ───────────────────────────────────────────────────
+# ── URL (de)serialisation ─────────────────────────────────────────────────────────────────
+# Absolute child URLs are embedded in the proxy path as unpadded urlsafe-base64
+# so they survive being placed in a URL segment without extra escaping.
 
 def b64e(url: str) -> str:
+    """Encode a URL for embedding in a proxy path segment."""
     return base64.urlsafe_b64encode(url.encode("utf-8")).decode("ascii").rstrip("=")
 
 
 def b64d(s: str) -> str:
+    """Decode a URL previously encoded with :func:`b64e` (re-adds stripped padding)."""
     pad = "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s + pad).decode("utf-8")
 
 
-# ── SSRF guard ──────────────────────────────────────────────────────────────
+# ── SSRF guard ────────────────────────────────────────────────────────────────────
 
 def is_safe_url(url: str) -> bool:
+    """Reject non-http(s) schemes and hosts resolving to private/loopback/link-local
+    addresses, so the proxy can't be used to reach internal network services."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
         return False
@@ -108,7 +125,7 @@ def is_safe_url(url: str) -> bool:
     return True
 
 
-# ── Fetching ────────────────────────────────────────────────────────────────
+# ── Fetching ────────────────────────────────────────────────────────────────────────
 
 def fetch(url: str, headers: dict, range_header: str | None = None) -> tuple:
     """Fetch a URL with the provider headers. Returns (code, headers, data, final_url)."""
@@ -128,7 +145,7 @@ def is_playlist(data: bytes) -> bool:
     return data[:7] == b"#EXTM3U"
 
 
-# ── Playlist rewriting ──────────────────────────────────────────────────────
+# ── Playlist rewriting ─────────────────────────────────────────────────────────
 
 def rewrite_playlist(text: str, playlist_url: str, proxy_base: str) -> str:
     """Rewrite all child URIs in an HLS playlist to go through the proxy.

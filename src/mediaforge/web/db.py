@@ -1,3 +1,20 @@
+"""SQLite persistence layer for the MediaForge web app.
+
+This module owns the single on-disk SQLite database (``mediaforge.db``) and
+every table used by the web UI and its background workers: user accounts,
+the download queue, auto-sync jobs, download history, statistics, custom
+paths, favourites, app settings (including encrypted secrets), notification
+prefs/push subscriptions, various result caches (TMDB/provider/browse/
+mediascan), the calendar watcher, the upscale queue, watch progress, and
+uptime monitoring heartbeats.
+
+Each public function opens its own connection via ``get_db()``, does its
+work, and closes it again — see ``get_db()`` for how connection reuse and
+WAL mode are handled. Tables are created and migrated lazily by the
+``init_*_db()`` functions, which are called once at app startup (see
+``mediaforge/web/app.py``) and are safe to call repeatedly.
+"""
+
 import os
 import sqlite3
 
@@ -179,6 +196,17 @@ WHERE sso_issuer IS NOT NULL AND sso_subject IS NOT NULL;
 
 
 class ContextConnection(sqlite3.Connection):
+    """sqlite3.Connection subclass whose close() is a no-op while it is the
+    connection cached on the current Flask request (``g.db_conn``).
+
+    This lets every function in this module call ``conn.close()`` in a
+    ``finally`` block unconditionally (simple, uniform code) while still
+    reusing a single connection per request when one is available: the
+    real close happens once, via Flask app-context teardown, not on every
+    call. Outside of a request (e.g. background worker threads), close()
+    behaves normally.
+    """
+
     def close(self):
         try:
             from flask import g, has_app_context
@@ -190,6 +218,16 @@ class ContextConnection(sqlite3.Connection):
 
 
 def get_db():
+    """Return a SQLite connection for the current context.
+
+    Reuses the connection cached on the active Flask request (``g.db_conn``)
+    when a request context exists; otherwise opens a fresh connection (used
+    by background worker threads, which have no request context). WAL
+    journal mode + a 30s busy_timeout are set on every connection so
+    concurrent readers/writers (web requests, queue worker, autosync
+    worker, upscale worker, ...) do not immediately hit "database is
+    locked" errors.
+    """
     MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     try:
         from flask import g, has_app_context
@@ -212,6 +250,12 @@ def get_db():
 
 
 def _migrate_db(conn):
+    """Add columns to the users table that were introduced after the
+    initial CREATE TABLE, so existing databases stay compatible.
+
+    Each column is added only if missing (checked via PRAGMA table_info),
+    so this is safe to call on every startup.
+    """
     rows = conn.execute("PRAGMA table_info(users)").fetchall()
     columns = {r["name"] for r in rows}
 
@@ -234,6 +278,11 @@ def _migrate_db(conn):
 
 
 def init_db():
+    """Create the users table (and migrate it) and auto-create an admin
+    account from MEDIAFORGE_WEB_ADMIN_USER/PASS env vars if none exists yet.
+
+    Used by: mediaforge/web/app.py (create_app, only when auth is enabled).
+    """
     acquire_instance_lock()
     conn = get_db()
     try:
@@ -460,6 +509,15 @@ CREATE TABLE IF NOT EXISTS download_queue (
 
 
 def init_queue_db():
+    """Create the download_queue table and apply schema migrations.
+
+    There is no formal migration/version table: each column added after the
+    initial release is applied via an ALTER TABLE wrapped in try/except,
+    where "duplicate column" errors are swallowed because they just mean
+    the column was already added on a previous run. The CHECK constraint
+    migration (adding the 'partial' status) instead recreates the whole
+    table, since SQLite cannot ALTER a CHECK constraint in place.
+    """
     MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     conn = get_db()
     try:
@@ -701,6 +759,12 @@ def claim_next_queued():
     Uses BEGIN IMMEDIATE so the check-then-update is a single atomic
     operation even across multiple processes sharing the same SQLite file.
     Returns the claimed item dict, or None if nothing is available.
+
+    Uses its own raw connection instead of get_db(), since this is called
+    from the background queue worker thread which has no Flask request
+    context to cache a connection on.
+
+    Used by: mediaforge/web/queue_worker.py (background download worker loop).
     """
     conn = sqlite3.connect(str(DB_PATH), timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -1144,6 +1208,15 @@ CREATE TABLE IF NOT EXISTS autosync_jobs (
 
 
 def init_autosync_db():
+    """Create the autosync_jobs table and apply schema migrations.
+
+    Same ad-hoc migration pattern as init_queue_db(): each new column is
+    added via a best-effort ALTER TABLE, ignoring the error when it already
+    exists. Also runs a couple of one-time data migrations (rewriting
+    stale s.to URLs to serienstream.to, and adding a UNIQUE index on
+    series_url after de-duplicating any pre-existing rows that would
+    violate it).
+    """
     MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     conn = get_db()
     try:
@@ -1828,6 +1901,9 @@ def add_favourite(series_url: str, title: str, poster_url: str | None, added_by:
 
 
 def remove_favourite(series_url: str, added_by: str | None):
+    # "OR added_by IS NULL" also matches legacy/no-auth rows that have no
+    # owner, since SQLite treats NULL as distinct for the UNIQUE(series_url,
+    # added_by) constraint and a plain "=" comparison would never match NULL.
     conn = get_db()
     try:
         conn.execute(
@@ -2259,7 +2335,8 @@ def set_setting(key: str, value: str) -> None:
 
 
 def get_encoding_ffmpeg_opts():
-    """Return dict with vcodec, acodec, vopts ready for ffmpeg.output() kwargs.
+    """Read the encoding_* app_settings and build a dict with vcodec, acodec,
+    vopts ready for ffmpeg.output() kwargs.
 
     Structure:
         {
@@ -2267,6 +2344,11 @@ def get_encoding_ffmpeg_opts():
             "acodec": str | None,
             "vopts":  dict,         # extra encoder kwargs (preset, crf, etc.)
         }
+
+    Note: as of this audit, no other module in the repo calls this function
+    (grepped the whole tree) — routes/encoding.py reads/writes the same
+    encoding_* settings directly via get_setting()/set_setting() instead.
+    Kept here for whichever download/transcode step is meant to consume it.
     """
     import shlex
 
@@ -2450,6 +2532,14 @@ def init_notification_db() -> None:
 # ---------------------------------------------------------------------------
 
 def get_user_id_by_username(username: str) -> "int | None":
+    """Resolve a username to its numeric user id, for use as the key in
+    the per-user notification-prefs / watch-progress tables.
+
+    In no-auth mode (see app.py: init_db()/the users table is only created
+    when auth is enabled) the session always uses the pseudo-username
+    "admin" with no backing row, so that case short-circuits to id 0
+    instead of hitting a nonexistent table.
+    """
     if not username:
         return None
     # In no-auth mode there is no users table — return 0 (pseudo-user)
@@ -3111,6 +3201,8 @@ def claim_next_upscale_queued():
     Uses BEGIN IMMEDIATE for the same reason as claim_next_queued — prevents
     double-processing when multiple threads call the worker simultaneously.
     Returns the claimed item dict, or None if nothing is available.
+
+    Used by: mediaforge/web/upscale_worker.py (background upscale worker loop).
     """
     conn = sqlite3.connect(str(DB_PATH), timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row

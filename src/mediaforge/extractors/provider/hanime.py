@@ -7,6 +7,12 @@ hanime video/series URL into the best available ``.m3u8`` master playlist, and
 
 Self-contained on purpose (mirrors extractors/provider/veev.py): it does its
 own tiny API fetch so importing the extractor never pulls in the model layer.
+
+Used by: models/hanime_tv/episode.py, which imports
+get_direct_link_from_hanime and download_from_hanime directly (this
+provider is not dispatched through extractors.provider_functions like the
+other hosters, since hanime is the site's own player rather than a
+third-party embed).
 """
 import re
 
@@ -27,11 +33,21 @@ _HEADERS = {
 
 
 def _slug(url):
+    """Extract the hanime video slug from a full video URL, if present.
+
+    Falls back to returning the (stripped) input unchanged, so this also
+    accepts a bare slug directly.
+    """
     m = re.search(r"/videos/hentai/([a-zA-Z0-9._\-]+)", url or "")
     return m.group(1) if m else (url or "").strip()
 
 
 def _best_stream_from_detail(detail):
+    """Pick the highest-resolution HLS stream URL out of a video-detail JSON blob.
+
+    Walks every server's stream list in ``videos_manifest`` and keeps the
+    one with the largest ``height`` value.
+    """
     manifest = (detail or {}).get("videos_manifest") or {}
     best_url, best_h = "", -1
     for server in manifest.get("servers") or []:

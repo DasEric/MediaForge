@@ -1,0 +1,117 @@
+/* ===================================================================
+   MediaForge — Auth / Onboarding pages
+   Login screen, first-run setup wizard, and the "instance locked"
+   screen. These three templates don't extend base.html (no sidebar/
+   shell), so they link this file directly instead of through style.css.
+   Used by: templates/login.html, templates/setup.html,
+            templates/setup_locked.html
+   =================================================================== */
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-base);
+}.auth-container h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  text-align: center;
+}.auth-container h2 {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  text-align: center;
+}.auth-container form {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}.auth-container form input {
+  height: 46px;
+  font-size: 0.95rem;
+}.auth-container form button[type="submit"] {
+  height: 46px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), box-shadow var(--transition);
+  margin-top: 4px;
+}.auth-container form button[type="submit"]:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}.auth-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--error);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 8px;
+}.auth-info {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--info);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 8px;
+}.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  width: 100%;
+  margin: 4px 0;
+}/* the "or" divider: two flex-grown hairlines with the label sandwiched between them */
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}.auth-divider span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}/* OIDC "Sign in with <provider>" link, rendered by login.html when oidc_enabled */
+.sso-button {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background var(--transition), border-color var(--transition);
+}.sso-button:hover {
+  background: var(--bg-hover);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: var(--text-primary);
+}.setup-container {
+  max-width: 560px;
+  margin: 60px auto;
+  padding: 24px;
+  text-align: center;
+}
