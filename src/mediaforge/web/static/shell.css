@@ -531,6 +531,22 @@
   margin-left: auto;
 }
 
+/* Dev Infos sidebar badge — sits inside .sidebar-action-btn (a flex row in
+   the footer, alongside GitHub), not a .sidebar-link nav item, so it uses
+   the same margin-left: auto trick as .seerr-badge/.update-badge to push
+   itself to the end of that flex row. Hidden via inline style when count
+   is 0, exactly like .seerr-badge. */
+.devinfo-badge {
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 99px;
+  line-height: 1.4;
+  margin-left: auto;
+}
+
 
 /* ===================================================================
    RESPONSIVE — Mobile

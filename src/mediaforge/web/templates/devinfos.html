@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Dev Infos') }} — MediaForge{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='devinfos.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="devinfos-page">
+  <div class="page-header devinfos-header">
+    <div>
+      <h1 class="page-title">{{ _('Dev Infos') }}</h1>
+      <p class="page-subtitle">{{ _('Latest news, fixes and known issues from the developers') }}</p>
+    </div>
+  </div>
+
+  <div class="devinfos-list" id="devinfosList">
+    {% if posts %}
+      {% for post in posts %}
+      <div class="devinfo-card" data-type="{{ post.type or 'announcement' }}">
+        <div class="devinfo-card-head">
+          <span class="devinfo-tag devinfo-tag-{{ post.type or 'announcement' }}">
+            {% if post.type == 'feature' %}{{ _('Feature') }}
+            {% elif post.type == 'fix' %}{{ _('Fix') }}
+            {% elif post.type == 'warning' %}{{ _('Warning') }}
+            {% else %}{{ _('Announcement') }}
+            {% endif %}
+          </span>
+          <span class="devinfo-time" data-ts="{{ post.remote_created_at or '' }}">{{ post.remote_created_at or '' }}</span>
+        </div>
+        <h3 class="devinfo-title">{{ post.title }}</h3>
+        <div class="devinfo-body devinfo-markdown">{{ post.body_html|default(post.body, true)|safe }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="devinfos-empty" id="devinfosEmpty">{{ _('No dev infos yet.') }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='devinfos.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,110 @@
+/* -- Homepage Dev Info warning banners ------------------------------------
+   Shown at the top of the homepage (index.html) for every cached Dev Info
+   post whose type is "warning" (see app.py's index() view). Styled to match
+   the rest of the dark/light theme via variables.css tokens. */
+
+.devinfo-warning-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 900px;
+  margin: 0 auto 22px;
+  padding: 0 4px;
+}
+
+.devinfo-warning-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warning);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 16px 46px 16px 18px;
+}
+
+.devinfo-warning-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--warning);
+}
+
+.devinfo-warning-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.devinfo-warning-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.devinfo-warning-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.devinfo-warning-body {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.devinfo-warning-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.devinfo-warning-dismiss:hover,
+.devinfo-warning-dismiss:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+@media (max-width: 700px) {
+  .devinfo-warning-banners { margin: 0 auto 18px; }
+  .devinfo-warning-banner { padding: 14px 44px 14px 14px; gap: 10px; }
+  .devinfo-warning-title { font-size: 0.92rem; }
+  .devinfo-warning-body { font-size: 0.84rem; }
+}
+
+@media (max-width: 560px) {
+  .devinfo-warning-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 44px 14px 14px;
+  }
+  .devinfo-warning-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .devinfo-warning-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+}

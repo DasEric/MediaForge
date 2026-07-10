@@ -45,6 +45,8 @@ from .db import (
     init_mediascan_db,
     init_watch_progress_db,
     init_uptime_db,
+    init_devinfos_db,
+    get_devinfo_posts,
 )
 
 logger = get_logger(__name__)
@@ -66,6 +68,7 @@ from .runtime_state import (
 )
 from .dns_patch import _apply_dns_patch, _DNS_PRESETS
 from .uptime_monitor import _start_uptime_monitor
+from .devinfos_monitor import _start_devinfos_poller
 from .queue_worker import _ensure_queue_worker
 from .mediascan import _start_mediascan_scheduler
 from .autosync_worker import _ensure_autosync_worker
@@ -78,6 +81,7 @@ from .settings_migration import (
     _apply_captcha_env,
 )
 from .tmdb_keywords_sync import _ensure_tmdb_keywords_sync_worker
+from .markdown_utils import render_markdown
 
 
 def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
@@ -101,6 +105,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
 
     app = Flask(__name__)
     app.config['TEMPLATES_AUTO_RELOAD'] = False
+    app.jinja_env.filters["markdown"] = render_markdown
 
     # ── i18n / Flask-Babel ──────────────────────────────────────────────────
     # Translations are modular: every web/thirdparties/<name>/translations/
@@ -403,6 +408,8 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     init_watch_progress_db()
     init_uptime_db()
     _start_uptime_monitor()
+    init_devinfos_db()
+    _start_devinfos_poller()
     _load_queue_paused_from_db()
     # Start MediaScan 24-h background scheduler
     _start_mediascan_scheduler()
@@ -568,11 +575,17 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     @app.route("/")
     def index():
         sto_lang_labels = {"1": "German Dub", "2": "English Dub", "3": "English Dub (German Sub)"}
+        _devinfo_warnings = [
+            {**p, "body_html": render_markdown(p.get("body"))}
+            for p in get_devinfo_posts()
+            if (p.get("type") or "").strip().lower() == "warning"
+        ]
         return render_template(
             "index.html",
             lang_labels=LANG_LABELS,
             sto_lang_labels=sto_lang_labels,
             supported_providers=WORKING_PROVIDERS,
+            devinfo_warnings=_devinfo_warnings,
         )
 
 
@@ -612,6 +625,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     from .routes.extensions import register_extensions_routes
     from .routes.syncplay import register_syncplay_routes
     from .routes.uptime import register_uptime_routes
+    from .routes.devinfos import register_devinfos_routes
     from .routes.calendar_routes import register_calendar_routes
     from .thirdparties import discover_and_register as _discover_and_register_thirdparties
     from .routes.encoding import register_encoding_routes
@@ -639,6 +653,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     register_integrations_routes(app)
     register_syncplay_routes(app)
     register_uptime_routes(app)
+    register_devinfos_routes(app)
     register_calendar_routes(app)
     # Third-party integrations (web/thirdparties/<name>/) are auto-discovered
     # and registered here — see web/thirdparties/__init__.py. Adding a new

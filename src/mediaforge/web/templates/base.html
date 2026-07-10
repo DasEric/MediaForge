@@ -384,6 +384,16 @@
         </a>
       </div>
       {% endif %}
+      <a href="{{ url_for('devinfos_page') }}" class="sidebar-action-btn" title="{{ _('Dev Infos') }}" style="text-decoration:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" style="width:16px;height:16px">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="11" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        <span style="font-size:0.85rem;font-weight:500">{{ _('Dev Infos') }}</span>
+        <span class="devinfo-badge" id="devinfoBadge" style="display:none">0</span>
+      </a>
       <a href="https://github.com/PD-Codes/MediaForge" target="_blank" rel="noopener noreferrer"
         class="sidebar-action-btn" title="GitHub Repository" style="text-decoration:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -698,6 +708,7 @@
     });
   </script>
   <script src="{{ url_for('static', filename='queue.js') }}"></script>
+  <script src="{{ url_for('static', filename='devinfos.js') }}"></script>
   <script src="{{ url_for('static', filename='upscale_queue.js') }}"></script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
   <script>
