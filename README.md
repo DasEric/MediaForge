@@ -24,7 +24,7 @@ WebUI (Landing Page) | WebUI (Auto-Sync)
 
 ## Quick Start
 
-> **Requirements:** Python ≥ 3.9 and **ffmpeg** available in your `PATH`. New to Python? See the [Installation](https://github.com/PD-Codes/MediaForge/wiki/Installation) wiki for per-OS instructions.
+> **Requirements:** Python ≥ 3.10 and **ffmpeg** available in your `PATH`. New to Python? See the [Installation](https://github.com/PD-Codes/MediaForge/wiki/Installation) wiki for per-OS instructions.
 
 ```bash
 # Install the latest stable release

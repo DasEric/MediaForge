@@ -7,7 +7,7 @@ authors = [
 ]
 description = "MediaForge is a WebUI-only tool for downloading anime and series from AniWorld, SerienStream and FilmPalast. Start it with 'mediaforge' to launch the web interface directly."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "niquests",
   "ffmpeg-python",
