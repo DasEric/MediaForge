@@ -65,9 +65,14 @@ RUN apt-get update && apt-get install -y \
 # compose file — no manual chown needed. legacy_import.py picks it up and
 # copies the data on first boot; the folder stays empty and harmless otherwise.
 
-# Container-friendly Python defaults
+# Container-friendly Python & UV defaults
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Default download directory
 ENV MEDIAFORGE_DOWNLOAD_PATH=/app/Downloads \
@@ -80,28 +85,19 @@ ENV TZ=Europe/Berlin \
     LANGUAGE=de_DE:de \
     LC_ALL=de_DE.UTF-8
 
-# Install patchright browsers to a global path accessible by the unprivileged runtime user.
+# Install dependencies & patchright browsers to a global path accessible by the unprivileged runtime user.
 # This step is intentionally placed BEFORE copying source code so that the heavy
-# Chromium download is cached independently and only re-runs when pyproject.toml changes.
-#
-# The version installed here MUST match the "patchright==" pin in pyproject.toml
-# exactly (not just "patchright", unpinned) — otherwise `pip install .` below can
-# resolve a different patchright/playwright version against the full dependency
-# graph than the standalone install above, leaving the downloaded Chromium
-# revision (baked into this layer) mismatched against what actually runs at
-# startup. That mismatch is exactly what triggers Patchright's
-# "Looks like Playwright was just installed or updated — run patchright install"
-# warning at container start. Bump both places together when upgrading.
-COPY pyproject.toml README.md LICENSE MANIFEST.in /app/
+# dependency resolution and Chromium download are cached independently and only re-run when pyproject.toml / uv.lock change.
+COPY pyproject.toml uv.lock README.md LICENSE MANIFEST.in /app/
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir "patchright==1.61.2" && \
+RUN uv sync --frozen --no-dev --no-install-project && \
     patchright install chromium && \
-    chmod -R 755 /opt/ms-playwright
+    chmod -R 755 /opt/ms-playwright /app/.venv
 
 # Copy source and install the full project
 COPY --chown=mediaforge:mediaforge src/ /app/src/
-RUN pip install --no-cache-dir .
+RUN uv sync --frozen --no-dev && \
+    chown -R mediaforge:mediaforge /app/.venv /app/src
 
 # Entrypoint script for logged startup sequence
 COPY entrypoint.sh /entrypoint.sh
