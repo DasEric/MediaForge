@@ -3,6 +3,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='shared_modals.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='hanime.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='devinfo_banner.css') }}">
 <style>
   #directLinkBtn {
     height: 46px;
@@ -217,6 +218,27 @@
 {% endblock %}
 
 {% block content %}
+{% if devinfo_warnings %}
+<div id="devinfoWarningBanners" class="devinfo-warning-banners">
+  {% for w in devinfo_warnings %}
+  <div class="devinfo-warning-banner" data-devinfo-id="{{ w.id }}">
+    <div class="devinfo-warning-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    </div>
+    <div class="devinfo-warning-content">
+      <div class="devinfo-warning-title">{{ w.title }}</div>
+      <div class="devinfo-warning-body devinfo-markdown">{{ w.body_html|safe }}</div>
+    </div>
+    <button type="button" class="devinfo-warning-dismiss" aria-label="{{ _('Dismiss') }}" title="{{ _('Dismiss') }}">&times;</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 <div class="container">
   <div class="site-hero">
     <h1 id="pageHeading">MediaForge</h1>
@@ -310,4 +332,5 @@
 {% include "shared_modals.html" %}
 {% endblock %} {% block scripts %}
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='devinfo_banner.js') }}"></script>
 {% endblock %}

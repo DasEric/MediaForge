@@ -4280,3 +4280,29 @@ msgstr "Seite konfigurieren"
 msgid "Scan web/thirdparties/ for new module folders and register them without restarting the app."
 msgstr "web/thirdparties/ nach neuen Modul-Ordnern durchsuchen und diese registrieren, ohne die App neu zu starten."
 
+
+# -- Dev Infos --------------------------------------------------------------
+msgid "Dev Infos"
+msgstr "Dev Infos"
+
+msgid "Latest news, fixes and known issues from the developers"
+msgstr "Neuigkeiten, Fixes und bekannte Probleme von den Entwicklern"
+
+msgid "Feature"
+msgstr "Feature"
+
+msgid "Fix"
+msgstr "Fix"
+
+msgid "Warning"
+msgstr "Warnung"
+
+msgid "Announcement"
+msgstr "Ankündigung"
+
+msgid "No dev infos yet."
+msgstr "Noch keine Dev Infos."
+
+msgid "Dismiss"
+msgstr "Schließen"
+

@@ -3996,3 +3996,83 @@ def get_uptime_heartbeats_between(source, start_ts, end_ts, limit=1000):
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+# ── Dev Infos (remote changelog/status feed) ──────────────────────────────────
+_CREATE_DEVINFO_TABLE = """
+CREATE TABLE IF NOT EXISTS devinfo_posts (
+    id                TEXT    PRIMARY KEY,
+    title             TEXT,
+    body              TEXT,
+    type              TEXT,
+    remote_created_at TEXT,
+    fetched_at        INTEGER
+)
+"""
+
+
+def init_devinfos_db():
+    """Create the devinfo_posts table used to cache the remote Dev Info feed."""
+    MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    conn = get_db()
+    try:
+        conn.execute(_CREATE_DEVINFO_TABLE)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def replace_devinfo_posts(posts):
+    """Replace the entire cached Dev Info post set with a fresh batch.
+
+    Small, low-frequency dataset fetched wholesale from the remote server, so
+    a clear-and-reinsert transaction is simpler and just as correct as an
+    upsert-by-id. ``posts`` is a list of dicts with keys: id, title, body,
+    type, remote_created_at (already mapped from the remote payload's
+    ``created_at`` by the caller).
+    """
+    import time as _t
+    now = int(_t.time())
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM devinfo_posts")
+        for p in posts or []:
+            conn.execute(
+                "INSERT OR REPLACE INTO devinfo_posts "
+                "(id, title, body, type, remote_created_at, fetched_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    str(p.get("id")),
+                    p.get("title"),
+                    p.get("body"),
+                    p.get("type"),
+                    p.get("remote_created_at"),
+                    now,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_devinfo_posts():
+    """Return all cached Dev Info posts as a list of dicts, newest first."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, title, body, type, remote_created_at, fetched_at "
+            "FROM devinfo_posts ORDER BY remote_created_at DESC, fetched_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_devinfo_count():
+    """Return the number of cached Dev Info posts (for the sidebar badge)."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT COUNT(*) AS n FROM devinfo_posts").fetchone()
+        return (row["n"] if row else 0) or 0
+    finally:
+        conn.close()
