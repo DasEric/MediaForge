@@ -21,7 +21,8 @@ the sanitizing/guard logic.
 from datetime import datetime, timezone
 
 from . import settings
-from .sanitize import clean_url, is_adult_provider, redact_secrets, sanitize_exception
+from .sanitize import (clean_url, is_adult_provider, redact_secrets, redact_urls_in_text,
+                        sanitize_exception, shorten_path)
 
 
 def _now_iso() -> str:
@@ -43,6 +44,37 @@ def build_crash_event(exc_type, exc_value, tb):
     if not settings.is_key_enabled("crash_reports"):
         return None
     return _event("crash_reports", sanitize_exception(exc_type, exc_value, tb))
+
+
+def build_log_error_event(record):
+    """Build a crash_reports event from a logging.LogRecord that reached
+    ERROR level with no exception object available at all (see
+    hooks._TelemetryLogHandler -- the common case, a logger.error(f"...: {e}")
+    call still inside its own except block, is handled by build_crash_event()
+    via a live sys.exc_info() instead, since that gives a real traceback).
+
+    This is the fallback for a bare logger.error("message") with no except
+    block backing it -- there is no call stack to walk, so this reports only
+    the log call site itself (file/line/function from the LogRecord) plus the
+    formatted message, sanitized the same way a real traceback would be.
+    Still far more useful for fixing a bug than nothing at all, which is the
+    alternative every time code logs an error without raising."""
+    if not settings.is_key_enabled("crash_reports"):
+        return None
+    message = redact_secrets(redact_urls_in_text(record.getMessage()))[:2000]
+    filename = shorten_path(record.pathname)
+    frame = {"filename": filename, "lineno": record.lineno, "name": record.funcName, "line": ""}
+    traceback_text = (
+        f"LoggedError (no exception object, logger.error() call site only)\n"
+        f'  File "{filename}", line {record.lineno}, in {record.funcName}\n'
+        f"    {message}"
+    )
+    return _event("crash_reports", {
+        "exception_type": "LoggedError",
+        "message": message,
+        "frames": [frame],
+        "traceback_text": traceback_text,
+    })
 
 
 def build_system_info_event():
