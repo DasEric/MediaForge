@@ -4,7 +4,9 @@ Extracted from create_app as a plain route-registration function
 (no Flask blueprint: endpoint names stay bare so url_for() keeps working).
 """
 
+from .. import runtime_state as _runtime_state
 from .. import selfupdate
+from ... import mirrors as _mirrors
 from ...config import LANG_LABELS
 from ..autosync_worker import _normalize_sync_times
 from ..autosync_worker import _parse_sync_days
@@ -254,6 +256,30 @@ def register_settings_routes(app):
                     },
                     "hide_disabled_in_search": get_setting("sources_hide_in_search", "0"),
                 },
+                # Hoster order + fallback. "available" is every hoster with a
+                # working extractor; "order" is the user's ranking of them,
+                # which queue_worker.py walks when the hoster picked for a
+                # download fails. See runtime_state.get_provider_fallback_chain().
+                "providers": {
+                    "available": list(_runtime_state.WORKING_PROVIDERS),
+                    "order": _runtime_state.get_provider_order(),
+                    "fallback_enabled": "1" if _runtime_state.is_provider_fallback_enabled() else "0",
+                },
+                # Per-site domain fallback (s.to -> serienstream.to -> origin IP).
+                # See mediaforge/mirrors.py.
+                "mirrors": {
+                    "sites": [
+                        {
+                            "id": _site,
+                            "label": _mirrors.SITE_LABELS.get(_site, _site),
+                            "canonical": _mirrors.canonical_host(_site),
+                            "hosts": _mirrors.get_mirrors(_site),
+                            "active": _mirrors.active_host(_site),
+                            "default": list(_default_hosts),
+                        }
+                        for _site, _default_hosts in _mirrors.DEFAULT_SITE_MIRRORS.items()
+                    ],
+                },
             }
         )
     @app.route("/api/console", methods=["GET"])
@@ -357,6 +383,12 @@ def register_settings_routes(app):
             "show_hover_rating": get_setting("cineinfo_show_hover_rating", "0"),
             "show_hover_genres": get_setting("cineinfo_show_hover_genres", "0"),
             "show_hover_fsk": get_setting("cineinfo_show_hover_fsk", "0"),
+            # Order of the provider-pill sources (TMDB, Crunchyroll,
+            # Fernsehserien.de and any module-registered pill, addressed as
+            # "ext:<name>"). The frontend treats it as a preference, not a
+            # whitelist: unlisted sources are still tried, after the listed
+            # ones. See static/app.js's _pillSources().
+            "provider_order": get_setting("cineinfo_provider_order", "tmdb,crunchyroll,fernsehserien"),
             "advanced_search": get_setting("cineinfo_advanced_search", "0"),
             "calendar":        get_setting("cineinfo_calendar",        "0"),
             "calendar_seerr":  get_setting("cineinfo_calendar_seerr",  "0"),
@@ -376,6 +408,7 @@ def register_settings_routes(app):
         for key in ["tmdb_api_key", "country", "show_providers",
                     "show_genres", "show_fsk", "show_rating", "show_recommendations", "show_trailer",
                     "show_hover_rating", "show_hover_genres", "show_hover_fsk", "advanced_search",
+                    "provider_order",
                     "calendar", "calendar_seerr", "calendar_mediathek", "calendar_refresh_interval"]:
             if key in data:
                 set_setting("cineinfo_" + key, str(data[key]))
@@ -908,6 +941,56 @@ def register_settings_routes(app):
                 set_setting(_k, "1" if str(data[_k]).lower() in ("true", "1") else "0")
         if "sources_hide_in_search" in data:
             set_setting("sources_hide_in_search", "1" if str(data["sources_hide_in_search"]).lower() in ("true", "1") else "0")
+
+        # -- Provider order & fallback (admin only) --
+        # The order the download queue walks when a hoster fails; see
+        # runtime_state.get_provider_fallback_chain() and queue_worker's
+        # _build_attempt_plan().
+        _provider_keys = ("provider_order", "provider_fallback_enabled")
+        _mirror_keys = tuple("site_mirrors_" + s for s in _mirrors.DEFAULT_SITE_MIRRORS)
+        if any(_k in data for _k in _provider_keys + _mirror_keys):
+            _pu, _padmin = _get_current_user_info()
+            if not _padmin:
+                return jsonify({"error": "forbidden"}), 403
+        if "provider_order" in data:
+            raw = data["provider_order"]
+            parts = raw if isinstance(raw, list) else str(raw).split(",")
+            by_lower = {p.lower(): p for p in WORKING_PROVIDERS}
+            order = []
+            for p in parts:
+                canonical = by_lower.get(str(p).strip().lower())
+                if canonical and canonical not in order:
+                    order.append(canonical)
+            if not order:
+                return jsonify({"error": "Invalid provider_order"}), 400
+            set_setting("provider_order", ",".join(order))
+        if "provider_fallback_enabled" in data:
+            set_setting(
+                "provider_fallback_enabled",
+                "1" if str(data["provider_fallback_enabled"]).lower() in ("true", "1") else "0",
+            )
+
+        # -- Site mirrors (admin only) --
+        # One key per site, e.g. site_mirrors_sto = "s.to,serienstream.to,186.2.175.5".
+        # The canonical host is always kept first by mirrors.py itself, so a
+        # user cannot accidentally drop the primary domain.
+        _mirrors_changed = False
+        for _site in _mirrors.DEFAULT_SITE_MIRRORS:
+            _key = "site_mirrors_" + _site
+            if _key not in data:
+                continue
+            raw = data[_key]
+            parts = raw if isinstance(raw, list) else str(raw).split(",")
+            hosts = []
+            for h in parts:
+                host = _mirrors._clean_host(h)
+                if host and host not in hosts:
+                    hosts.append(host)
+            set_setting(_key, ",".join(hosts))
+            _mirrors_changed = True
+        if _mirrors_changed:
+            _mirrors.invalidate_cache()  # re-read the lists + retry the primary host
+
         return jsonify({"ok": True})
     @app.route("/api/custom-paths")
     def api_custom_paths():

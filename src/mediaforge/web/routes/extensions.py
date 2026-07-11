@@ -16,25 +16,29 @@ up here, with the reason. It's meant as the "why isn't my integration
 showing up" page.
 
 The /api/store/* half is the module store client (see
-web/thirdparties/store.py). Every one of those routes short-circuits when
-no store URL is configured — which is the default — so a MediaForge that
-was never pointed at a store never talks to one, and its Modulmanager
-renders no store UI at all.
+web/thirdparties/store.py). The official store's address and the keys whose
+signatures make a module "Official" are both compiled into the build
+(store.py's DEFAULT_STORE_URL, trusted_keys.py's BUILTIN_KEYS) — this file
+exposes them read-only and refuses to write them. An admin may add their own
+extra repositories and opt into unverified modules; that is the whole of what
+is configurable, and neither can promote anything to Official.
 """
 
 from flask import jsonify, render_template, request
 
-from ..db import get_setting
-from ..thirdparties import pending_changes, rescan_new_modules
+from ..thirdparties import (
+    install_staged_live,
+    pending_changes,
+    rescan_new_modules,
+    uninstall_module_live,
+)
 from ..thirdparties import store as module_store
 from ..thirdparties.registry import REGISTRY_API_VERSION, resolve_extensions_overview
-from ..thirdparties.trusted_keys import ADMIN_KEYS_SETTING as TRUSTED_KEYS_SETTING
 from ..thirdparties.trusted_keys import trusted_keys
 
 
 def _page_context():
     """Everything both the initial render and a post-action re-render need."""
-    keys = trusted_keys()
     return {
         "extensions": resolve_extensions_overview(),
         "registry_api": REGISTRY_API_VERSION,
@@ -43,12 +47,11 @@ def _page_context():
         "extra_urls": module_store.extra_urls(),
         "allow_unverified": module_store.allow_unverified(),
         "pending": pending_changes(),
-        # Trusted signing keys: what MediaForge ships, plus what this admin added.
-        # Shown so an admin can see *why* a module is (or isn't) official, without
-        # reading source or guessing.
-        "trusted_keys_raw": get_setting(TRUSTED_KEYS_SETTING, "") or "",
-        "trusted_keys": sorted(keys.values(), key=lambda k: (k.get("admin_added", False),
-                                                             k.get("name", ""))),
+        # Read-only: the keys this *build* ships (thirdparties/trusted_keys.py). Shown
+        # so an admin can see why a module is (or isn't) official — not so they can
+        # change it. There is deliberately no route that writes this list; a trust root
+        # a user can edit is one an attacker can talk them into editing.
+        "trusted_keys": sorted(trusted_keys().values(), key=lambda k: k.get("name", "")),
     }
 
 
@@ -86,72 +89,64 @@ def register_extensions_routes(app):
 
     @app.route("/api/store/config", methods=["GET", "PUT"])
     def api_store_config():
-        """Read/write the store URL + the unverified opt-in.
+        """The two things an admin may configure: their own extra repositories, and
+        whether unverified modules may be installed at all.
 
-        Setting the URL to "" is how you turn the store back off completely:
-        the UI disappears and every route below starts refusing again.
+        Deliberately NOT writable here, and with no route anywhere else that writes
+        them either:
+
+        - **the official store URL** — it is a constant in thirdparties/store.py.
+          A settings field for it would mean "talk someone into pasting a URL and
+          their official modules now come from you".
+        - **the trusted signing keys** — they are BUILTIN_KEYS in
+          thirdparties/trusted_keys.py, shipped with the build. A trust root a user
+          can edit is a trust root an attacker can talk them into editing, and the
+          "Official" badge would then mean nothing at all.
+
+        Both are still *readable* (the GET below, and the page context), because an
+        admin should be able to see what their install trusts. Seeing is not editing.
         """
-        from ..db import get_setting, set_setting
+        from ..db import set_setting
 
         if request.method == "GET":
             return jsonify({
-                "url": module_store.store_url(),
+                "url": module_store.store_url(),            # read-only, from code
                 "extra_urls": module_store.extra_urls(),
                 "allow_unverified": module_store.allow_unverified(),
                 "registry_api": REGISTRY_API_VERSION,
             })
 
         data = request.get_json(silent=True) or {}
-        if "url" in data:
-            url = str(data["url"] or "").strip()
-            if url and not url.startswith(("http://", "https://")):
-                return jsonify({"error": "store URL must start with http:// or https://"}), 400
-            set_setting(module_store.STORE_URL_KEY, url)
+
+        # An older client (or a curious admin with curl) sending "url"/"trusted_keys"
+        # gets told no, rather than having it silently ignored — a request that looks
+        # like it worked but didn't is how you end up debugging the wrong thing.
+        for locked, where in (("url", "thirdparties/store.py (DEFAULT_STORE_URL)"),
+                              ("trusted_keys", "thirdparties/trusted_keys.py (BUILTIN_KEYS)")):
+            if locked in data:
+                return jsonify({
+                    "error": f"'{locked}' is not configurable — it is compiled into this build. "
+                             f"Change it in {where} and ship a new release."
+                }), 400
+
         if "extra_urls" in data:
-            # One repo per line. Anything that isn't an http(s) URL is dropped
-            # rather than saved and silently ignored later.
+            # One repo per line. Anything that isn't an http(s) URL is dropped rather
+            # than saved and silently ignored later.
             lines = [line.strip() for line in str(data["extra_urls"] or "").splitlines()]
             urls = [line for line in lines if line.startswith(("http://", "https://"))]
             set_setting(module_store.EXTRA_URLS_KEY, "\n".join(urls))
         if "allow_unverified" in data:
             set_setting(module_store.ALLOW_UNVERIFIED_KEY,
                         "1" if str(data["allow_unverified"]) == "1" else "0")
-        if "trusted_keys" in data:
-            # The keys whose signatures this install believes, on top of the ones
-            # MediaForge ships (see thirdparties/trusted_keys.py). Pasting a key
-            # here is the act of deciding to trust it -- so it is validated, not
-            # merely stored: a malformed blob would otherwise be silently ignored
-            # at verification time and the admin would wonder why their own
-            # modules still say "unsigned".
-            raw = str(data["trusted_keys"] or "").strip()
-            if raw:
-                import base64
-                import json as _json
 
-                try:
-                    entries = _json.loads(raw)
-                    if not isinstance(entries, list):
-                        raise ValueError("expected a JSON list of keys")
-                    for entry in entries:
-                        if not entry.get("key_id") or not entry.get("public_key"):
-                            raise ValueError("each key needs a key_id and a public_key")
-                        if len(base64.b64decode(str(entry["public_key"]), validate=True)) != 32:
-                            raise ValueError(
-                                f"{entry.get('key_id')}: not an Ed25519 public key "
-                                "(expected 32 bytes). If that was a PRIVATE key, treat it "
-                                "as compromised and generate a new one.")
-                except Exception as exc:
-                    return jsonify({"error": f"invalid trusted keys: {exc}"}), 400
-            set_setting(TRUSTED_KEYS_SETTING, raw)
-        # Any config change invalidates every cached index -- the set of repos we
-        # were caching for may not even exist any more.
+        # Any config change invalidates every cached index -- the set of repos we were
+        # caching for may not even exist any more.
         module_store._CACHE.clear()
         return jsonify({
             "ok": True,
             "url": module_store.store_url(),
             "extra_urls": module_store.extra_urls(),
             "allow_unverified": module_store.allow_unverified(),
-            "trusted_keys": get_setting(TRUSTED_KEYS_SETTING, "") or "",
             "enabled": module_store.store_enabled(),
         })
 
@@ -166,9 +161,21 @@ def register_extensions_routes(app):
 
     @app.route("/api/store/install", methods=["POST"])
     def api_store_install():
-        """Download + verify + stage a module for the next start. The install
-        is NOT live -- see web/thirdparties/__init__.py's
-        apply_pending_changes()."""
+        """Download + verify + install a module — live, without a restart.
+
+        The download is still staged into ``_pending/`` first (that is where
+        signature verification happens, and a package that fails it never
+        reaches the live folder), but a module the running process has not
+        imported yet is then moved into place and registered immediately:
+        install_staged_live() → rescan_new_modules() → its blueprint, settings
+        card, sidebar link and translations are all live on the next request.
+
+        The one case that still needs a restart is an UPGRADE/reinstall of a
+        module that is already loaded: Flask can add a blueprint to a running
+        app but never replace one, so that stays staged and the "restart
+        required" banner appears for it exactly as before. ``restart_required``
+        in the response says which of the two happened.
+        """
         if not module_store.store_enabled():
             return jsonify({"ok": False, "error": "no store configured"}), 400
         data = request.get_json(silent=True) or {}
@@ -176,17 +183,42 @@ def register_extensions_routes(app):
         if not module_id:
             return jsonify({"ok": False, "error": "missing module id"}), 400
         result = module_store.install(module_id, force=str(data.get("force")) == "1")
+
+        if result.get("ok"):
+            applied = install_staged_live(app, result.get("folder"))
+            result["live"] = result.get("folder") in applied["live"]
+            result["restart_required"] = not result["live"]
+            if applied["failed"]:
+                # Downloaded and verified, but it won't run here (bad code,
+                # unmet DEPENDS_ON, ...). Still "ok" — it IS installed — but the
+                # admin gets told, and the Modulmanager card carries the reason.
+                result["warning"] = "; ".join(str(f) for f in applied["failed"])
+
         result["pending"] = pending_changes()
+        result["extensions"] = resolve_extensions_overview()
         return jsonify(result), (200 if result["ok"] else 400)
 
     @app.route("/api/store/uninstall", methods=["POST"])
     def api_store_uninstall():
-        """Stage a module folder for removal at the next start. Works for
-        hand-installed and broken modules too, not just store ones -- so it is
-        deliberately not gated on store_enabled()."""
+        """Remove a module — live, without a restart.
+
+        It is switched OFF before anything is deleted (master toggle to "0" +
+        on_disable(app), so its workers stop while its code still exists), then
+        unregistered from the UI, its settings purged and its folder deleted.
+        See web/thirdparties/__init__.py's uninstall_module_live().
+
+        Only if the folder itself cannot be deleted (a file still held open —
+        Windows) does the deletion fall back to being staged for the next start;
+        the module is off and gone from the UI either way. ``restart_required``
+        reports which.
+
+        Works for hand-installed and broken modules too, not just store ones --
+        so it is deliberately not gated on store_enabled().
+        """
         data = request.get_json(silent=True) or {}
-        result = module_store.uninstall(str(data.get("folder") or ""))
+        result = uninstall_module_live(app, str(data.get("folder") or ""))
         result["pending"] = pending_changes()
+        result["extensions"] = resolve_extensions_overview()
         return jsonify(result), (200 if result["ok"] else 400)
 
     @app.route("/api/store/pending", methods=["GET", "DELETE"])

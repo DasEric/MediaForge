@@ -69,6 +69,59 @@ def _get_working_providers():
 
 WORKING_PROVIDERS = _get_working_providers()
 
+
+# ---------------------------------------------------------------------------
+# Provider fallback order
+# ---------------------------------------------------------------------------
+# The user can reorder the hosters in the settings ("Provider order"). The
+# order is stored in app_settings as a comma-separated list under
+# "provider_order"; anything not listed (a newly enabled hoster, a typo) is
+# appended in SUPPORTED_PROVIDERS order, so the chain always covers every
+# working provider. queue_worker.py walks this chain when the provider picked
+# for a download fails (dead mirror, extractor error, hoster not offered for
+# that episode), instead of failing the episode outright.
+
+def get_provider_order():
+    """The user's hoster order, restricted to providers that actually work."""
+    order = []
+    try:
+        raw = get_setting("provider_order", "") or ""
+    except Exception:
+        raw = ""
+    wanted = [p.strip() for p in raw.split(",") if p.strip()]
+    by_lower = {p.lower(): p for p in WORKING_PROVIDERS}
+    for name in wanted:
+        canonical = by_lower.get(name.lower())
+        if canonical and canonical not in order:
+            order.append(canonical)
+    for p in WORKING_PROVIDERS:  # append anything the setting didn't mention
+        if p not in order:
+            order.append(p)
+    return order
+
+
+def is_provider_fallback_enabled():
+    try:
+        return (get_setting("provider_fallback_enabled", "1") or "1") == "1"
+    except Exception:
+        return True
+
+
+def get_provider_fallback_chain(primary):
+    """[primary, ...the remaining providers in the configured order].
+
+    Returns just ``[primary]`` when the fallback is switched off, so callers
+    can always iterate the same structure.
+    """
+    primary = primary or (WORKING_PROVIDERS[0] if WORKING_PROVIDERS else "VOE")
+    if not is_provider_fallback_enabled():
+        return [primary]
+    chain = [primary]
+    for p in get_provider_order():
+        if p != primary:
+            chain.append(p)
+    return chain
+
 # Only match series-level links: /anime/stream/<slug> (no season/episode).
 # Used by routes/autosync.py and routes/search.py to tell a series page apart
 # from a season/episode page when scraping search results.

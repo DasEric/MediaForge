@@ -100,7 +100,7 @@ Actively in development — current work in progress:
 - [ ] More Sources — additional anime, series and movie providers (open a feature request)
 - [x] AutoSync Episode Filter — configure per job which seasons/episodes to sync, include/skip movies & specials, separate movie download path
 - [x] AutoSync Schedule — run on a fixed interval or a weekly plan (weekdays + times)
-- [ ] Provider Fallback Order — automatically try the next provider if the primary one fails
+- [x] Provider Fallback Order — automatically try the next provider if the primary one fails
 - [x] Calendar View — show upcoming episode air dates for AutoSync jobs based on TMDB data
 - [x] Bandwidth Limit / Download Time Window — throttle speed or restrict downloads to specific hours
 - [x] Download History — searchable log of all completed downloads with date, size and duration
@@ -109,6 +109,8 @@ Actively in development — current work in progress:
 - [ ] Integrated VPN/Proxy — download through VPN or proxy servers to increase privacy
 - [x] Adding Pills to Advanced Search if a Media is already downloaded, and more
 - [x] Auto-Sync "Waitlist". If an Auto-Sync Title was not found for X Days, it will be tried again in Y week(s)
+
+**Go here for more information**: [Progress in Work](https://github.com/orgs/PD-Codes/projects/4/views/1)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

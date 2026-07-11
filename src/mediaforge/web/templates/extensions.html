@@ -23,9 +23,22 @@
       </p>
       {% endif %}
     </div>
-    <button class="btn btn-secondary" id="extRescanBtn" style="white-space:nowrap;" title="{{ _('Scan web/thirdparties/ for new module folders and register them without restarting the app.') }}">
-      {{ _('Refresh') }}
-    </button>
+    <!-- Two views, one page: the modules installed here, and the store to get more
+         from. They are separate destinations, not one long scroll — an admin came to
+         do one or the other. The store button carries the update count, so the reason
+         to go there is visible from the installed view without opening it. -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      {% if store_enabled %}
+      <button class="btn btn-primary" id="extStoreToggleBtn" style="white-space:nowrap;"
+              title="{{ _('Browse the module store') }}">
+        <span id="extStoreToggleLabel">{{ _('Module Store') }}</span>
+        <span class="integ-subsection-badge badge-update" id="extStoreUpdateBadge" style="display:none;margin-left:6px;"></span>
+      </button>
+      {% endif %}
+      <button class="btn btn-secondary" id="extRescanBtn" style="white-space:nowrap;" title="{{ _('Scan web/thirdparties/ for new module folders and register them without restarting the app.') }}">
+        {{ _('Refresh') }}
+      </button>
+    </div>
   </div>
 
   <!-- Restart banner. Everything the store does (install, update, uninstall)
@@ -53,6 +66,9 @@
     </div>
   </div>
 
+  <!-- View 1: what is installed here. Shown by default; module_store.js swaps it
+       for the store view (and back) when the header button is used. -->
+  <div id="extInstalledView">
   {% if not extensions %}
   <div class="settings-section">
     <div class="settings-hint" style="padding:20px 24px;">{{ _('No extension folders discovered.') }}</div>
@@ -264,13 +280,23 @@
     </div>
   </div>
   {% endfor %}
+  </div><!-- /#extInstalledView -->
 
-  <!-- ── Module store ──────────────────────────────────────────────────────
-       Rendered only once an admin has configured a store URL. A MediaForge
-       that was never pointed at a store shows the one-row config form below
-       and nothing else — no catalog, no network request, no install buttons.
-       Modules are arbitrary Python running in this process, so trusting a
-       remote is an explicit act, never a default. -->
+  <!-- ── View 2: the module store ─────────────────────────────────────────
+       Hidden until the header button opens it. The catalog is still fetched on
+       page load though (see module_store.js) — that is what puts the update count
+       on the button and the "Update: v…" badges on the installed cards, and an
+       admin should not have to go looking to find out something is out of date.
+       Modules are arbitrary Python running in this process, so nothing here
+       installs anything without an explicit click, and unverified entries need an
+       opt-in on top of that. -->
+  <div id="extStoreView" style="display:none;">
+
+  <!-- Card 1: where the modules come from and what this install is willing to run.
+       Settings, not merchandise — kept apart from the catalog below, because reading a
+       list of available modules and deciding which repositories to trust are two
+       different jobs and mixing them into one scroll made the modules look like just
+       another settings row. -->
   <div class="settings-section" id="extStoreSection">
     <div class="integ-subsection-header" style="padding:14px 20px !important;">
       <span class="integ-subsection-title">{{ _('Module Store') }}</span>
@@ -279,31 +305,35 @@
       {% else %}
       <span class="integ-subsection-badge badge-disabled">{{ _('Not configured') }}</span>
       {% endif %}
-      <button class="btn btn-secondary" id="extStoreRefreshBtn" style="margin-left:auto;{% if not store_enabled %}display:none;{% endif %}">
-        {{ _('Refresh store') }}
-      </button>
     </div>
     <div style="padding:0 20px 16px;">
+      <!-- The official store: read-only, on purpose. It is a constant in
+           thirdparties/store.py, not a setting — a field here would mean "talk
+           someone into pasting a URL and their official modules now come from
+           you". Shown, because an admin should be able to see where their modules
+           come from; not editable, because that is not their decision to make. -->
       <div class="settings-row">
         <div class="settings-row-left">
-          <div class="settings-row-label">{{ _('Store repository URL') }}</div>
+          <div class="settings-row-label">{{ _('Official store') }}</div>
           <div class="settings-row-desc">
-            {{ _('Base URL or index.json of a MediaForge module repository. Leave empty to disable the store entirely.') }}
+            {{ _('Ships with MediaForge and cannot be changed here — this is the one repository whose modules this build is willing to call official.') }}
           </div>
         </div>
-        <div class="settings-row-right" style="display:flex;gap:8px;align-items:center;">
-          <input type="text" id="extStoreUrl" style="min-width:320px;"
-                 placeholder="https://modules.example.com" value="{{ store_url }}">
-          <button class="btn btn-primary" id="extStoreSaveBtn">{{ _('Save') }}</button>
+        <div class="settings-row-right">
+          {% if store_url %}
+          <code style="opacity:.8;">{{ store_url }}</code>
+          {% else %}
+          <span class="settings-row-desc">{{ _('This build ships no official store.') }}</span>
+          {% endif %}
         </div>
       </div>
-      <!-- Additional repositories. Only offered once a main store is configured
-           (the server enforces that too — see store.extra_urls()). These are
-           ordinary stores: a module from one of them proves its tier with the
-           same signature check as anything else, which in practice means
-           "unverified", because a third-party repo does not hold MediaForge's
-           maintainer keys. That's the correct outcome, not a restriction. -->
-      <div class="settings-row" id="extStoreExtraRow" {% if not store_enabled %}style="display:none;"{% endif %}>
+
+      <!-- Additional repositories: the part that IS the admin's to decide. An extra
+           repo is an ordinary store — same index format, same signature check, no
+           special standing. Its modules come out "unverified" in practice, because a
+           third-party repo doesn't hold the keys this build was compiled with. That's
+           the correct outcome, not a restriction. -->
+      <div class="settings-row" id="extStoreExtraRow">
         <div class="settings-row-left">
           <div class="settings-row-label">{{ _('Additional repositories') }}</div>
           <div class="settings-row-desc">
@@ -332,54 +362,59 @@
         </div>
       </div>
 
-      <!-- Trusted signing keys. This is what decides whether a module is
-           "Official" on THIS install — not the store, which can only ever make a
-           claim. MediaForge ships the maintainer keys; an admin running their own
-           store pastes its public key here (the store's dashboard prints it
-           ready to copy). Note what this does NOT do: pointing MediaForge at a
-           repository changes nothing about what it trusts. A key gets trusted
-           because an admin deliberately pasted it in — the same weight as
-           installing a module by hand. -->
-      <div class="settings-row" id="extStoreKeysRow" {% if not store_enabled %}style="display:none;"{% endif %}>
+      <!-- Trusted signing keys: shown, never editable. They are BUILTIN_KEYS in
+           thirdparties/trusted_keys.py, compiled into this build. A trust root a user
+           can paste into is a trust root an attacker can talk them into pasting into
+           ("add this key and my module shows up as Official"), and the badge would
+           stop meaning anything at all. So this row exists to answer "why is that
+           module official?" — not to change the answer. -->
+      <div class="settings-row" id="extStoreKeysRow">
         <div class="settings-row-left">
           <div class="settings-row-label">{{ _('Trusted signing keys') }}</div>
           <div class="settings-row-desc">
-            {{ _('Public keys whose signatures this install believes, as JSON. A module is "Official" because a key in this list signed it — a store cannot decide that for you. Only ever paste a PUBLIC key here.') }}
+            {{ _('Built into MediaForge and not configurable. A module is "Official" because one of these keys signed it — neither a store nor a setting can decide that.') }}
           </div>
-          <!-- Honest about when this takes effect: the store checks signatures at
-               download time (so a key pasted now applies to the very next install),
-               but an already-installed module's badge was decided when it was
-               imported at startup, and only changes on the next restart. -->
-          <div class="settings-row-desc">
-            {{ _('Takes effect immediately for new installs. Modules already installed keep their current badge until the next restart.') }}
-          </div>
-          {% if trusted_keys %}
-          <div class="settings-row-desc" style="margin-top:6px;">
-            {% for key in trusted_keys %}
-            <span class="integ-subsection-badge {% if 'official' in key.tiers %}badge-official{% else %}badge-verified{% endif %}"
-                  title="{{ key.key_id }} · {{ key.tiers|join(', ') }}">
-              {{ key.name }}{% if key.admin_added %} ({{ _('added here') }}){% endif %}
-            </span>
-            {% endfor %}
-          </div>
-          {% endif %}
         </div>
-        <div class="settings-row-right" style="display:flex;gap:8px;align-items:flex-start;">
-          <textarea id="extStoreTrustedKeys" rows="4" style="min-width:320px;font-family:ui-monospace,monospace;font-size:.85em;"
-                    placeholder='[{"key_id": "…", "name": "…", "public_key": "…", "tiers": ["official"]}]'>{{ trusted_keys_raw }}</textarea>
-          <button class="btn btn-primary" id="extStoreKeysSaveBtn">{{ _('Save') }}</button>
+        <div class="settings-row-right">
+          {% if trusted_keys %}
+          {% for key in trusted_keys %}
+          <span class="integ-subsection-badge {% if 'official' in key.tiers %}badge-official{% else %}badge-verified{% endif %}"
+                title="{{ key.key_id }} · {{ key.tiers|join(', ') }}">
+            {{ key.name }}
+          </span>
+          {% endfor %}
+          {% else %}
+          <span class="settings-row-desc">{{ _('This build trusts no signing keys — nothing can be official.') }}</span>
+          {% endif %}
         </div>
       </div>
 
-      <!-- Catalog is fetched client-side (see module_store.js): a slow or
-           unreachable store must not be able to delay the page whose actual
-           job is showing the modules already installed here. -->
+    </div>
+  </div>
+
+  <!-- Card 2: the catalog itself, in its own card below the settings — this is what an
+       admin came here to look at.
+
+       Fetched client-side (module_store.js): a slow or unreachable repository must not
+       be able to delay the page whose actual job is showing the modules already
+       installed here. -->
+  <div class="settings-section" id="extStoreCatalogCard">
+    <div class="integ-subsection-header" style="padding:14px 20px !important;">
+      <span class="integ-subsection-title">{{ _('Available modules') }}</span>
+      <span class="integ-subsection-badge badge-version" id="extStoreCount" style="display:none;"></span>
+      <button class="btn btn-secondary" id="extStoreRefreshBtn" style="margin-left:auto;{% if not store_enabled %}display:none;{% endif %}">
+        {{ _('Refresh store') }}
+      </button>
+    </div>
+    <div style="padding:0 20px 16px;">
       <div id="extStoreCatalog" {% if not store_enabled %}style="display:none;"{% endif %}>
         <div class="settings-hint" id="extStoreStatus">{{ _('Loading store…') }}</div>
         <div id="extStoreList"></div>
       </div>
     </div>
   </div>
+
+  </div><!-- /#extStoreView -->
 </div>
 <!-- Generic enable-toggle load/save helpers (see web/thirdparties/registry.py's
      register_generic_settings_routes) -- the "Enable module" toggle above
@@ -387,9 +422,10 @@
      saved via loadThirdpartyToggles()/saveThirdpartyToggle() from this file,
      exactly like integrations.html/notifications.html. -->
 <script src="{{ url_for('static', filename='extension_cards.js') }}"></script>
-<!-- Module store client: store config form, catalog rendering, install/
-     uninstall/discard actions, restart banner. Everything it does is gated on
-     a store URL being configured — see web/thirdparties/store.py. -->
+<!-- Module store client: the installed/store view switch, catalog rendering,
+     install/uninstall/discard actions, restart banner, extra repositories. The
+     official store URL and the trusted keys are compiled in and only displayed
+     here — see web/thirdparties/store.py and trusted_keys.py. -->
 <script src="{{ url_for('static', filename='module_store.js') }}"></script>
 <script>
 // "Refresh" button -- POST /api/extensions/rescan (see routes/extensions.py /

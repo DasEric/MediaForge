@@ -255,6 +255,128 @@ _DEFAULT_HEADERS = {
 _DEFAULT_TIMEOUT = (10, 30)
 
 
+# -----------------------------
+# TLS: validate against the OS trust store where we can
+# -----------------------------
+# Python does NOT use the operating system's certificate store -- it validates
+# against the CA bundle that ships with certifi. That bundle ages with the
+# installed package, so a chain the browser happily accepts (Chrome/Edge use the
+# Windows store, which Windows Update keeps current) can still fail in Python
+# with "certificate has expired" -- typically because the served chain is
+# validated up through an expired cross-signed root (the classic Let's Encrypt
+# ISRG Root X1 <- DST Root CA X3 case) that the OS store replaced long ago. The
+# leaf certificate is perfectly valid in that case; the trust anchor is stale.
+#
+# truststore fixes that by validating against the OS store -- but ONLY as an
+# explicitly passed SSLContext, never via truststore.inject_into_ssl().
+#
+# Do NOT call inject_into_ssl() here. It swaps out the ssl.SSLContext module
+# attribute, and CPython's own SSLContext property setters resolve the name
+# ``SSLContext`` from the ssl module at call time
+# (``super(SSLContext, SSLContext).minimum_version.__set__(...)``). Once that
+# name points at truststore's subclass, urllib3-future's create_urllib3_context()
+# -- which niquests, and therefore GLOBAL_SESSION *and the DoH resolver*, runs on
+# every single connection -- recurses until RecursionError. The result is every
+# site going "offline" at once, DNS included.
+def _os_trust_store_context():
+    """An SSLContext validating against the OS trust store, or None if
+    truststore isn't installed. Passed explicitly to the urllib call sites."""
+    try:
+        import ssl
+
+        import truststore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:
+        return None
+
+
+# -----------------------------
+# TLS: first-party hosts exempt from certificate verification
+# -----------------------------
+# MediaForge's own infrastructure (the Dev Info feed, the module store, the
+# mpv download) occasionally serves an expired/misissued certificate, which
+# makes every outbound call to it die with SSLCertVerificationError. These
+# hosts are OURS, and what actually protects the payloads that matter is not
+# TLS but the signature check: module packages are verified against the
+# built-in signing keys (see web/thirdparties/store.py + trusted_keys.py)
+# regardless of how they were transported.
+#
+# So: certificate verification is skipped for these hosts, and ONLY these
+# hosts. This is deliberately a short, hard-coded allowlist and not a global
+# "verify=False" -- every third-party host (hosters, TMDB, Jellyfin, the
+# scraper sites) keeps full verification. Note this does trade away MITM
+# protection on the listed hosts; renewing the certificate is still the real
+# fix, this only stops a lapsed cert from taking features offline.
+#
+# Extendable for self-hosters via MEDIAFORGE_TLS_INSECURE_HOSTS (comma-separated,
+# same glob syntax).
+TLS_INSECURE_HOSTS = (
+    "domekologe.eu",
+    "*.domekologe.eu",
+    "softarchiv.com",
+    "*.softarchiv.com",
+)
+
+_extra_insecure = os.environ.get("MEDIAFORGE_TLS_INSECURE_HOSTS", "")
+if _extra_insecure:
+    TLS_INSECURE_HOSTS = TLS_INSECURE_HOSTS + tuple(
+        h.strip().lower() for h in _extra_insecure.split(",") if h.strip()
+    )
+
+
+def is_tls_insecure_host(url_or_host):
+    """True if *url_or_host* is one of our own hosts on TLS_INSECURE_HOSTS.
+
+    Accepts either a full URL or a bare hostname. Matching is glob-style
+    (``*.softarchiv.com``) and case-insensitive; a plain http:// URL is never
+    "insecure" in this sense (there is no certificate to skip).
+    """
+    import fnmatch
+    from urllib.parse import urlsplit
+
+    value = str(url_or_host or "").strip()
+    if not value:
+        return False
+    if "://" in value:
+        parts = urlsplit(value)
+        if parts.scheme != "https":
+            return False
+        host = parts.hostname or ""
+    else:
+        host = value
+    host = host.lower()
+    return any(fnmatch.fnmatch(host, pattern) for pattern in TLS_INSECURE_HOSTS)
+
+
+def insecure_ssl_context_for(url):
+    """The SSLContext to use for *url* at the urllib egress points
+    (``urllib.request.urlopen(..., context=...)``) -- the module store and the
+    mpv auto-download.
+
+    - One of our own hosts (TLS_INSECURE_HOSTS): a context with verification
+      switched off, so a lapsed certificate on our own infrastructure can't take
+      the Modulmanager/Dev Infos/mpv download offline.
+    - Anything else: the OS trust store (via truststore) when available -- the
+      same certificate store the browser uses, which validates chains an ageing
+      certifi bundle would wrongly reject as expired. Verification stays fully
+      ON here; this only fixes *which* roots are trusted.
+    - truststore missing: None, i.e. Python's default certifi-based context.
+
+    Callers pass the result straight through: None simply means "your default".
+    """
+    if not is_tls_insecure_host(url):
+        return _os_trust_store_context()
+
+    import ssl
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    logger.debug("TLS verification skipped for first-party host: %s", url)
+    return ctx
+
+
 def _make_session(resolver=None):
     """Create a new niquests Session with the given DoH resolver (or default Google DoH)."""
     kwargs = {"headers": _DEFAULT_HEADERS}
@@ -295,6 +417,33 @@ class _SessionProxy:
         local = object.__getattribute__(self, "_local")
         if hasattr(local, "session"):
             del local.session
+
+    # -- Site-mirror failover -------------------------------------------------
+    # Every request for one of the scraper sites (s.to, aniworld.to, ...) is
+    # routed through mediaforge.mirrors, which rewrites the host to whichever
+    # mirror of that site is currently healthy and walks the rest of the list
+    # if it isn't (e.g. s.to -> serienstream.to -> the bare origin IP). URLs
+    # for anything else (TMDB, hosters, DoH endpoints, ...) pass through
+    # untouched. See mirrors.py.
+    def request(self, method, url, **kwargs):
+        from .mirrors import request_with_failover
+        # Our own hosts (Dev Info feed, module store) are exempt from
+        # certificate verification -- see TLS_INSECURE_HOSTS above. An explicit
+        # verify= from the caller always wins.
+        if "verify" not in kwargs and is_tls_insecure_host(url):
+            kwargs["verify"] = False
+        return request_with_failover(self._get_session(), method, url, **kwargs)
+
+    def get(self, url, **kwargs):
+        kwargs.setdefault("allow_redirects", True)
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def head(self, url, **kwargs):
+        kwargs.setdefault("allow_redirects", False)
+        return self.request("HEAD", url, **kwargs)
 
     def __getattr__(self, name):
         return getattr(self._get_session(), name)
@@ -376,6 +525,20 @@ _CHROMIUM_MAP_HOSTS = (
     "megakino.to", "www.megakino.to",
 )
 
+def _chromium_map_hosts():
+    """The hosts to pin, including every configured mirror domain (see
+    mirrors.py) — so the captcha browser can reach a fallback domain
+    (serienstream.to, ...) on the project DNS too, not just the primary one.
+    Falls back to the static tuple above if the mirror registry is unavailable.
+    """
+    try:
+        from .mirrors import all_hosts
+        hosts = all_hosts()
+    except Exception:
+        hosts = ()
+    return tuple(dict.fromkeys(tuple(_CHROMIUM_MAP_HOSTS) + tuple(hosts)))
+
+
 _CHROMIUM_MAP_LOCK = threading.Lock()
 _CHROMIUM_MAP_CACHE = {"mode": None, "ts": 0.0, "rules": []}
 _CHROMIUM_MAP_TTL = 600  # re-resolve the pinned hosts at most every 10 minutes
@@ -429,7 +592,7 @@ def _chromium_host_map_rules():
                 and now - cache["ts"] < _CHROMIUM_MAP_TTL):
             return list(cache["rules"])
         rules = []
-        for host in _CHROMIUM_MAP_HOSTS:
+        for host in _chromium_map_hosts():
             ip = _doh_resolve_a(host, endpoint)
             if ip:
                 rules.append("MAP %s %s" % (host, ip))

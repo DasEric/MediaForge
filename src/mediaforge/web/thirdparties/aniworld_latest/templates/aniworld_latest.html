@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ _('AniWorld Latest') }} — MediaForge{% endblock %}
+{% block styles %}
+<!-- advanced_search.css + shared_modals.css style the cross-provider search
+     modal (aniSearchModalOverlay, in shared_modals.html) opened via
+     openAniSearchModal() (app.js) when a row is clicked. Without them the
+     modal renders unstyled while body scroll stays locked. -->
+<link rel="stylesheet" href="{{ url_for('static', filename='advanced_search.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='shared_modals.css') }}">
+<link rel="stylesheet" href="{{ url_for('aniworld_latest.static', filename='aniworld_latest.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="awl-page-container">
+  <div class="page-header">
+    <h1 class="page-title">{{ _('The 50 newest episodes') }}</h1>
+    <p class="page-subtitle">{{ _('Newest episodes from aniworld.to. Click a row to search your configured sources for the series.') }}</p>
+  </div>
+
+  {% if not tmdb_configured %}
+  <div class="awl-banner awl-banner-warn">
+    {{ _('TMDB is not configured. The list still works, but TMDB provider pills need the CineInfo TMDB connection.') }}
+    <a href="{{ url_for('integrations_page') }}">{{ _('Open Integrations settings') }}</a>
+  </div>
+  {% endif %}
+
+  <div class="awl-loading" id="awlLoading">
+    <span class="awl-spinner"></span>
+    <span>{{ _('Loading newest episodes…') }}</span>
+  </div>
+
+  <div class="awl-empty" id="awlEmpty" style="display:none">
+    <p>{{ _('The newest episodes could not be loaded from aniworld.to right now. Please try again later.') }}</p>
+  </div>
+
+  <div class="awl-list" id="awlList" style="display:none"></div>
+</div>
+
+<!-- The cross-provider search modal (aniSearchModalOverlay, same one
+     Advanced Search / Anime Seasons use) lives in shared_modals.html. -->
+{% include "shared_modals.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Fully-resolved URLs for the local language flag SVGs (web/static/flags/),
+// keyed by the canonical flag names service.py's _FLAG_MAP emits.
+//
+// Built as a complete map rather than a base URL + filename concatenation:
+// url_for() appends a cache-busting query string ("/static/flags/?v=1783..."),
+// so gluing a filename onto a *directory* url_for() produced broken paths
+// like "/static/flags/?v=1783...japanese-germanSub.svg". Resolving each file
+// individually keeps the cache-buster where it belongs (after the filename).
+window.AWL_FLAGS = {
+  {% for f in ['german', 'english', 'japanese-germanSub', 'japanese-englishSub', 'english-germanSub'] -%}
+  {{ f|tojson }}: {{ url_for('static', filename='flags/' ~ f ~ '.svg')|tojson }}{{ "," if not loop.last }}
+  {% endfor -%}
+};
+</script>
+<!-- app.js provides openAniSearchModal()/enrichCardWithTmdb()/loadCineinfoSettings()
+     etc. -- needed for the row click + provider pills. Loaded before our own
+     script, exactly like anime_seasons_view.html does. -->
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('aniworld_latest.static', filename='aniworld_latest.js') }}"></script>
+{% endblock %}

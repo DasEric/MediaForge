@@ -208,6 +208,12 @@ async function loadSettings() {
     // Sources: order, section order, enabled state, search scope
     _loadSourceSettings(data.sources || {});
 
+    // Hoster order + automatic provider fallback
+    _loadProviderSettings(data.providers || {});
+
+    // Per-site domain fallback (mirrors)
+    _loadMirrorSettings(data.mirrors || {});
+
   } catch (e) {
     showToast("Einstellungen konnten nicht geladen werden: " + e.message);
   }
@@ -2280,4 +2286,187 @@ function saveSourcesHideInSearch() {
   _putSettings({ sources_hide_in_search: el.checked },
     el.checked ? t("Deaktivierte Quellen aus Suche ausgeblendet", "Disabled sources hidden from search")
                : t("Deaktivierte Quellen in Suche sichtbar", "Disabled sources shown in search"));
+}
+
+// ─── Provider order & fallback (Sources tab) ─────────────────────────────
+// The order the download queue walks when a hoster fails: the hoster picked
+// for the download is tried first (with its normal retries), then every other
+// hoster in this list, top to bottom — see web/queue_worker.py's
+// _build_attempt_plan() and runtime_state.get_provider_fallback_chain().
+// The list itself is whatever WORKING_PROVIDERS reports, so a newly enabled
+// hoster shows up here on its own.
+let _providerState = { available: [], order: [], fallback: true };
+
+function _loadProviderSettings(providers) {
+  _providerState.available = providers.available || [];
+  _providerState.order = (providers.order || []).slice();
+  _providerState.fallback = providers.fallback_enabled !== "0";
+
+  // Guard against a stale saved order: drop unknown names, append new hosters.
+  _providerState.order = _providerState.order.filter(p => _providerState.available.indexOf(p) !== -1);
+  _providerState.available.forEach(p => {
+    if (_providerState.order.indexOf(p) === -1) _providerState.order.push(p);
+  });
+
+  const cb = document.getElementById("providerFallbackEnabled");
+  if (cb) cb.checked = _providerState.fallback;
+  _renderProviderOrder();
+}
+
+function _renderProviderOrder() {
+  const list = document.getElementById("providerOrderList");
+  if (!list) return;
+  list.innerHTML = "";
+  _providerState.order.forEach((prov, idx) => {
+    const row = document.createElement("div");
+    row.className = "source-order-row";
+    row.setAttribute("draggable", "true");
+    row.dataset.provider = prov;
+    row.innerHTML =
+      '<span class="source-drag-handle" title="' + t("Ziehen zum Sortieren", "Drag to reorder") + '" aria-hidden="true">' +
+        '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><circle cx="7" cy="5" r="1.5"/><circle cx="13" cy="5" r="1.5"/><circle cx="7" cy="10" r="1.5"/><circle cx="13" cy="10" r="1.5"/><circle cx="7" cy="15" r="1.5"/><circle cx="13" cy="15" r="1.5"/></svg>' +
+      '</span>' +
+      '<span class="source-badge">' + (idx + 1) + '. ' + prov + '</span>' +
+      '<div class="source-order-actions">' +
+        '<button type="button" class="source-move-btn" title="' + t("Nach oben", "Move up") + '" ' + (idx === 0 ? "disabled" : "") + ' onclick="moveProvider(\'' + prov + '\',-1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</button>' +
+        '<button type="button" class="source-move-btn" title="' + t("Nach unten", "Move down") + '" ' + (idx === _providerState.order.length - 1 ? "disabled" : "") + ' onclick="moveProvider(\'' + prov + '\',1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</button>' +
+      '</div>';
+    _attachProviderDnd(row);
+    list.appendChild(row);
+  });
+}
+
+let _dragProvider = null;
+function _attachProviderDnd(row) {
+  row.addEventListener("dragstart", (e) => {
+    _dragProvider = row.dataset.provider;
+    row.classList.add("dragging");
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", _dragProvider); } catch (err) {}
+  });
+  row.addEventListener("dragend", () => {
+    _dragProvider = null;
+    row.classList.remove("dragging");
+    document.querySelectorAll("#providerOrderList .source-order-row.drag-over").forEach(r => r.classList.remove("drag-over"));
+  });
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
+    if (row.dataset.provider !== _dragProvider) row.classList.add("drag-over");
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+  row.addEventListener("drop", (e) => {
+    e.preventDefault();
+    row.classList.remove("drag-over");
+    const target = row.dataset.provider;
+    if (!_dragProvider || _dragProvider === target) return;
+    const order = _providerState.order;
+    const from = order.indexOf(_dragProvider);
+    const to = order.indexOf(target);
+    if (from === -1 || to === -1) return;
+    order.splice(from, 1);
+    order.splice(to, 0, _dragProvider);
+    _renderProviderOrder();
+    _saveProviderOrder();
+  });
+}
+
+function moveProvider(prov, dir) {
+  const order = _providerState.order;
+  const i = order.indexOf(prov);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= order.length) return;
+  const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+  _renderProviderOrder();
+  _saveProviderOrder();
+}
+
+function _saveProviderOrder() {
+  _putSettings({ provider_order: _providerState.order.join(",") },
+    t("Provider-Reihenfolge gespeichert", "Provider order saved"));
+}
+
+function saveProviderFallbackEnabled() {
+  const el = document.getElementById("providerFallbackEnabled");
+  if (!el) return;
+  _providerState.fallback = el.checked;
+  _putSettings({ provider_fallback_enabled: el.checked },
+    el.checked ? t("Provider-Fallback aktiv", "Provider fallback enabled")
+               : t("Provider-Fallback deaktiviert", "Provider fallback disabled"));
+}
+
+// ─── Domain fallback / mirrors (Sources tab) ─────────────────────────────
+// One textarea per site: the ordered list of interchangeable domains for it
+// (see mediaforge/mirrors.py). The first line is the primary domain and is
+// rendered read-only — every URL inside MediaForge is written with it, only
+// the actual HTTP request is redirected to a healthy mirror.
+let _mirrorSites = [];
+
+function _loadMirrorSettings(mirrors) {
+  _mirrorSites = mirrors.sites || [];
+  _renderMirrorSites();
+}
+
+function _renderMirrorSites() {
+  const box = document.getElementById("mirrorSitesList");
+  if (!box) return;
+  box.innerHTML = "";
+  _mirrorSites.forEach(site => {
+    const wrap = document.createElement("div");
+    wrap.className = "mirror-site";
+    const fallbacks = (site.hosts || []).slice(1);
+    const activeNote = site.active && site.active !== site.canonical
+      ? '<span class="mirror-active-badge">' + t("aktiv: ", "active: ") + site.active + '</span>'
+      : '';
+    wrap.innerHTML =
+      '<div class="mirror-site-head">' +
+        '<span class="mirror-site-label">' + site.label + '</span>' +
+        '<span class="mirror-site-primary">' + site.canonical + '</span>' +
+        activeNote +
+      '</div>' +
+      '<textarea class="mirror-hosts" id="mirrorHosts-' + site.id + '" rows="' + Math.max(2, fallbacks.length + 1) + '" ' +
+        'placeholder="' + t("z. B. serienstream.to", "e.g. serienstream.to") + '">' + fallbacks.join("\n") + '</textarea>' +
+      '<div class="mirror-site-actions">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="resetMirrorHosts(\'' + site.id + '\')">' + t("Standard", "Default") + '</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" onclick="saveMirrorHosts(\'' + site.id + '\')">' + t("Speichern", "Save") + '</button>' +
+      '</div>';
+    box.appendChild(wrap);
+  });
+}
+
+function _mirrorPayload(siteId, fallbackLines) {
+  const site = _mirrorSites.find(s => s.id === siteId);
+  const hosts = [site.canonical].concat(
+    fallbackLines.map(l => l.trim()).filter(Boolean)
+  );
+  const payload = {};
+  payload["site_mirrors_" + siteId] = hosts.join(",");
+  return { payload: payload, hosts: hosts };
+}
+
+async function saveMirrorHosts(siteId) {
+  const ta = document.getElementById("mirrorHosts-" + siteId);
+  if (!ta) return;
+  const { payload, hosts } = _mirrorPayload(siteId, ta.value.split("\n"));
+  const ok = await _putSettings(payload, t("Mirrors gespeichert", "Mirrors saved"));
+  if (ok) {
+    const site = _mirrorSites.find(s => s.id === siteId);
+    if (site) { site.hosts = hosts; site.active = site.canonical; }
+    _renderMirrorSites();
+  }
+}
+
+async function resetMirrorHosts(siteId) {
+  const site = _mirrorSites.find(s => s.id === siteId);
+  if (!site) return;
+  const { payload, hosts } = _mirrorPayload(siteId, (site.default || []).slice(1));
+  const ok = await _putSettings(payload, t("Standard wiederhergestellt", "Defaults restored"));
+  if (ok) {
+    site.hosts = hosts;
+    site.active = site.canonical;
+    _renderMirrorSites();
+  }
 }
