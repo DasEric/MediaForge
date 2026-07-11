@@ -147,7 +147,7 @@ from .registry import (
     register_generic_settings_routes, record_module_status, item_ids, seed_default_enabled,
     known_module_names, registered_module_names, check_app_compatibility,
     check_api_compatibility, installed_version, record_installed_version,
-    purge_module_settings,
+    purge_module_settings, get_thirdparty, module_entry, unregister_module,
 )
 from .signing import verify_module
 from ...logger import get_logger
@@ -175,6 +175,20 @@ REMOVE_MANIFEST = "_remove.txt"
 # the filesystem work happens before Flask (and therefore the DB) is up, so
 # these two halves of "uninstall" can't be done in the same place.
 _PENDING_SETTING_PURGES: list = []
+
+# Blueprint names of modules uninstalled LIVE in this process (see
+# uninstall_module_live()). Flask can add a blueprint to a running app but never
+# remove one, so the routes of an uninstalled module stay in the URL map until
+# the process restarts -- pointing at a package whose files are gone. app.py
+# installs one before_request guard that 404s anything belonging to a blueprint
+# in here, which turns "500, TemplateNotFound" into a plain "not found".
+_UNINSTALLED_BLUEPRINTS: set = set()
+
+
+def uninstalled_blueprints() -> set:
+    """Blueprint names whose module was uninstalled live -- their leftover
+    routes must 404. Read by app.py's guard on every request."""
+    return set(_UNINSTALLED_BLUEPRINTS)
 
 
 def apply_pending_changes() -> dict:
@@ -760,3 +774,231 @@ def rescan_new_modules(app) -> list:
         return []
     registered = registered_module_names()
     return _register_modules(app, modules, registered)
+
+
+# ---------------------------------------------------------------------------
+# Live install / live uninstall (Modulmanager, no restart)
+# ---------------------------------------------------------------------------
+# What CAN be done on a running Flask app:
+#   * add a brand-new blueprint  -> rescan_new_modules() (see its docstring)
+#   * add translation catalogs   -> _add_module_translations(), below
+#   * drop registry entries      -> registry.unregister_module()
+#   * fire on_disable(app)       -> fire_module_hook()
+# What CANNOT:
+#   * remove or replace a blueprint that is already registered
+#
+# So: a FIRST-TIME install of a folder nobody has imported yet goes live
+# immediately. An UPGRADE of a folder that is already imported and registered
+# stays staged for the next start -- its old module object, blueprint and routes
+# are unreplaceable while the process runs, and half-swapping them is worse than
+# waiting. An uninstall goes live in the sense that matters (the module is
+# switched off, disappears from the UI, its settings are purged and its files are
+# deleted); only its now-orphaned URL rules survive until the next restart, and
+# those are 404'd by app.py's guard.
+
+
+def _add_module_translations(app, name) -> None:
+    """Merge a freshly installed module's translations/ into the live catalog.
+
+    Flask-Babel reads BABEL_TRANSLATION_DIRECTORIES exactly once, at
+    init_app() -- but it keeps the parsed result in a mutable list on
+    ``app.extensions["babel"].translation_directories`` and caches loaded
+    catalogs per (locale, domain) on the domain instance. Appending to the
+    former and clearing the latter is enough to make a live-installed module's
+    strings translate on the very next request, instead of showing raw English
+    msgids until a restart. Best-effort: a Flask-Babel that ever changes this
+    shape simply leaves the module untranslated, which is not worth failing an
+    install over.
+    """
+    tdir = Path(__file__).parent / name / "translations"
+    if not tdir.is_dir():
+        return
+    try:
+        babel_cfg = app.extensions.get("babel")
+        dirs = babel_cfg.translation_directories
+        if str(tdir) not in dirs:
+            dirs.append(str(tdir))
+        app.config["BABEL_TRANSLATION_DIRECTORIES"] = ";".join(dirs)
+        babel_cfg.instance.domain_instance.cache.clear()
+        logger.info("[Thirdparties] Live-loaded translations of '%s'", name)
+    except Exception:
+        logger.warning(
+            "[Thirdparties] Could not live-load translations of '%s' — its strings stay "
+            "untranslated until the next restart", name, exc_info=True
+        )
+
+
+def install_staged_live(app, folder=None) -> dict:
+    """Apply what the store just staged in ``_pending/`` and register it on the
+    RUNNING app -- the no-restart half of an install.
+
+    *folder* limits this to the one module the admin just clicked (the normal
+    case); None applies everything staged.
+
+    Returns ``{"live": [...], "staged": [...], "failed": [...]}``:
+
+    - **live**: folder was new to this process -- moved into place, imported,
+      register(app) called, translations merged. Fully usable now.
+    - **staged**: left in ``_pending/`` because the folder is ALREADY imported
+      and registered (an upgrade/reinstall). Flask cannot replace a live
+      blueprint, so this one genuinely needs the restart, and
+      apply_pending_changes() will pick it up at the next start exactly as
+      before.
+    - **failed**: moving the folder blew up (permissions, a file still open).
+
+    Note the staged->live move is a plain shutil.move of a folder nothing has
+    imported yet, so there is no window in which half a module is importable:
+    rescan_new_modules() only looks at the folder after it is fully in place.
+    """
+    package_dir = Path(__file__).parent
+    pending_dir = package_dir / PENDING_DIR
+    result = {"live": [], "staged": [], "failed": []}
+    if not pending_dir.is_dir():
+        return result
+
+    known = known_module_names()
+    candidates = [
+        entry for entry in sorted(pending_dir.iterdir())
+        if entry.is_dir() and not entry.name.startswith("_")
+        and (folder is None or entry.name == folder)
+    ]
+
+    moved = []
+    for staged in candidates:
+        target = package_dir / staged.name
+        # Already live in this process (upgrade/reinstall): the blueprint, the
+        # imported module object and the routes are all unreplaceable now.
+        if staged.name in known or target.exists():
+            result["staged"].append(staged.name)
+            continue
+        try:
+            if not (staged / "__init__.py").is_file():
+                raise ValueError("staged folder has no __init__.py")
+            shutil.move(str(staged), str(target))
+            moved.append(staged.name)
+            logger.info("[Thirdparties] Installed module folder '%s' live", staged.name)
+        except Exception as exc:
+            logger.exception("[Thirdparties] Could not apply staged module '%s' live", staged.name)
+            result["failed"].append(f"{staged.name}: {exc}")
+
+    if not moved:
+        return result
+
+    for name in moved:
+        _add_module_translations(app, name)
+
+    # One rescan covers every folder just moved (and is a no-op for anything
+    # else): import + register(app) + lifecycle hooks, exactly as at startup.
+    registered = rescan_new_modules(app)
+    for name in moved:
+        if name in registered:
+            result["live"].append(name)
+        else:
+            # Moved into place but refused to import/register (bad code, unmet
+            # DEPENDS_ON, incompatible version...). It is installed -- the
+            # Modulmanager card now shows the reason -- it just isn't running.
+            result["failed"].append(name)
+    return result
+
+
+def uninstall_module_live(app, name) -> dict:
+    """Switch a module off and remove it, on the running app.
+
+    Order matters, and it is the order an admin would expect:
+
+    1. **Disable it first.** Every item the module registered has its master
+       toggle set to "0" and ``on_disable(app)`` fires -- so its background
+       workers stop, its caches are dropped and it has a chance to clean up
+       *while its code is still importable*. Deleting the files of a module
+       that is still switched on and mid-poll is how you get a worker thread
+       exploding into a traceback five minutes later.
+    2. **Unregister it.** Its sidebar link, settings card, dashboard widget and
+       provider pill come out of the registry -- gone from the UI on the next
+       request (registry.unregister_module()).
+    3. **Purge its settings** (namespaced keys only -- see
+       registry.purge_module_settings()) and forget the imported module object.
+    4. **Delete the folder.**
+
+    Returns ``{"ok", "error", "live", "restart_required"}``. If the folder
+    itself cannot be deleted (Windows likes to hold on to files that are still
+    open somewhere), everything up to and including step 3 has still happened --
+    the module is off, gone from the UI and purged -- and the deletion alone is
+    staged for the next start, which is what ``restart_required`` then reports.
+    """
+    import sys
+
+    name = (name or "").strip()
+    if not name or name.startswith("_") or "/" in name or "\\" in name:
+        return {"ok": False, "error": "invalid module folder", "live": False,
+                "restart_required": False}
+
+    package_dir = Path(__file__).parent
+    target = package_dir / name
+    if not target.is_dir():
+        return {"ok": False, "error": f"no such module folder: {name}", "live": False,
+                "restart_required": False}
+
+    entry = module_entry(name) or {}
+    module = _LOADED.get(name)
+    module_id = getattr(module, "MODULE_ID", None) or _module_id_on_disk(target) or name
+
+    # 1. Disable every item this module registered, then fire on_disable once.
+    was_enabled = False
+    try:
+        from ..db import get_setting, set_setting
+
+        for item_id in (entry.get("item_ids") or ()):
+            item = get_thirdparty(item_id)
+            if not item:
+                continue
+            key = item["enabled_setting_key"]
+            if get_setting(key, "0") == "1":
+                was_enabled = True
+            set_setting(key, "0")
+    except Exception:
+        logger.exception("[Thirdparties] Could not switch off '%s' before removal", name)
+    if was_enabled:
+        fire_module_hook(name, "on_disable", app)
+
+    # 2. Out of the registry -> out of the UI, immediately.
+    prefix = f"{__name__}.{name}"
+    blueprints = set(unregister_module(name))
+    # ...and ask Flask itself, rather than trusting the registry to know every
+    # blueprint: a module can register a Blueprint and then fail (or never call)
+    # register_thirdparty(), in which case the registry has no item for it and no
+    # blueprint name to report — but its routes are live all the same. Matching on
+    # import_name catches those too, so nothing of an uninstalled module stays
+    # reachable.
+    for bp_name, blueprint in (getattr(app, "blueprints", None) or {}).items():
+        import_name = getattr(blueprint, "import_name", "") or ""
+        if import_name == prefix or import_name.startswith(prefix + "."):
+            blueprints.add(bp_name)
+    _UNINSTALLED_BLUEPRINTS.update(blueprints)
+
+    # 3. Settings + the imported module object.
+    try:
+        removed = purge_module_settings(module_id)
+        logger.info("[Thirdparties] Purged %d setting(s) of '%s'", removed, module_id)
+    except Exception:
+        logger.exception("[Thirdparties] Could not purge settings of '%s'", module_id)
+    _LOADED.pop(name, None)
+    for mod_name in [m for m in sys.modules if m == prefix or m.startswith(prefix + ".")]:
+        sys.modules.pop(mod_name, None)
+    importlib.invalidate_caches()
+
+    # 4. The files.
+    try:
+        shutil.rmtree(target)
+    except Exception as exc:
+        logger.warning("[Thirdparties] Could not delete '%s' live (%s) — staging it for the "
+                       "next start instead", name, exc)
+        try:
+            stage_removal(name)
+        except Exception as stage_exc:
+            logger.exception("[Thirdparties] Could not stage removal of '%s' either", name)
+            return {"ok": False, "error": str(stage_exc), "live": False,
+                    "restart_required": False}
+        return {"ok": True, "error": None, "live": True, "restart_required": True}
+
+    logger.info("[Thirdparties] Uninstalled module '%s' live", name)
+    return {"ok": True, "error": None, "live": True, "restart_required": False}

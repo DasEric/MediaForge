@@ -386,6 +386,25 @@ function setUiLanguage(lang) {
       </label>
       <div class="settings-hint">{{ _('When enabled, disabled sources are also skipped in the search results.') }}</div>
     </div>
+
+    <!-- ── Provider order & fallback ── -->
+    <div class="settings-section">
+      <h2>{{ _('Provider order') }}</h2>
+      <div class="settings-hint">{{ _('Order in which hosters are tried. If the hoster selected for a download fails (dead link, hoster not offered for that episode), MediaForge automatically continues with the next one in this list. Drag the rows or use the arrows.') }}</div>
+      <label class="settings-checkbox-row" for="providerFallbackEnabled">
+        <input type="checkbox" class="chb-main" id="providerFallbackEnabled" onchange="saveProviderFallbackEnabled()" />
+        <span>{{ _('Automatic provider fallback') }}</span>
+      </label>
+      <div class="settings-hint">{{ _('When disabled, only the selected hoster is used and a download fails if it is unavailable.') }}</div>
+      <div class="source-order-list" id="providerOrderList"></div>
+    </div>
+
+    <!-- ── Domain / mirror fallback ── -->
+    <div class="settings-section">
+      <h2>{{ _('Domain fallback (mirrors)') }}</h2>
+      <div class="settings-hint">{{ _('Alternative domains per site, tried top to bottom whenever a domain is unreachable or blocked (e.g. s.to → serienstream.to → 186.2.175.5). The first entry is the primary domain and cannot be removed. An IP address is called with the primary domain as its Host header. One entry per line.') }}</div>
+      <div id="mirrorSitesList"></div>
+    </div>
   </div>
   {% endif %}
 

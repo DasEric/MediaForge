@@ -102,11 +102,28 @@ from ...logger import get_logger
 
 logger = get_logger(__name__)
 
-# app_settings keys. An empty STORE_URL_KEY is the "store is off" state: no UI,
-# no requests, no way to install anything from a remote. That's the default, and
-# EXTRA_URLS_KEY is deliberately gated behind it: extra repositories are an
-# addition to a configured store, never a way to sneak one in.
-STORE_URL_KEY = "module_store_url"
+# ── The official store: in code, not in settings ─────────────────────────────
+# The main repository is a constant. A user cannot repoint it and cannot clear it,
+# for the same reason they cannot edit trusted_keys.py from the UI: "just change
+# this URL and the official modules will come from over here" is a one-line
+# social-engineering script, and it would silently redirect the one repository whose
+# modules this build is prepared to call official.
+#
+# The client appends /index.json itself, so the base URL is all that goes here.
+#
+# Pair it with that store's public key in trusted_keys.py's BUILTIN_KEYS -- without
+# the key, everything from it arrives as "unverified", which is correct but not what
+# you want from your own official store.
+#
+# "" is valid: a build with no store of its own. The Modulmanager then shows no
+# official repository, only whatever the admin added themselves.
+DEFAULT_STORE_URL = "https://mediaforge.softarchiv.com/store"
+
+# What an admin CAN configure, and the limits of it. Both are strictly additive:
+# neither can touch the official store above, and neither can make MediaForge trust a
+# signing key it wasn't built with. The worst an admin can do to themselves here is
+# add a repository nobody vouched for -- and then still have to tick
+# ALLOW_UNVERIFIED_KEY before anything from it will install.
 EXTRA_URLS_KEY = "module_store_extra_urls"
 ALLOW_UNVERIFIED_KEY = "module_store_allow_unverified"
 
@@ -122,36 +139,49 @@ TRUST_LEVELS = ("official", "verified", "unverified")
 MAX_PACKAGE_BYTES = 25 * 1024 * 1024
 HTTP_TIMEOUT = 20
 
-# Process-lifetime cache of each repository's last successfully fetched index,
-# keyed by store URL, so opening the Modulmanager doesn't re-hit every configured
-# repo on every page load. Refreshed on demand (the page's "Refresh store" button
-# passes force=True).
+# Fetching an index is not the same errand as downloading a package, so it doesn't get
+# the same patience. The index is a few KB and someone is sitting in front of the page
+# waiting for it; a repo that hasn't answered in this long is, for that person's
+# purposes, down. 20 seconds of "Loading store…" for a store whose domain doesn't even
+# resolve is indistinguishable from a hung page — and with several repos configured and
+# fetched one after another, those seconds used to add up.
+INDEX_TIMEOUT = 6
+
+# Process-lifetime cache of each repository's last fetched index, keyed by store URL, so
+# opening the Modulmanager doesn't re-hit every configured repo on every page load.
+# Refreshed on demand (the page's "Refresh store" button passes force=True).
+#
+# Failures are cached too, but only briefly: a 15-minute memory of "this repo is down"
+# would mean an admin who fixes their repo, or plugs the network back in, sits there
+# reloading a page that has decided not to ask again. One minute is long enough to stop
+# a page load from re-waiting on a dead host, short enough to notice a fixed one.
 _CACHE: dict = {}
 _CACHE_TTL = 15 * 60
+_FAIL_TTL = 60
 
 
 def store_url() -> str:
-    """The configured store's index URL, or "" when no store is configured --
-    which is the state every fresh install starts in, and the one the whole
-    store UI is gated on."""
-    from ..db import get_setting
-
-    return (get_setting(STORE_URL_KEY, "") or "").strip()
+    """The official store's base URL. Comes from DEFAULT_STORE_URL and nowhere else
+    -- there is no setting, and therefore no route, that can change it. See that
+    constant for why."""
+    return DEFAULT_STORE_URL.strip()
 
 
 def extra_urls() -> list:
-    """Additional repositories, one per line in ``module_store_extra_urls``.
+    """Additional repositories an admin added, one per line in
+    ``module_store_extra_urls``.
 
-    Empty unless a main store is configured — see STORE_URL_KEY. An extra repo is
-    just another store: same index format, same signature check, no special
-    standing. In practice its modules come out `unverified`, because a
-    third-party repo doesn't hold MediaForge's maintainer keys — which is the
-    correct outcome, not a limitation.
+    This is the part that *is* theirs to decide: their own store, a company-internal
+    one, a fork's. An extra repo is just another store -- same index format, same
+    signature check, no special standing. In practice its modules come out
+    `unverified`, because a third-party repo doesn't hold the keys this build was
+    compiled with, and that is the correct outcome rather than a limitation.
+
+    The official store can't be duplicated in here (it's filtered out), so no amount
+    of pasting can quietly shadow it.
     """
     from ..db import get_setting
 
-    if not store_url():
-        return []
     raw = get_setting(EXTRA_URLS_KEY, "") or ""
     seen, out = {store_url()}, []
     for line in raw.replace(",", "\n").splitlines():
@@ -169,9 +199,16 @@ def store_urls() -> list:
 
 
 def store_enabled() -> bool:
-    """True once an admin has pointed MediaForge at a store. Everything
-    store-related in the UI and the routes checks this first."""
-    return bool(store_url())
+    """True when there is any repository at all to talk to -- the official one this
+    build ships with, or one the admin added. Everything store-related in the UI and
+    the routes checks this first.
+
+    Note it is *not* gated on the official store alone: a build with an empty
+    DEFAULT_STORE_URL still has to let a self-hoster add their own repository, or the
+    field to add one would be behind the very condition adding one is meant to
+    satisfy.
+    """
+    return bool(store_urls())
 
 
 def allow_unverified() -> bool:
@@ -189,11 +226,24 @@ def _index_url(url: str) -> str:
     return url + "/index.json"
 
 
-def _http_get(url: str, max_bytes: int) -> bytes:
+def _http_get(url: str, max_bytes: int, timeout: int = HTTP_TIMEOUT) -> bytes:
     """Plain GET with a size cap. Reads max_bytes + 1 so an oversized body is
-    *detected* rather than silently truncated into a corrupt package."""
+    *detected* rather than silently truncated into a corrupt package.
+
+    Certificate verification is skipped for MediaForge's own store hosts (see
+    config.TLS_INSECURE_HOSTS) -- an expired certificate there must not take the
+    Modulmanager offline. What actually guards a package is the signature check
+    against the built-in keys (see trusted_keys.py), which is unaffected by how
+    the bytes were transported. Every other (admin-added) repository keeps full
+    TLS verification: insecure_ssl_context_for() returns None for those, i.e.
+    Python's default verifying context.
+    """
+    from ...config import insecure_ssl_context_for
+
     req = urllib.request.Request(url, headers={"User-Agent": "MediaForge-ModuleStore/1.0"})
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+    with urllib.request.urlopen(
+        req, timeout=timeout, context=insecure_ssl_context_for(url)
+    ) as resp:
         data = resp.read(max_bytes + 1)
     if len(data) > max_bytes:
         raise ValueError(f"response larger than {max_bytes} bytes")
@@ -260,12 +310,14 @@ def fetch_index(url: str = None, force: bool = False) -> dict:
         return {"ok": False, "error": "no store configured", "url": "", "modules": []}
 
     cached = _CACHE.get(url)
-    if cached and not force and (time.time() - cached["fetched_at"]) < _CACHE_TTL:
-        return cached["index"]
+    if cached and not force:
+        ttl = _CACHE_TTL if cached["index"].get("ok") else _FAIL_TTL
+        if (time.time() - cached["fetched_at"]) < ttl:
+            return cached["index"]
 
     index_url = _index_url(url)
     try:
-        raw = _http_get(index_url, 4 * 1024 * 1024)
+        raw = _http_get(index_url, 4 * 1024 * 1024, timeout=INDEX_TIMEOUT)
         data = json.loads(raw.decode("utf-8"))
         announced = int(data.get("store_api") or 0)
         if announced > STORE_API_VERSION:
@@ -352,9 +404,69 @@ def catalog(force: bool = False) -> dict:
     unverified_ok = allow_unverified()
     from packaging.version import InvalidVersion, Version
 
+    # Fetch every repo at once, not one after another, and put a wall clock on the whole
+    # thing.
+    #
+    # Two separate problems, one mechanism. Sequentially, a dead repo spent its entire
+    # timeout before the next was even asked, so the page waited for the *sum* of the slow
+    # repos rather than the slowest. And socket timeouts do not bound everything: name
+    # resolution happens before the socket exists, so a host whose DNS hangs (a VPN, a
+    # firewall that drops instead of refusing) blocks urlopen for as long as the resolver
+    # feels like — INDEX_TIMEOUT never gets a say, and the Modulmanager sits on "Loading
+    # store…" forever with no error to show.
+    #
+    # A thread per repo with a hard deadline fixes both. The deadline is what an admin
+    # actually experiences, so it is the number that matters; a worker that is still stuck
+    # in getaddrinfo is abandoned (daemon threads, they die with the process) rather than
+    # waited on. The results are consumed in store_urls() order below — main store first —
+    # so which repo wins a duplicate module id stays deterministic and has nothing to do
+    # with who answered first.
+    import threading
+    import time
+
+    urls = store_urls()
+    indexes = {}
+    deadline = INDEX_TIMEOUT + 2
+
+    def _unreachable(url, error):
+        return {"ok": False, "error": error, "name": url, "url": url,
+                "store_url": url, "modules": []}
+
+    def _worker(url):
+        try:
+            indexes[url] = fetch_index(url, force=force)
+        except Exception as exc:  # pragma: no cover - fetch_index already swallows these
+            logger.exception("[ModuleStore] Fetching %s failed unexpectedly", url)
+            indexes[url] = _unreachable(url, str(exc))
+
+    # Plain daemon threads rather than a ThreadPoolExecutor, deliberately: since Python
+    # 3.9 the pool's workers are non-daemon and the interpreter *joins them at exit*, so a
+    # worker stuck in getaddrinfo would hold up MediaForge's shutdown — trading a hung page
+    # for a hung Ctrl+C. A daemon thread we can simply walk away from.
+    threads = [threading.Thread(target=_worker, args=(url,), daemon=True,
+                                name=f"store-index-{url}") for url in urls]
+    for thread in threads:
+        thread.start()
+
+    # One deadline for all of them, not one each: they run concurrently, so joining each
+    # for the full `deadline` would quietly restore the very summing this replaced.
+    expires_at = time.monotonic() + deadline
+    for thread in threads:
+        thread.join(timeout=max(0.0, expires_at - time.monotonic()))
+
+    for url in urls:
+        if url not in indexes:
+            # Its thread is still in there somewhere, blocked. Name resolution happens
+            # before the socket exists, so INDEX_TIMEOUT never got a say — this is the
+            # backstop that keeps "Loading store…" from being forever.
+            logger.warning(
+                "[ModuleStore] %s did not answer within %ss (DNS or a dropped "
+                "connection) — reporting it as unreachable", url, deadline)
+            indexes[url] = _unreachable(url, f"no answer within {deadline}s (DNS or network)")
+
     repos, raw_entries, seen_ids = [], [], set()
-    for url in store_urls():
-        index = fetch_index(url, force=force)
+    for url in urls:
+        index = indexes[url]
         repos.append({"url": url, "name": index.get("name", url),
                       "ok": index.get("ok", False), "error": index.get("error")})
         for entry in index.get("modules", []):

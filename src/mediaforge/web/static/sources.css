@@ -10,6 +10,75 @@
   margin-top: 8px;
 }
 
+/* ── Provider order (Settings › Sources) ────────────────────────────────
+   Reuses the .source-order-row rows above; the hoster rows have no coloured
+   dot, so the ::before bullet the source badges carry is dropped here. */
+#providerOrderList .source-badge::before {
+  display: none;
+}
+
+#providerOrderList .source-badge {
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+/* ── Domain fallback / mirrors (Settings › Sources) ─────────────────────
+   One block per site: primary domain (read-only, shown as a chip) plus a
+   textarea with the fallback domains/IPs, one per line. */
+.mirror-site {
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.22));
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.02));
+}
+
+.mirror-site-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mirror-site-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.mirror-site-primary,
+.mirror-active-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: var(--text-muted, #55556a);
+  white-space: nowrap;
+}
+
+.mirror-active-badge {
+  border-color: var(--accent, #e05a5a);
+  color: var(--accent, #e05a5a);
+}
+
+textarea.mirror-hosts {
+  width: 100%;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.mirror-site-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
 .source-order-row {
   display: flex;
   align-items: center;

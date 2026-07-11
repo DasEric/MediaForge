@@ -17,7 +17,12 @@ from ...logger import get_logger
 from ..common.common import _YtdlpQuietLogger
 from ..megakino_to.scraper import classify_hoster
 from .browser_sniff import _MEDIA_URL_RE, sniff_media_url
-from .resolver import DIRECT_LINK_USER_AGENT, FAST_PROVIDERS, resolve_stream_for_provider
+from .resolver import (
+    DIRECT_LINK_USER_AGENT,
+    FAST_PROVIDERS,
+    fast_providers,
+    resolve_stream_for_provider,
+)
 
 logger = get_logger(__name__)
 
@@ -31,10 +36,15 @@ def _clean_title(raw):
 
 
 def detect_fast_provider(url):
-    """Return the canonical provider name (e.g. "VOE") if *url* is a known,
-    fast-to-resolve embed host, else None."""
+    """Return the canonical provider name (e.g. "VOE") if *url* is one of the
+    supported embed hosts MediaForge has an extractor for, else None.
+
+    This is the "is this a supported provider?" lookup Direct Link does BEFORE
+    handing anything to yt-dlp's generic extraction -- see
+    :func:`discover_and_resolve`.
+    """
     name = classify_hoster(url)
-    return name if name in FAST_PROVIDERS else None
+    return name if name and name in FAST_PROVIDERS else None
 
 
 # Matches a plain http(s) URL inside raw HTML/JS text, stopping at the
@@ -60,11 +70,12 @@ def find_candidate_urls_in_page(url, timeout=15):
     that a site only reveals after a click-driven AJAX call (the link
     simply isn't present in the HTML at all in that case).
 
-    Returns a list of (provider_name, candidate_url) tuples, in the order
-    found, or an empty list if the page can't be fetched or no known
-    hoster link appears in it. Deliberately returns ALL matches (not just
-    the first) so the caller can try each until one actually resolves --
-    a page can link to several mirrors and some may be dead.
+    Returns a list of (provider_name, candidate_url) tuples, sorted by the
+    user's configured provider order (Settings -> Provider order; see
+    resolver.fast_providers()), or an empty list if the page can't be fetched
+    or no known hoster link appears in it. Deliberately returns ALL matches
+    (not just the first) so the caller can try each until one actually
+    resolves -- a page can link to several mirrors and some may be dead.
     """
     import requests
 
@@ -101,10 +112,14 @@ def find_candidate_urls_in_page(url, timeout=15):
         if len(parts) < 2 or not parts[1].strip():
             continue
         name = classify_hoster(candidate)
-        if name in FAST_PROVIDERS and candidate not in seen:
+        if name and name in FAST_PROVIDERS and candidate not in seen:
             seen.add(candidate)
             candidates.append((name, candidate))
 
+    # Try the user's preferred hosters first; unknown/unranked ones keep their
+    # in-page order behind them (stable sort).
+    ranking = {name: i for i, name in enumerate(fast_providers())}
+    candidates.sort(key=lambda c: ranking.get(c[0], len(ranking)))
     return candidates
 
 

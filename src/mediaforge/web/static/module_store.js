@@ -3,14 +3,19 @@
  * Talks to /api/store/* (see routes/extensions.py, web/thirdparties/store.py).
  * Three things worth knowing before reading on:
  *
- * 1. Nothing here runs against a store that isn't configured. The whole
- *    catalog block stays hidden until an admin saves a store URL, and the
- *    server refuses every store route in that state anyway — the hiding is
- *    convenience, not the security boundary.
- * 2. No install is ever live. The server stages downloads into
- *    web/thirdparties/_pending/ and applies them at the next start, so every
- *    successful action here ends in the same place: updating the
- *    "restart required" banner.
+ * 1. The official store's URL is compiled into the build and is not editable
+ *    here — this page only displays it, and the server rejects a PUT that
+ *    tries to change it. Same for the trusted signing keys. An admin can add
+ *    extra repositories; that is all.
+ * 2. Installs and uninstalls are LIVE — no app restart. The server still stages
+ *    a download into web/thirdparties/_pending/ first (that's where the
+ *    signature is checked), but then moves it into place and registers it on
+ *    the running app. The page is reloaded afterwards purely so the
+ *    server-rendered parts (sidebar link, settings card) catch up — the module
+ *    itself is already running. The one exception is an UPGRADE of a module
+ *    that's already loaded: Flask cannot replace a live blueprint, so that one
+ *    stays staged and the "restart required" banner appears for it. The server
+ *    says which happened via `live` / `restart_required`.
  * 3. Trust tiers (official / verified / unverified) are shown, not enforced,
  *    on this side. The server re-checks them — an unverified module still
  *    needs the explicit opt-in there.
@@ -32,7 +37,19 @@
     return d.innerHTML;
   }
 
-  // ---- restart banner ------------------------------------------------------
+  // ---- badges: update count + restart banner --------------------------------
+  // The whole reason the store view is worth opening, shown from the installed
+  // view. Set on every catalog load, including the silent one on page load —
+  // otherwise "3 updates waiting" would only be discoverable by going to look.
+  function renderUpdateCount(n) {
+    const badge = $("extStoreUpdateBadge");
+    if (!badge) return;
+    if (!n) { badge.style.display = "none"; return; }
+    badge.textContent = String(n);
+    badge.title = t(n + " Update(s) verfügbar", n + " update(s) available");
+    badge.style.display = "";
+  }
+
   // Single source of truth for "is a restart pending": every action that stages
   // something gets {pending: {...}} back and pipes it through here, so the
   // banner can never drift from what's actually sitting in _pending/.
@@ -74,7 +91,15 @@
     } else if (m.update_available) {
       action = `<button class="btn btn-primary store-install-btn" data-id="${esc(m.id)}">${esc(t("Aktualisieren", "Update"))} → v${esc(m.version)}</button>`;
     } else if (m.installed) {
-      action = `<span class="integ-subsection-badge badge-enabled">${esc(t("Installiert", "Installed"))}</span>`;
+      // Installed, and up to date — but "reinstall" still has to exist. A module folder
+      // gets edited by hand, half-deleted, or corrupted by a failed unzip, and the fix
+      // is to fetch the same version again. Without this the only way back to a clean
+      // copy is uninstall, restart, install, restart.
+      action = `<span class="integ-subsection-badge badge-enabled">${esc(t("Installiert", "Installed"))}</span>
+                <button class="btn btn-secondary store-install-btn" data-id="${esc(m.id)}"
+                        title="${esc(t("Dieselbe Version erneut herunterladen und überschreiben", "Download this same version again and overwrite the installed copy"))}">
+                  ${esc(t("Neu installieren", "Reinstall"))}
+                </button>`;
     } else if (m.installable) {
       action = `<button class="btn btn-primary store-install-btn" data-id="${esc(m.id)}">${esc(t("Installieren", "Install"))}</button>`;
     } else {
@@ -106,8 +131,23 @@
           ${desc ? `<div class="settings-row-desc">${esc(desc)}</div>` : ""}
           <div class="settings-row-desc" style="opacity:.7;">${meta.join(" · ")}</div>
         </div>
-        <div class="settings-row-right">${action}</div>
+        <div class="settings-row-right" style="display:flex;gap:8px;align-items:center;">${action}</div>
       </div>`;
+  }
+
+  // "Loading store…" is a promise the client has to keep. A fetch with no timeout has no
+  // failure state — a request that never comes back leaves that text on screen forever,
+  // which is indistinguishable from a hang and tells an admin nothing. The server now
+  // bounds its own repo fetches (store.py), but the wire between here and there can also
+  // simply go quiet, so this side gets a deadline of its own and always ends in either a
+  // catalog or a reason.
+  const CATALOG_TIMEOUT_MS = 20000;
+
+  function fetchWithTimeout(url, ms) {
+    if (!window.AbortController) return fetch(url);   // old browser: no timeout, but no crash
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
   }
 
   async function loadCatalog(refresh) {
@@ -118,10 +158,12 @@
     status.textContent = t("Lade Store…", "Loading store…");
     list.innerHTML = "";
     try {
-      const resp = await fetch("/api/store/catalog" + (refresh ? "?refresh=1" : ""));
+      const resp = await fetchWithTimeout(
+        "/api/store/catalog" + (refresh ? "?refresh=1" : ""), CATALOG_TIMEOUT_MS);
       const data = await resp.json();
       if (!data.ok) {
         status.innerHTML = `<span style="color:var(--error);">${esc(t("Store nicht erreichbar: ", "Store unreachable: ") + (data.error || ""))}</span>`;
+        renderUpdateCount(0);
         return;
       }
       renderPending(data.pending);
@@ -138,15 +180,23 @@
       if (!data.modules.length) {
         status.innerHTML = brokenHtml + esc(t("Keine Module in den konfigurierten Repositories.",
                                               "No modules in the configured repositories."));
+        renderUpdateCount(0);
         return;
       }
       if (brokenHtml) { status.innerHTML = brokenHtml; } else { status.style.display = "none"; }
       list.innerHTML = data.modules.map(moduleRow).join("");
-      // Also mark already-installed modules that have a newer version upstream,
-      // right on their own card further up the page — an admin scrolling the
-      // installed list shouldn't have to reach the store section to find out
-      // something is out of date.
-      data.modules.filter((m) => m.update_available).forEach((m) => {
+      const count = $("extStoreCount");
+      if (count) {
+        count.textContent = data.modules.length + " " + t("Module", "modules");
+        count.style.display = "";
+      }
+      // Also mark already-installed modules that have a newer version upstream, on
+      // their own card in the installed view, and count them onto the store button.
+      // The store view is a click away, so out-of-date has to be visible from the
+      // other side of that click.
+      const updates = data.modules.filter((m) => m.update_available);
+      renderUpdateCount(updates.length);
+      updates.forEach((m) => {
         const card = document.getElementById("integCard-ext-" + m.folder);
         if (!card || card.querySelector(".badge-update")) return;
         const badge = document.createElement("span");
@@ -155,7 +205,18 @@
         card.querySelector(".integ-subsection-header").appendChild(badge);
       });
     } catch (e) {
-      status.innerHTML = `<span style="color:var(--error);">${esc(String(e))}</span>`;
+      const aborted = e && e.name === "AbortError";
+      const msg = aborted
+        ? t("Der Store hat nicht geantwortet. Erneut versuchen?",
+            "The store did not answer. Try again?")
+        : String(e);
+      status.innerHTML =
+        `<span style="color:var(--error);">${esc(msg)}</span> ` +
+        `<button class="btn btn-secondary" id="extStoreRetryBtn">${esc(t("Erneut laden", "Retry"))}</button>`;
+      status.style.display = "";
+      const retry = $("extStoreRetryBtn");
+      if (retry) retry.addEventListener("click", () => loadCatalog(true));
+      renderUpdateCount(0);
     }
   }
 
@@ -178,9 +239,24 @@
       const data = await post("/api/store/install", { id: installBtn.dataset.id });
       if (data.ok) {
         renderPending(data.pending);
-        toast(t(`${data.folder} v${data.version} vorgemerkt — beim nächsten Start wird es installiert.`,
-                `${data.folder} v${data.version} staged — it will be installed on the next start.`));
-        loadCatalog(false);
+        if (data.warning) {
+          // Installed, verified — but it refused to load here (unmet DEPENDS_ON,
+          // incompatible version, broken code). Its Modulmanager card has the reason.
+          toast(t(`${data.folder} installiert, startet aber nicht: ${data.warning}`,
+                  `${data.folder} installed, but it won't load: ${data.warning}`));
+          setTimeout(() => window.location.reload(), 1200);
+        } else if (data.live) {
+          // Already running — the reload is only so the server-rendered sidebar
+          // link and settings card show up.
+          toast(t(`${data.folder} v${data.version} installiert und aktiv.`,
+                  `${data.folder} v${data.version} installed and running.`));
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          // An upgrade of an already-loaded module: unavoidable restart.
+          toast(t(`${data.folder} v${data.version} vorgemerkt — das Update wird beim nächsten Start aktiv.`,
+                  `${data.folder} v${data.version} staged — the update goes live on the next start.`));
+          loadCatalog(false);
+        }
       } else {
         toast(t("Fehler: ", "Error: ") + (data.error || ""));
         installBtn.disabled = false;
@@ -192,14 +268,17 @@
     const uninstallBtn = ev.target.closest(".ext-uninstall-btn");
     if (uninstallBtn) {
       const label = uninstallBtn.dataset.label || uninstallBtn.dataset.folder;
-      if (!window.confirm(t(`"${label}" beim nächsten Start entfernen?`,
-                            `Remove "${label}" on the next start?`))) return;
+      if (!window.confirm(t(`"${label}" jetzt abschalten und entfernen?`,
+                            `Switch "${label}" off and remove it now?`))) return;
       uninstallBtn.disabled = true;
       const data = await post("/api/store/uninstall", { folder: uninstallBtn.dataset.folder });
       if (data.ok) {
         renderPending(data.pending);
-        toast(t("Zum Entfernen vorgemerkt — wird beim nächsten Start angewendet.",
-                "Staged for removal — applied on the next start."));
+        toast(data.restart_required
+          ? t("Abgeschaltet und entfernt — die Dateien werden beim nächsten Start gelöscht.",
+              "Switched off and removed — its files are deleted on the next start.")
+          : t("Abgeschaltet und entfernt.", "Switched off and removed."));
+        setTimeout(() => window.location.reload(), 800);
       } else {
         toast(t("Fehler: ", "Error: ") + (data.error || ""));
         uninstallBtn.disabled = false;
@@ -224,19 +303,12 @@
     });
   }
 
-  const saveBtn = $("extStoreSaveBtn");
-  if (saveBtn) {
-    saveBtn.addEventListener("click", async () => {
-      const url = $("extStoreUrl").value.trim();
-      saveBtn.disabled = true;
-      const data = await post("/api/store/config", { url: url }, "PUT");
-      saveBtn.disabled = false;
-      if (data.error) { toast(t("Fehler: ", "Error: ") + data.error); return; }
-      // Turning the store on or off changes which parts of this page exist at
-      // all (server-rendered), so a reload is the honest way to show it.
-      window.location.reload();
-    });
-  }
+  // Note what is NOT here: no handler for the official store URL and none for the
+  // trusted signing keys. Both are compiled into the build (thirdparties/store.py's
+  // DEFAULT_STORE_URL and trusted_keys.py's BUILTIN_KEYS), the API refuses to write
+  // them, and the page only displays them. A trust root — or the address the trusted
+  // modules come from — that a user can edit is one an attacker can talk them into
+  // editing.
 
   const extraSaveBtn = $("extStoreExtraSaveBtn");
   if (extraSaveBtn) {
@@ -249,23 +321,6 @@
       $("extStoreExtraUrls").value = (data.extra_urls || []).join("\n");
       toast(t("Repositories gespeichert.", "Repositories saved."));
       loadCatalog(true);
-    });
-  }
-
-  // Trusted signing keys. A save here changes what this install considers
-  // official, so a reload is the honest response: every trust badge on the page
-  // may now say something different.
-  const keysSaveBtn = $("extStoreKeysSaveBtn");
-  if (keysSaveBtn) {
-    keysSaveBtn.addEventListener("click", async () => {
-      keysSaveBtn.disabled = true;
-      const data = await post("/api/store/config",
-        { trusted_keys: $("extStoreTrustedKeys").value }, "PUT");
-      keysSaveBtn.disabled = false;
-      if (data.error) { toast(t("Fehler: ", "Error: ") + data.error); return; }
-      toast(t("Schlüssel gespeichert. Module werden neu bewertet.",
-              "Keys saved. Modules will be re-evaluated."));
-      setTimeout(() => window.location.reload(), 700);
     });
   }
 
@@ -282,8 +337,48 @@
   const refreshBtn = $("extStoreRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", () => loadCatalog(true));
 
-  // Only fetch when a store is actually configured — the catalog container is
-  // rendered hidden in that case (see extensions.html).
+  // ---- view switching ------------------------------------------------------
+  // Installed modules and the store are two destinations, not one long scroll: an
+  // admin arrived to do one or the other. The header button swaps between them.
+  //
+  // The catalog is still fetched on page load even though the store starts hidden —
+  // it is what puts the update count on the button and the "Update: v…" badges on
+  // the installed cards. Loading it lazily would mean an admin only learns about
+  // updates by going to look for them, which is the wrong way round.
+  const installedView = $("extInstalledView");
+  const storeView = $("extStoreView");
+  const toggleBtn = $("extStoreToggleBtn");
+  const toggleLabel = $("extStoreToggleLabel");
+  const rescanBtn = $("extRescanBtn");
+
+  function setView(showStore) {
+    if (!installedView || !storeView) return;
+    installedView.style.display = showStore ? "none" : "";
+    storeView.style.display = showStore ? "" : "none";
+    // "Refresh" rescans web/thirdparties/ on disk. With the catalog on screen it
+    // would be a button that looks like it refreshes what you're looking at and
+    // doesn't — the store has its own.
+    if (rescanBtn) rescanBtn.style.display = showStore ? "none" : "";
+    if (toggleBtn) toggleBtn.className = showStore ? "btn btn-secondary" : "btn btn-primary";
+    if (toggleLabel) {
+      toggleLabel.textContent = showStore
+        ? t("← Installierte Module", "← Installed modules")
+        : t("Modulstore", "Module Store");
+    }
+    // Survives a reload — and the store spends its time telling you to restart.
+    try {
+      history.replaceState(null, "", showStore ? "#store" : window.location.pathname);
+    } catch (e) { /* file:// and the like; the view still switched */ }
+    window.scrollTo(0, 0);
+  }
+
+  if (toggleBtn && storeView) {
+    toggleBtn.addEventListener("click", () => setView(storeView.style.display === "none"));
+    if (window.location.hash === "#store") setView(true);
+  }
+
+  // Note this checks the catalog box's own display, not the store view's: the view
+  // is hidden at rest, the box is only hidden when this build ships no store at all.
   const catalogBox = $("extStoreCatalog");
   if (catalogBox && catalogBox.style.display !== "none") loadCatalog(false);
 })();

@@ -17,6 +17,8 @@ No Flask blueprint, matching the rest of web/routes/ (see queue.py's
 module docstring): endpoint names stay bare so url_for() keeps working.
 """
 
+import re
+
 from flask import jsonify
 from flask import request
 
@@ -26,9 +28,97 @@ from ..db import add_to_queue
 from ..db import is_series_queued_or_running
 from ..queue_worker import _dl_lock
 
+# Provider (site) name as returned by mediaforge.providers.resolve_provider ->
+# the source key the frontend knows (and gates, in hanime's case).
+_PROVIDER_TO_SOURCE = {
+    "AniWorld": "aniworld",
+    "SerienStream": "sto",
+    "FilmPalast": "filmpalast",
+    "Megakino": "megakino",
+    "MegakinoFilm": "megakino",
+    "Hanime": "hanime",
+}
+
+# Cut a season/episode URL back to its series page:
+#   .../anime/stream/<slug>/staffel-1/episode-3 -> .../anime/stream/<slug>
+#   .../serie/<slug>/staffel-1/episode-3        -> .../serie/<slug>
+_SERIES_TRIM = re.compile(
+    r"^(https?://[^/]+/(?:anime/stream|serie(?:/stream)?)/[a-zA-Z0-9\-]+)(?:/.*)?$",
+    re.IGNORECASE,
+)
+
+
+def _series_url_for(url, source):
+    """The series/movie landing URL the detail modal should be opened with."""
+    if source in ("aniworld", "sto"):
+        m = _SERIES_TRIM.match(url)
+        return m.group(1) if m else url
+    # megakino (?episode=N) and hanime (?ep=N) use synthetic query episodes;
+    # filmpalast has no series concept at all — its /stream/<slug> page IS the
+    # movie. In all three cases the bare page URL is what openSeries() wants.
+    return url.split("?")[0].split("#")[0]
+
 
 def register_direct_link_routes(app):
-    """Register the Direct Link probe and queue-download endpoints."""
+    """Register the Direct Link classify, probe and queue-download endpoints."""
+
+    @app.route("/api/direct-link/classify", methods=["POST"])
+    def api_direct_link_classify():
+        """Decide what a pasted URL actually is.
+
+        POST /api/direct-link/classify. Called from static/app.js's
+        submitDirectLink() as the FIRST step, before any probing: a link to one
+        of MediaForge's own scraper sites must go through the normal
+        series/season flow (with its provider + language pickers), and only
+        everything else is a "direct link" in the yt-dlp sense.
+
+        The lookup runs against the same single source of truth the rest of the
+        app uses -- mediaforge.providers.resolve_provider() and its URL
+        patterns -- instead of a second, hand-maintained set of regexes in the
+        frontend that silently missed sites (FilmPalast) and every mirror
+        domain. Mirror hosts (serienstream.to, a bare origin IP, ...) are first
+        rewritten back to the site's canonical host (see mediaforge.mirrors), so
+        a link copied from a mirror opens the series just like the primary
+        domain does.
+
+        Returns either:
+            {"kind": "site", "source": "sto", "series_url": "https://s.to/serie/x"}
+        or:
+            {"kind": "generic"}   -- not one of our sites: probe it with yt-dlp
+        """
+        from ...mirrors import canonical_host, map_url, site_for_url
+        from ...providers import normalize_url, resolve_provider
+
+        data = request.get_json(silent=True) or {}
+        raw = str(data.get("url", "")).strip()
+        if not raw:
+            return jsonify({"error": "url is required"}), 400
+
+        url = normalize_url(raw)
+
+        # A mirror domain (or bare IP) points at the same site — normalize it
+        # back to the canonical host so the URL patterns below match.
+        site = site_for_url(url)
+        if site:
+            host = canonical_host(site)
+            if host:
+                url = map_url(url, host)
+
+        try:
+            provider = resolve_provider(url)
+        except ValueError:
+            return jsonify({"kind": "generic", "url": url})
+
+        source = _PROVIDER_TO_SOURCE.get(provider.name)
+        if not source:
+            return jsonify({"kind": "generic", "url": url})
+
+        return jsonify({
+            "kind": "site",
+            "source": source,
+            "url": url,
+            "series_url": _series_url_for(url, source),
+        })
 
     @app.route("/api/direct-link/probe", methods=["POST"])
     def api_direct_link_probe():

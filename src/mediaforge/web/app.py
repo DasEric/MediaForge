@@ -672,6 +672,21 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     # and registered here — see web/thirdparties/__init__.py. Adding a new
     # one means adding a new subfolder, not editing this file.
     _discover_and_register_thirdparties(app)
+
+    # A module uninstalled live (Modulmanager, no restart) has its files deleted
+    # and its registry entries dropped, but Flask has no way to *un*register the
+    # blueprint it added — those URL rules stay in the map until the process
+    # restarts, now pointing at a package that no longer exists. Answer them with
+    # a plain 404 rather than letting them blow up in a template loader.
+    # See web/thirdparties/__init__.py's uninstall_module_live().
+    @app.before_request
+    def _block_uninstalled_module_routes():
+        from flask import abort, request as _req
+        from .thirdparties import uninstalled_blueprints
+
+        if _req.blueprint and _req.blueprint in uninstalled_blueprints():
+            abort(404)
+
     # Reads whatever the discovery pass above just populated in
     # web/thirdparties/registry.py's _MODULES/_ITEMS at *request* time, not
     # at registration time, so placement relative to the discovery call

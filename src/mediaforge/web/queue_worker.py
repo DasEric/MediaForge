@@ -27,11 +27,49 @@ from .runtime_state import (
     _active_cancel_events,
     _active_cancel_events_lock,
     consume_episode_skip,
+    get_provider_fallback_chain,
     is_queue_paused,
 )
 from .upscale_worker import _trigger_batch_after_download_upscale
 
 logger = get_logger(__name__)
+
+
+# Errors that mean "this hoster has nothing for this episode" (as opposed to a
+# transient failure worth retrying on the same hoster): the site didn't offer
+# the provider for this episode/language at all, or MediaForge has no extractor
+# for it. Both are answered by moving on to the next provider in the chain.
+_PROVIDER_UNAVAILABLE_MARKERS = (
+    "is not available for",          # AniworldEpisode.redirect_url / s.to
+    "is not yet implemented",        # extractor missing for this provider
+    "no extractor available",
+    "provider source not found",     # HTTP 404 on the /redirect/<id> link
+    "did not return a stream url",
+)
+
+
+def _is_provider_unavailable_error(exc) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _PROVIDER_UNAVAILABLE_MARKERS)
+
+
+def _build_attempt_plan(primary_provider, max_retries):
+    """Ordered [(provider, attempt_no, attempts_for_this_provider), ...].
+
+    The provider the user picked gets the full *max_retries* budget; every
+    other working provider (in the order configured in the settings) then gets
+    one shot each, so a dead hoster costs one extra try rather than failing the
+    whole episode. Direct-link jobs ("Direct") have no hoster concept and just
+    keep the plain retry loop.
+    """
+    if primary_provider == "Direct":
+        return [("Direct", i, max_retries) for i in range(1, max_retries + 1)]
+
+    chain = get_provider_fallback_chain(primary_provider)
+    plan = [(chain[0], i, max_retries) for i in range(1, max_retries + 1)]
+    for fallback in chain[1:]:
+        plan.append((fallback, 1, 1))
+    return plan
 
 
 # Queue worker state
@@ -488,7 +526,27 @@ def _queue_worker():
                 _ep_start_time = time.time()
                 _ep_path = None
                 _ep_size_bytes = 0
-                for attempt in range(1, MAX_EP_RETRIES + 1):
+
+                # ── Provider fallback chain ──────────────────────────────────
+                # The hoster the user picked is tried MAX_EP_RETRIES times; if
+                # it still fails (dead embed, extractor error, hoster simply not
+                # offered for this episode), every other working hoster is tried
+                # once, in the order configured in the settings. See
+                # runtime_state.get_provider_fallback_chain(). Direct-link jobs
+                # have no hoster concept and keep the plain retry loop.
+                _attempt_plan = _build_attempt_plan(item.get("provider"), MAX_EP_RETRIES)
+                _current_provider = None
+                _dead_providers = set()
+
+                for _hoster, attempt, _attempts_for_hoster in _attempt_plan:
+                    if _hoster in _dead_providers:
+                        continue
+                    if _hoster != _current_provider and _current_provider is not None:
+                        logger.warning(
+                            f"[Provider-Fallback] {ep_url}: '{_current_provider}' failed — "
+                            f"switching to '{_hoster}'"
+                        )
+                    _current_provider = _hoster
                     try:
                         if item.get("provider") == "Direct":
                             # Direct Link job (see routes/direct_link.py): a raw
@@ -509,7 +567,7 @@ def _queue_worker():
                             ep_kwargs = {
                                 "url": ep_url,
                                 "selected_language": item["language"],
-                                "selected_provider": item["provider"],
+                                "selected_provider": _hoster,
                             }
                             if selected_path:
                                 ep_kwargs["selected_path"] = selected_path
@@ -616,16 +674,26 @@ def _queue_worker():
                             logger.warning(f"Language unavailable for {ep_url}: {e}")
                             break
                         last_error = e
-                        if attempt < MAX_EP_RETRIES:
+                        if _is_provider_unavailable_error(e):
+                            # This hoster isn't offered for this episode at all —
+                            # retrying it is pointless, so drop it and let the
+                            # chain move straight on to the next hoster.
+                            _dead_providers.add(_hoster)
+                            logger.warning(
+                                f"Episode {ep_url}: provider '{_hoster}' not available "
+                                f"for this episode: {e}"
+                            )
+                        elif attempt < _attempts_for_hoster:
                             delay = 2
                             logger.warning(
-                                f"Episode {ep_url} failed (attempt {attempt}/{MAX_EP_RETRIES}), "
-                                f"retrying in {delay}s: {e}"
+                                f"Episode {ep_url} failed with provider '{_hoster}' "
+                                f"(attempt {attempt}/{_attempts_for_hoster}), retrying in {delay}s: {e}"
                             )
                             time.sleep(delay)
                         else:
                             logger.error(
-                                f"Episode {ep_url} failed after {MAX_EP_RETRIES} attempts: {e}"
+                                f"Episode {ep_url} failed with provider '{_hoster}' after "
+                                f"{_attempts_for_hoster} attempt(s): {e}"
                             )
                     # Check skip flag after each attempt (success or fail)
                     if consume_episode_skip(item["id"]):

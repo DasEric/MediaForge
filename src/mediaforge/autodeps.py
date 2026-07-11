@@ -240,18 +240,39 @@ def _download_mpv_windows() -> None:
     for a valid binary.
     """
     import urllib.request
+    from .config import insecure_ssl_context_for
+
     dest = Path(__file__).parent / "bin" / "windows" / "mpv.exe"
     tmp  = dest.with_suffix(".download_tmp")
     try:
         logger.info("[mpv] mpv.exe nicht gefunden — starte Auto-Download von softarchiv.com …")
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        def _report(block_nr, block_size, total_size):
-            if total_size > 0:
-                pct = min(int(block_nr * block_size * 100 / total_size), 99)
-                _mpv_download_status["pct"] = pct
+        # Streamed by hand rather than via urlretrieve(): only urlopen() takes an
+        # SSL context, and softarchiv.com is one of our own hosts, which are
+        # exempt from certificate verification (see config.TLS_INSECURE_HOSTS) so
+        # an expired certificate can't break the mpv auto-download. For any other
+        # URL insecure_ssl_context_for() returns None = Python's default,
+        # fully verifying context.
+        req = urllib.request.Request(
+            _MPV_DOWNLOAD_URL, headers={"User-Agent": "MediaForge/1.0"}
+        )
+        with urllib.request.urlopen(
+            req, timeout=60, context=insecure_ssl_context_for(_MPV_DOWNLOAD_URL)
+        ) as resp, open(tmp, "wb") as fh:
+            total_size = int(resp.headers.get("Content-Length") or 0)
+            read_bytes = 0
+            while True:
+                chunk = resp.read(64 * 1024)
+                if not chunk:
+                    break
+                fh.write(chunk)
+                read_bytes += len(chunk)
+                if total_size > 0:
+                    _mpv_download_status["pct"] = min(
+                        int(read_bytes * 100 / total_size), 99
+                    )
 
-        urllib.request.urlretrieve(_MPV_DOWNLOAD_URL, str(tmp), reporthook=_report)
         tmp.rename(dest)
         _mpv_download_status["state"] = "done"
         _mpv_download_status["pct"] = 100

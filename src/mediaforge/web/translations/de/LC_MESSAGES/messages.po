@@ -4423,3 +4423,24 @@ msgstr "Noch keine Dev Infos."
 msgid "Dismiss"
 msgstr "Schließen"
 
+
+msgid "Provider order"
+msgstr "Provider-Reihenfolge"
+
+msgid "Order in which hosters are tried. If the hoster selected for a download fails (dead link, hoster not offered for that episode), MediaForge automatically continues with the next one in this list. Drag the rows or use the arrows."
+msgstr "Reihenfolge, in der die Hoster probiert werden. Schlägt der für einen Download gewählte Hoster fehl (toter Link, Hoster für diese Episode nicht angeboten), macht MediaForge automatisch mit dem nächsten Eintrag dieser Liste weiter. Zeilen ziehen oder die Pfeile nutzen."
+
+msgid "Automatic provider fallback"
+msgstr "Automatischer Provider-Fallback"
+
+msgid "When disabled, only the selected hoster is used and a download fails if it is unavailable."
+msgstr "Ist die Option aus, wird nur der gewählte Hoster verwendet und ein Download schlägt fehl, wenn dieser nicht verfügbar ist."
+
+msgid "Domain fallback (mirrors)"
+msgstr "Domain-Fallback (Mirrors)"
+
+msgid "Alternative domains per site, tried top to bottom whenever a domain is unreachable or blocked (e.g. s.to → serienstream.to → 186.2.175.5). The first entry is the primary domain and cannot be removed. An IP address is called with the primary domain as its Host header. One entry per line."
+msgstr "Alternative Domains pro Seite, die von oben nach unten probiert werden, sobald eine Domain nicht erreichbar oder gesperrt ist (z. B. s.to → serienstream.to → 186.2.175.5). Der erste Eintrag ist die Primär-Domain und kann nicht entfernt werden. Eine IP-Adresse wird mit der Primär-Domain als Host-Header aufgerufen. Ein Eintrag pro Zeile."
+
+msgid "Which source may show its provider pill first. The first source that knows the title wins; the others are skipped. Modules that register their own pill appear here automatically."
+msgstr "Welche Quelle ihre Provider-Pille zuerst anzeigen darf. Die erste Quelle, die den Titel kennt, gewinnt; die übrigen werden übersprungen. Module, die eine eigene Pille registrieren, erscheinen hier automatisch."

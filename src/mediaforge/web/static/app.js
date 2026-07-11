@@ -845,8 +845,12 @@ function refreshSyncBadges() {
 
 // Apply already-fetched TMDB data to a browse card synchronously (no network)
 function _applyTmdbToCard(card, d) {
-  _cardProviderChain(card, d);           // TMDB → Crunchyroll → Fernsehserien.de fallback pill
-  if (!d || !d.found) return;
+  if (!d || !d.found) {
+    // No TMDB data at all — the chain still runs (Crunchyroll, Fernsehserien,
+    // module pills can all still know this title).
+    _cardProviderChain(card, d);
+    return;
+  }
   const info = card.querySelector(".browse-info");
   if (!info) return;
 
@@ -873,29 +877,25 @@ function _applyTmdbToCard(card, d) {
     }
   }
 
-  if (!cineinfoSettings || !cineinfoSettings.tmdb_api_key) return;
+  if (!cineinfoSettings || !cineinfoSettings.tmdb_api_key) {
+    _cardProviderChain(card, d);
+    return;
+  }
   if (cineinfoSettings.show_providers === '0' &&
       cineinfoSettings.show_fsk === '0' &&
       cineinfoSettings.show_hover_rating !== '1' &&
       cineinfoSettings.show_hover_genres !== '1' &&
       cineinfoSettings.show_hover_fsk !== '1') return;
 
-  let meta = info.querySelector(".browse-tmdb-meta");
-  if (!meta) {
-    meta = document.createElement("div");
-    meta.className = "browse-tmdb-meta";
-    info.appendChild(meta);
-  }
+  const meta = _ensureCardMeta(card);
   // Only clear the children — layout (flex/wrap/gap/margin) lives in the
   // .browse-tmdb-meta CSS rule now, not as an inline style set from JS, so
   // there's nothing stray left behind on an empty container to reset.
-  meta.innerHTML = '';
-  if (cineinfoSettings.show_providers !== '0' && d.providers && d.providers.length) {
-    // Same small-pill styling as the Crunchyroll/Fernsehserien fallback pills
-    // (see _makeProviderPill) so all three sources render identically.
-    const pill = _makeProviderPill(d.providers[0], { small: true, title: d.providers.join(', ') });
-    meta.appendChild(pill);
-  }
+  if (meta) meta.innerHTML = '';
+  // Pills are rendered by the chain (which honours the configured CineInfo
+  // provider order, TMDB included) — run it only AFTER the container is
+  // cleared, or its pills would be wiped again by the line above.
+  _cardProviderChain(card, d, meta);
 
   // Populate Browse Info Card
   let tmdb_voting = d.vote_average;
@@ -2365,7 +2365,7 @@ async function _fsProviderPill(title, containerEl, opts) {
 // the pill (creating the meta container if the card had no TMDB data at all).
 // Returns true iff a pill is present afterwards (already-there or newly added)
 // so _cardProviderChain knows whether to fall through to Fernsehserien.de.
-async function _crCardPill(card, d) {
+async function _crCardPill(card, d, metaEl) {
   if (!crunchyrollSettings || crunchyrollSettings.enabled !== '1') return false;
   if (crunchyrollSettings.show_providers === '0') return false;
   if (d && d.providers && d.providers.some(pp => /crunchyroll/i.test(pp))) return true;
@@ -2373,14 +2373,8 @@ async function _crCardPill(card, d) {
   // better than the raw site title.
   const title = (d && d.title) || card.dataset.title || card.dataset.tmdbTitle || "";
   if (!title) return false;
-  const info = card.querySelector('.browse-info');
-  if (!info) return false;
-  let meta = info.querySelector('.browse-tmdb-meta');
-  if (!meta) {
-    meta = document.createElement('div');
-    meta.className = 'browse-tmdb-meta';
-    info.appendChild(meta);
-  }
+  const meta = metaEl || _ensureCardMeta(card);
+  if (!meta) return false;
   return _crProviderPill(title, meta, { small: true });
 }
 
@@ -2388,19 +2382,13 @@ async function _crCardPill(card, d) {
 // as the last step of _cardProviderChain (TMDB and Crunchyroll both empty),
 // so this does not add extra load against the scraper for cards that are
 // already covered by TMDB or Crunchyroll.
-async function _fsCardPill(card, d) {
+async function _fsCardPill(card, d, metaEl) {
   if (!fernsehserienSettings || fernsehserienSettings.enabled !== '1') return false;
   if (fernsehserienSettings.show_providers === '0') return false;
   const title = (d && d.title) || card.dataset.title || card.dataset.tmdbTitle || "";
   if (!title) return false;
-  const info = card.querySelector('.browse-info');
-  if (!info) return false;
-  let meta = info.querySelector('.browse-tmdb-meta');
-  if (!meta) {
-    meta = document.createElement('div');
-    meta.className = 'browse-tmdb-meta';
-    info.appendChild(meta);
-  }
+  const meta = metaEl || _ensureCardMeta(card);
+  if (!meta) return false;
   return _enqueueFsLookup(title, meta, { small: true });
 }
 
@@ -2436,7 +2424,13 @@ window.registerProviderPill = window.registerProviderPill || function (name, res
 async function _extensionProviderPill(title, containerEl, opts) {
   opts = opts || {};
   if (!title || !containerEl || !window._providerPillResolvers || !window._providerPillResolvers.length) return false;
-  for (const entry of window._providerPillResolvers) {
+  // opts.only restricts this to ONE registered resolver (by its name) — that's
+  // how the configurable CineInfo order addresses a single module's pill; with
+  // no `only`, every resolver is tried in registration order (legacy behaviour).
+  const entries = opts.only
+    ? window._providerPillResolvers.filter(e => e.name === opts.only)
+    : window._providerPillResolvers;
+  for (const entry of entries) {
     try {
       const result = await entry.resolverFn(title, opts.imdbId);
       if (!result || !result.name) continue;
@@ -2454,35 +2448,152 @@ async function _extensionProviderPill(title, containerEl, opts) {
   return false;
 }
 
-// Card-level wrapper, mirroring _crCardPill/_fsCardPill — only reached once
-// TMDB, Crunchyroll and Fernsehserien.de all came up empty for this card.
-async function _extensionCardPill(card, d) {
+// Card-level wrapper, mirroring _crCardPill/_fsCardPill. `only` names a single
+// registered resolver, so the chain can place each module's pill at exactly the
+// position the user configured.
+async function _extensionCardPill(card, d, metaEl, only) {
   const title = (d && d.title) || card.dataset.title || card.dataset.tmdbTitle || "";
   if (!title) return false;
+  const meta = metaEl || _ensureCardMeta(card);
+  if (!meta) return false;
+  return _extensionProviderPill(title, meta, { small: true, imdbId: d && d.imdb_id, only: only });
+}
+
+// ─── CineInfo provider order ────────────────────────────────────────────
+// Which source gets to put its pill on a card/modal first is user-configurable
+// (Integrations → CineInfo → "Provider order"): a comma-separated list of
+// source ids, stored as cineinfo_provider_order and served with the CineInfo
+// settings. Built-in ids are "tmdb", "crunchyroll" and "fernsehserien"; a
+// module's pill (registered via registerProviderPill(), see below) is
+// addressed as "ext:<its registered name>".
+//
+// The order is a *preference*, not a whitelist: any source the saved order
+// doesn't mention (a module installed after the order was saved, say) is still
+// tried, appended after the configured ones — so a new module's pill shows up
+// on its own, and nothing silently disappears.
+const _PILL_SOURCES_DEFAULT = ["tmdb", "crunchyroll", "fernsehserien"];
+
+function _registeredPillIds() {
+  return (window._providerPillResolvers || []).map(e => "ext:" + e.name);
+}
+
+function _pillSources() {
+  const known = _PILL_SOURCES_DEFAULT.concat(_registeredPillIds());
+  const raw = (cineinfoSettings && cineinfoSettings.provider_order) || "";
+  const configured = raw.split(",").map(s => s.trim()).filter(s => s && known.includes(s));
+  return configured.concat(known.filter(id => !configured.includes(id)));
+}
+
+// TMDB's own pill on a browse card: the top provider, with the full list as a
+// tooltip. Same _makeProviderPill styling as every other source, so all pills
+// look identical no matter which source supplied the name.
+function _tmdbCardPill(meta, d) {
+  if (!meta || !d || !d.found) return false;
+  if (!cineinfoSettings || cineinfoSettings.show_providers === '0') return false;
+  if (!d.providers || !d.providers.length) return false;
+  if (meta.querySelector('.tmdb-provider-pill')) return true;
+  meta.appendChild(_makeProviderPill(d.providers[0], { small: true, title: d.providers.join(', ') }));
+  return true;
+}
+
+// Provider resolution chain for browse cards. Walks _pillSources() and stops
+// at the first source that actually produced a pill for this title.
+async function _cardProviderChain(card, d, metaEl) {
+  const meta = metaEl || _ensureCardMeta(card);
+  if (!meta) return;
+  for (const id of _pillSources()) {
+    let added = false;
+    if (id === "tmdb") {
+      added = _tmdbCardPill(meta, d);
+    } else if (id === "crunchyroll") {
+      added = await _crCardPill(card, d, meta);
+    } else if (id === "fernsehserien") {
+      added = await _fsCardPill(card, d, meta);
+    } else if (id.startsWith("ext:")) {
+      added = await _extensionCardPill(card, d, meta, id.slice(4));
+    }
+    if (added) return;
+  }
+}
+
+// The .browse-tmdb-meta container a card's pills live in, created on demand.
+function _ensureCardMeta(card) {
+  if (!card) return null;
   const info = card.querySelector('.browse-info');
-  if (!info) return false;
+  if (!info) return null;
   let meta = info.querySelector('.browse-tmdb-meta');
   if (!meta) {
     meta = document.createElement('div');
     meta.className = 'browse-tmdb-meta';
     info.appendChild(meta);
   }
-  return _extensionProviderPill(title, meta, { small: true, imdbId: d && d.imdb_id });
+  return meta;
 }
 
-// Provider resolution order for browse cards: TMDB → Crunchyroll →
-// Fernsehserien.de → registered extensions. TMDB's own provider badge is
-// rendered separately in _applyTmdbToCard; this only decides whether the
-// fallback pill (CR, then FS, then extensions) is worth trying at all —
-// skipped entirely once TMDB already has providers.
-async function _cardProviderChain(card, d) {
-  const tmdbHasProviders = !!(d && d.found && d.providers && d.providers.length);
-  if (tmdbHasProviders) return;
-  const crAdded = await _crCardPill(card, d);
-  if (crAdded) return;
-  const fsAdded = await _fsCardPill(card, d);
-  if (fsAdded) return;
-  await _extensionCardPill(card, d);
+// TMDB's provider block in the detail modal: every provider as a pill, capped
+// at MAX_SHOW with a "+N more" chip. Returns true iff it rendered anything.
+function _tmdbModalPills(provEl, d) {
+  if (!provEl || !d || !d.found) return false;
+  if (!cineinfoSettings || cineinfoSettings.show_providers === '0') return false;
+  if (!d.providers || !d.providers.length) return false;
+
+  provEl.innerHTML = '';
+  provEl.style.cssText = [
+    'display:flex',
+    'flex-wrap:wrap',
+    'gap:5px',
+    'margin:4px 0 16px',
+    'max-height:74px',
+    'overflow:hidden',
+    'position:relative',
+  ].join(';');
+  const MAX_SHOW = 6;
+  const visible = d.providers.slice(0, MAX_SHOW);
+  const rest = d.providers.length - MAX_SHOW;
+  visible.forEach(p => provEl.appendChild(_makeProviderPill(p)));
+  if (rest > 0) {
+    const more = document.createElement('span');
+    more.textContent = '+' + rest + ' mehr';
+    more.style.cssText = [
+      'display:inline-flex',
+      'align-items:center',
+      'font-size:0.72rem',
+      'font-weight:600',
+      'padding:4px 10px',
+      'border-radius:99px',
+      'border:1.5px solid rgba(148,163,184,.3)',
+      'background:var(--bg-elevated,#1a1a28)',
+      'color:var(--text-muted,#55556a)',
+      'white-space:nowrap',
+      'cursor:default',
+    ].join(';');
+    provEl.appendChild(more);
+  }
+  return true;
+}
+
+// Detail-modal counterpart of _cardProviderChain: same configured order, same
+// "first source that has something wins" rule. `staleFn` lets the caller abort
+// when the user has already opened a different series while we were awaiting.
+async function _modalProviderChain(title, provEl, d, imdbId, staleFn) {
+  const stale = staleFn || (() => false);
+  for (const id of _pillSources()) {
+    let added = false;
+    if (id === "tmdb") {
+      added = _tmdbModalPills(provEl, d);
+    } else if (id === "crunchyroll") {
+      added = await _crProviderPill((d && d.title) || title, provEl);
+    } else if (id === "fernsehserien") {
+      added = await _enqueueFsLookup((d && d.title) || title, provEl);
+    } else if (id.startsWith("ext:")) {
+      added = await _extensionProviderPill((d && d.title) || title, provEl, {
+        imdbId: imdbId || (d && d.imdb_id),
+        only: id.slice(4),
+      });
+    }
+    if (stale()) return;
+    if (added) return;
+  }
 }
 
 async function enrichModalWithTmdb(title, imdbId, _seq) {
@@ -2494,13 +2605,9 @@ async function enrichModalWithTmdb(title, imdbId, _seq) {
   // provider pills) into the now-current modal.
   const _stale = () => _seq !== undefined && _seq !== _seriesLoadSeq;
   if (!cineinfoSettings || !cineinfoSettings.tmdb_api_key) {
-    // TMDB is off entirely — start the chain at Crunchyroll.
-    const crAdded = await _crProviderPill(title, provEl);
-    if (_stale()) return;
-    if (crAdded) return;
-    const fsAdded = await _enqueueFsLookup(title, provEl);
-    if (_stale()) return;
-    if (!fsAdded) await _extensionProviderPill(title, provEl, { imdbId });
+    // TMDB is off entirely — the chain simply skips it and runs the rest of
+    // the configured order (Crunchyroll, Fernsehserien.de, module pills).
+    await _modalProviderChain(title, provEl, null, imdbId, _stale);
     return;
   }
   try {
@@ -2515,64 +2622,18 @@ async function enrichModalWithTmdb(title, imdbId, _seq) {
     const sRecs = cineinfoSettings?.show_recommendations ?? "1";
     console.log("[CineInfo] Final Checks - show_trailer:", sTrailer, "show_recs:", sRecs);
     if (!d.found) {
-      // No TMDB data at all — start the chain at Crunchyroll.
-      const crAdded = await _crProviderPill(title, provEl);
-      if (_stale()) return;
-      if (crAdded) return;
-      const fsAdded = await _enqueueFsLookup(title, provEl);
-      if (_stale()) return;
-      if (!fsAdded) await _extensionProviderPill(title, provEl, { imdbId });
+      // No TMDB data at all — the chain skips TMDB and runs the rest of the
+      // configured order (Crunchyroll, Fernsehserien.de, module pills).
+      await _modalProviderChain(title, provEl, null, imdbId, _stale);
       return;
     }
-    const tmdbHasProviders = !!(d.providers && d.providers.length);
-    if (cineinfoSettings.show_providers !== '0' && tmdbHasProviders) {
-      provEl.innerHTML = '';
-      provEl.style.cssText = [
-        'display:flex',
-        'flex-wrap:wrap',
-        'gap:5px',
-        'margin:4px 0 16px',
-        'max-height:74px',
-        'overflow:hidden',
-        'position:relative',
-      ].join(';');
-      const MAX_SHOW = 6;
-      const visible = d.providers.slice(0, MAX_SHOW);
-      const rest = d.providers.length - MAX_SHOW;
-      visible.forEach(p => provEl.appendChild(_makeProviderPill(p)));
-      if (rest > 0) {
-        const more = document.createElement('span');
-        more.textContent = '+' + rest + '\u00a0mehr';
-        more.style.cssText = [
-          'display:inline-flex',
-          'align-items:center',
-          'font-size:0.72rem',
-          'font-weight:600',
-          'padding:4px 10px',
-          'border-radius:99px',
-          'border:1.5px solid rgba(148,163,184,.3)',
-          'background:var(--bg-elevated,#1a1a28)',
-          'color:var(--text-muted,#55556a)',
-          'white-space:nowrap',
-          'cursor:default',
-        ].join(';');
-        provEl.appendChild(more);
-      }
-    }
-    // Provider resolution order: TMDB → Crunchyroll → Fernsehserien.de. Only
-    // fall through to CR/FS when TMDB itself has no provider data for this
-    // title (not just when the display toggle is off) — avoids a redundant
-    // or conflicting pill next to TMDB's own list.
-    if (!tmdbHasProviders) {
-      const crAdded = await _crProviderPill((d && d.title) || title, provEl);
-      if (_stale()) return;
-      if (!crAdded) {
-        const fsAdded = await _enqueueFsLookup((d && d.title) || title, provEl);
-        if (_stale()) return;
-        if (!fsAdded) await _extensionProviderPill((d && d.title) || title, provEl, { imdbId: imdbId || (d && d.imdb_id) });
-        if (_stale()) return;
-      }
-    }
+    // Provider resolution follows the configured CineInfo order (TMDB,
+    // Crunchyroll, Fernsehserien.de and any module-registered pill, see
+    // _pillSources()): the first source that actually has something for this
+    // title renders its pill(s), the rest are skipped — so there is never a
+    // redundant or conflicting second pill next to TMDB's own list.
+    await _modalProviderChain(title, provEl, d, imdbId, _stale);
+    if (_stale()) return;
     // TMDB Genres — ersetze die Seiten-Genres wenn aktiviert
     if (cineinfoSettings.show_genres === '1' && d.genres && d.genres.length) {
       const genresEl = document.getElementById('modalGenres');
@@ -2918,7 +2979,16 @@ function closeDLModalOutside(event) {
   }
 }
 
-function submitDirectLink() {
+// Ask the backend what the pasted link actually is BEFORE probing it.
+// The site lookup runs server-side (/api/direct-link/classify) against the
+// very same URL patterns the rest of the app uses (mediaforge/providers.py),
+// so it covers every supported site — including FilmPalast, which the old
+// hard-coded frontend regexes silently missed — and every mirror domain
+// (serienstream.to, a bare origin IP, ...), which are normalized back to the
+// canonical host. Only a link that is NOT one of our sites falls through to
+// the generic yt-dlp probe (which itself first tries the supported hosters in
+// the configured provider order, see models/direct_link/probe.py).
+async function submitDirectLink() {
   const input = document.getElementById("directLinkInput");
   const error = document.getElementById("directLinkError");
   let url = input.value.trim();
@@ -2931,49 +3001,6 @@ function submitDirectLink() {
 
   if (!url) return;
 
-  const isSto = /s\.to\/serie\/[^\/]+/.test(url);
-  const isAniworld = /aniworld\.to\/anime\/stream\/[^\/]+/.test(url);
-  const isMegakino = /megakino[^/]*\/watch\/[^/]+\/[a-f0-9]{24}/i.test(url);
-  const isHanime = /hanime\.tv\/videos\/hentai\/[^/?#]+/.test(url);
-  const isKnownSite = isSto || isAniworld || isMegakino || isHanime;
-
-  // hanime is an adult source: a direct link must not bypass the 18+ gate.
-  if (isHanime) {
-    const _hanOn = ((((generalSettings || {}).sources || {}).enabled || {}).hanime === "1");
-    if (!_hanOn) {
-      error.textContent = t("hanime ist deaktiviert. Bitte zuerst in den Einstellungen aktivieren (18+).", "hanime is disabled. Please enable it in Settings first (18+).");
-      error.style.display = "block";
-      input.focus();
-      return;
-    }
-  }
-
-  if (isKnownSite) {
-    // Extract base series URL (strip staffel/episode sub-paths)
-    let seriesUrl = url;
-    if (isSto) {
-      const m = url.match(/(https?:\/\/[^/]*s\.to\/serie\/[^\/]+)/);
-      if (m) seriesUrl = m[1];
-    } else if (isAniworld) {
-      const m = url.match(/(https?:\/\/[^/]*aniworld\.to\/anime\/stream\/[^\/]+)/);
-      if (m) seriesUrl = m[1];
-    } else if (isMegakino) {
-      // megakino: the post URL itself is the series/movie; drop any ?episode=N
-      seriesUrl = url.split("?")[0];
-    } else if (isHanime) {
-      // hanime: strip any ?ep=N / query -> canonical franchise (series) URL
-      seriesUrl = url.split("?")[0].split("#")[0];
-    }
-
-    closeDirectLinkModal();
-    openSeries(seriesUrl);
-    return;
-  }
-
-  // Not one of the known scraper sites -- try it as a generic yt-dlp direct
-  // link (e.g. a raw .m3u8 HLS master playlist). MediaForge fetches the
-  // available quality variants first so the user can pick one, instead of
-  // just guessing "best" (see GitHub issue #8).
   if (!/^https?:\/\//i.test(url)) {
     error.textContent = t("Bitte eine gültige URL eingeben.", "Please enter a valid URL.");
     error.style.display = "block";
@@ -2981,7 +3008,39 @@ function submitDirectLink() {
     return;
   }
 
-  startDirectLinkProbe(url);
+  let cls = null;
+  try {
+    const resp = await fetch("/api/direct-link/classify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    cls = await resp.json();
+  } catch (e) {
+    cls = null;  // backend unreachable — fall through to the generic probe
+  }
+
+  if (cls && cls.kind === "site") {
+    // hanime is an adult source: a direct link must not bypass the 18+ gate.
+    if (cls.source === "hanime") {
+      const _hanOn = ((((generalSettings || {}).sources || {}).enabled || {}).hanime === "1");
+      if (!_hanOn) {
+        error.textContent = t("hanime ist deaktiviert. Bitte zuerst in den Einstellungen aktivieren (18+).", "hanime is disabled. Please enable it in Settings first (18+).");
+        error.style.display = "block";
+        input.focus();
+        return;
+      }
+    }
+    closeDirectLinkModal();
+    openSeries(cls.series_url || url);
+    return;
+  }
+
+  // Not one of the known scraper sites -- try it as a generic direct link
+  // (a supported hoster embed page, or a raw .m3u8 HLS master playlist).
+  // MediaForge fetches the available quality variants first so the user can
+  // pick one, instead of just guessing "best" (see GitHub issue #8).
+  startDirectLinkProbe((cls && cls.url) || url);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

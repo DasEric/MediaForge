@@ -157,6 +157,7 @@ async function loadCineinfoSettings() {
     if (hRatingEl) hRatingEl.checked = d.show_hover_rating === "1";
     if (hGenresEl) hGenresEl.checked = d.show_hover_genres === "1";
     if (hFskEl) hFskEl.checked = d.show_hover_fsk === "1";
+    _loadPillOrder(d.provider_order || "");
     if (advancedSearchEl) {
       advancedSearchEl.checked = d.advanced_search === "1";
       const sidebarAdvancedSearch = document.getElementById("sidebarAdvancedSearch");
@@ -1389,6 +1390,130 @@ function _startMediascanPoll() {
   }, 1500);
 }
 
+// ─── CineInfo provider order (pill chain) ────────────────────────────────
+// Which source may show its provider pill on a card / in the detail modal
+// first: TMDB, Crunchyroll, Fernsehserien.de — plus every module that
+// registered its own pill through registerProviderPill() (see
+// web/thirdparties/registry.py's provider_pill_script and static/app.js).
+// Those module resolvers are discovered live from window._providerPillResolvers,
+// so a newly installed module shows up in this list without any code change
+// here. The saved order is a preference, not a whitelist: a source the saved
+// order doesn't mention is still used, just after the ones that are listed
+// (see app.js's _pillSources()).
+const _PILL_BUILTIN_LABELS = {
+  tmdb: "TMDB",
+  crunchyroll: "Crunchyroll",
+  fernsehserien: "Fernsehserien.de",
+};
+
+let _pillOrder = [];
+
+function _pillLabel(id) {
+  if (_PILL_BUILTIN_LABELS[id]) return _PILL_BUILTIN_LABELS[id];
+  return id.startsWith("ext:") ? id.slice(4) : id;
+}
+
+function _knownPillIds() {
+  const ext = (window._providerPillResolvers || []).map(e => "ext:" + e.name);
+  return ["tmdb", "crunchyroll", "fernsehserien"].concat(ext);
+}
+
+function _loadPillOrder(raw) {
+  const known = _knownPillIds();
+  const configured = String(raw || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(s => s && known.indexOf(s) !== -1);
+  _pillOrder = configured.concat(known.filter(id => configured.indexOf(id) === -1));
+  _renderPillOrder();
+}
+
+function _renderPillOrder() {
+  const list = document.getElementById("cineinfoProviderOrderList");
+  if (!list) return;
+  list.innerHTML = "";
+  _pillOrder.forEach((id, idx) => {
+    const row = document.createElement("div");
+    row.className = "source-order-row";
+    row.setAttribute("draggable", "true");
+    row.dataset.pill = id;
+    row.innerHTML =
+      '<span class="source-drag-handle" title="' + t("Ziehen zum Sortieren", "Drag to reorder") + '" aria-hidden="true">' +
+        '<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><circle cx="7" cy="5" r="1.5"/><circle cx="13" cy="5" r="1.5"/><circle cx="7" cy="10" r="1.5"/><circle cx="13" cy="10" r="1.5"/><circle cx="7" cy="15" r="1.5"/><circle cx="13" cy="15" r="1.5"/></svg>' +
+      '</span>' +
+      '<span class="source-badge">' + (idx + 1) + '. ' + _pillLabel(id) +
+        (id.startsWith("ext:") ? ' <span class="mirror-active-badge">' + t("Modul", "Module") + '</span>' : '') +
+      '</span>' +
+      '<div class="source-order-actions">' +
+        '<button type="button" class="source-move-btn" title="' + t("Nach oben", "Move up") + '" ' + (idx === 0 ? "disabled" : "") + ' onclick="movePillSource(\'' + id + '\',-1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</button>' +
+        '<button type="button" class="source-move-btn" title="' + t("Nach unten", "Move down") + '" ' + (idx === _pillOrder.length - 1 ? "disabled" : "") + ' onclick="movePillSource(\'' + id + '\',1)">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</button>' +
+      '</div>';
+    _attachPillDnd(row);
+    list.appendChild(row);
+  });
+}
+
+let _dragPill = null;
+function _attachPillDnd(row) {
+  row.addEventListener("dragstart", (e) => {
+    _dragPill = row.dataset.pill;
+    row.classList.add("dragging");
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", _dragPill); } catch (err) {}
+  });
+  row.addEventListener("dragend", () => {
+    _dragPill = null;
+    row.classList.remove("dragging");
+    document.querySelectorAll("#cineinfoProviderOrderList .source-order-row.drag-over")
+      .forEach(r => r.classList.remove("drag-over"));
+  });
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
+    if (row.dataset.pill !== _dragPill) row.classList.add("drag-over");
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+  row.addEventListener("drop", (e) => {
+    e.preventDefault();
+    row.classList.remove("drag-over");
+    const target = row.dataset.pill;
+    if (!_dragPill || _dragPill === target) return;
+    const from = _pillOrder.indexOf(_dragPill);
+    const to = _pillOrder.indexOf(target);
+    if (from === -1 || to === -1) return;
+    _pillOrder.splice(from, 1);
+    _pillOrder.splice(to, 0, _dragPill);
+    _renderPillOrder();
+    _savePillOrder();
+  });
+}
+
+function movePillSource(id, dir) {
+  const i = _pillOrder.indexOf(id);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= _pillOrder.length) return;
+  const tmp = _pillOrder[i]; _pillOrder[i] = _pillOrder[j]; _pillOrder[j] = tmp;
+  _renderPillOrder();
+  _savePillOrder();
+}
+
+async function _savePillOrder() {
+  try {
+    const resp = await fetch("/api/settings/cineinfo", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider_order: _pillOrder.join(",") }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, "error"); return; }
+    showToast("✓ " + t("Provider-Reihenfolge gespeichert", "Provider order saved"));
+  } catch (e) {
+    showToast(t("Konnte nicht gespeichert werden: ", "Could not be saved: ") + e.message, "error");
+  }
+}
 
 
 // == Third Party Plugins ==

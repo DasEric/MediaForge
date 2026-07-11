@@ -495,6 +495,38 @@ def get_thirdparty(item_id):
     return None
 
 
+def unregister_module(name):
+    """Remove every trace of thirdparties/<name>/ from the registry, live.
+
+    The counterpart of a module's register_thirdparty() call(s): its sidebar
+    link, settings card, dashboard widget and provider-pill script all come out
+    of _ITEMS, so dropping its entries here makes the module disappear from the
+    UI on the very next request — no restart, no template change. The recorded
+    folder status (_MODULES) goes too, so the Modulmanager stops listing it and
+    a later rescan would treat the folder as brand new again if it reappeared.
+
+    Returns the blueprint names the removed items owned. Flask cannot
+    *un*register a blueprint on a running app, so the caller (see
+    web/thirdparties/__init__.py's uninstall_module_live()) uses those names to
+    404 whatever routes are left behind until the next restart.
+
+    Purely a registry operation: it does not touch the module's files, settings
+    or hooks -- uninstall_module_live() orchestrates all of that.
+    """
+    global _ITEMS
+
+    entry = _MODULES.get(name) or {}
+    ids = set(entry.get("item_ids") or ())
+    blueprints = {
+        item.get("blueprint")
+        for item in _ITEMS
+        if item["id"] in ids and item.get("blueprint")
+    }
+    _ITEMS = [item for item in _ITEMS if item["id"] not in ids]
+    _MODULES.pop(name, None)
+    return sorted(blueprints)
+
+
 def item_ids():
     """Current snapshot of registered item ids. Used by
     web/thirdparties/__init__.py's discover_and_register() to diff

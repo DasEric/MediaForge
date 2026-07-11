@@ -2,6 +2,9 @@
 {% import "_settings_card_macro.html" as ext %}
 {% block styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='settings_rows.css') }}">
+{# sources.css carries the drag-and-drop order-row styles reused by the
+   CineInfo provider-order list below (same rows as Settings › Sources). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='sources.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='integrations.css') }}">{% endblock %}
 {% block content %}
 <div class="settings-container">
@@ -465,6 +468,15 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+      </div>
+
+      <!-- ── Provider-Reihenfolge (Pill-Chain) ── -->
+      <div class="settings-row" style="display:block;">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Provider order') }}</div>
+          <div class="settings-row-desc">{{ _('Which source may show its provider pill first. The first source that knows the title wins; the others are skipped. Modules that register their own pill appear here automatically.') }}</div>
+        </div>
+        <div class="source-order-list" id="cineinfoProviderOrderList" style="margin-top:10px;"></div>
       </div>
 
       <div class="settings-row">
