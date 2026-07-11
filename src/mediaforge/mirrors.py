@@ -209,7 +209,7 @@ def _active_index(site, count):
             return 0
         if st["idx"] and now - st["ts"] > _PRIMARY_RETRY_AFTER:
             _active.pop(site, None)
-            logger.info("[Mirrors] %s: retrying primary host again", site)
+            logger.debug("[Mirrors] %s: retrying primary host again", site)
             return 0
         return min(st["idx"], max(count - 1, 0))
 
@@ -319,7 +319,7 @@ def request_with_failover(session, method, url, **kwargs):
             last_exc = exc
             if is_last:
                 break
-            logger.warning(
+            logger.debug(
                 "[Mirrors] %s: host %s unreachable (%s) — trying next mirror",
                 cand_site, urlsplit(cand_url).hostname, exc,
             )
@@ -327,7 +327,7 @@ def request_with_failover(session, method, url, **kwargs):
             continue
 
         if resp.status_code in _FAILOVER_STATUSES and not is_last:
-            logger.warning(
+            logger.debug(
                 "[Mirrors] %s: host %s answered HTTP %s — trying next mirror",
                 cand_site, urlsplit(cand_url).hostname, resp.status_code,
             )
