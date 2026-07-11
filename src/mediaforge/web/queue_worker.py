@@ -538,11 +538,12 @@ def _queue_worker():
                 _current_provider = None
                 _dead_providers = set()
 
-                for _hoster, attempt, _attempts_for_hoster in _attempt_plan:
+                for _plan_idx, (_hoster, attempt, _attempts_for_hoster) in enumerate(_attempt_plan):
+                    _last_attempt = _plan_idx == len(_attempt_plan) - 1
                     if _hoster in _dead_providers:
                         continue
                     if _hoster != _current_provider and _current_provider is not None:
-                        logger.warning(
+                        logger.debug(
                             f"[Provider-Fallback] {ep_url}: '{_current_provider}' failed — "
                             f"switching to '{_hoster}'"
                         )
@@ -677,9 +678,12 @@ def _queue_worker():
                         if _is_provider_unavailable_error(e):
                             # This hoster isn't offered for this episode at all —
                             # retrying it is pointless, so drop it and let the
-                            # chain move straight on to the next hoster.
+                            # chain move straight on to the next hoster. Debug:
+                            # a site not offering every hoster for every episode
+                            # is normal, and at warning level this alone would
+                            # print several lines per episode.
                             _dead_providers.add(_hoster)
-                            logger.warning(
+                            logger.debug(
                                 f"Episode {ep_url}: provider '{_hoster}' not available "
                                 f"for this episode: {e}"
                             )
@@ -690,10 +694,16 @@ def _queue_worker():
                                 f"(attempt {attempt}/{_attempts_for_hoster}), retrying in {delay}s: {e}"
                             )
                             time.sleep(delay)
+                        elif not _last_attempt:
+                            logger.debug(
+                                f"Episode {ep_url} failed with provider '{_hoster}' after "
+                                f"{_attempts_for_hoster} attempt(s), trying the next provider: {e}"
+                            )
                         else:
                             logger.error(
-                                f"Episode {ep_url} failed with provider '{_hoster}' after "
-                                f"{_attempts_for_hoster} attempt(s): {e}"
+                                f"Episode {ep_url} failed with every provider "
+                                f"({', '.join(dict.fromkeys(p for p, _a, _b in _attempt_plan))}) "
+                                f"— last error from '{_hoster}': {e}"
                             )
                     # Check skip flag after each attempt (success or fail)
                     if consume_episode_skip(item["id"]):
