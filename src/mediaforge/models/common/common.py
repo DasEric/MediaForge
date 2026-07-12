@@ -227,10 +227,20 @@ def _get_encoder_label():
     return ""
 
 
-def clean_title(title: str) -> str:
-    """Clean a string to make it safe for use as a filename."""
+def clean_title(title) -> str:
+    """Clean a string to make it safe for use as a filename.
+
+    Tolerates None. It gets fed whatever a page scrape produced, and a scrape produces
+    None whenever the markup didn't match — a blocked page, a captcha wall, a layout
+    change upstream. Blowing up in here turned that ordinary situation into
+    ``TypeError: argument of type 'NoneType' is not iterable`` from deep inside
+    html.unescape(), five frames below anything that knows what a series is. A
+    filename sanitiser has no business being the thing that reports a failed fetch.
+    """
+    if not title:
+        return ""
     # Unescape HTML entities first (e.g. &amp; → &) before stripping forbidden chars
-    return FORBIDDEN_CHARS.sub("", _html_unescape(title)).strip()
+    return FORBIDDEN_CHARS.sub("", _html_unescape(str(title))).strip()
 
 
 def check_downloaded(episode_path):

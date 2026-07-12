@@ -404,9 +404,29 @@ def _run_autosync_for_job(job, force_notify=False):
                 cp_path = Path.home() / cp_path
             scan_roots.append(cp_path)
 
-        title_clean = (
-            getattr(series, "title_cleaned", None) or getattr(series, "title", "")
-        ).lower()
+        # If the series page didn't parse, stop here — do not sync "nothing".
+        #
+        # A title of None means the markup had no series-title block: the site served a
+        # captcha, a block page, an error page, or changed its layout. The episode list
+        # scraped from that same page is then empty too — and an empty episode list is
+        # indistinguishable, further down, from "this series genuinely has no new
+        # episodes". The run would end in the success path, clear last_error, reset the
+        # new-episode counter and record a clean last_check. A blocked fetch would look
+        # exactly like being up to date, which is the worst thing a sync can do quietly.
+        #
+        # So: say what happened, in a sentence that names the likely cause, and let the
+        # normal error handling retry it next cycle.
+        series_title = getattr(series, "title", None)
+        if not series_title:
+            # The provider already worked out *why* while it still had the evidence (status
+            # code, body, the page itself) — see AniworldSeries.page_problem. Repeating a
+            # vaguer version of that here would mean the user reads "could not read the
+            # series page" in the job card while the log knows it was an HTTP 503.
+            problem = (getattr(series, "page_problem", None)
+                       or "could not read the series page (no title in the response)")
+            raise RuntimeError(f"{problem} — sync skipped, not treated as 'no new episodes'")
+
+        title_clean = (getattr(series, "title_cleaned", "") or series_title).lower()
         ep_re = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
 
         # mtime-based scan cache: {base_path_str -> (mtime, downloaded_eps_set)}
@@ -590,24 +610,78 @@ def _run_autosync_for_job(job, force_notify=False):
         # Transient network errors (timeout, connection refused, DNS) are
         # expected occasionally and should not count as retryable failures.
         # Log as WARNING without traceback and skip retry-count increment.
+        #
+        # "could not read the series page" belongs in that same category, and this is why:
+        # it fires when the site hands back something that isn't the series page — an
+        # outage, a maintenance page, a rate limit after a burst of jobs, a bot check. All
+        # of those pass on their own. Counting them as real failures would burn through the
+        # retry budget of every job in one bad sync cycle and start firing error
+        # notifications about a site that was simply busy for a minute. The job still gets
+        # its error text and still gets retried; it just doesn't get punished for weather.
         _net_keywords = ("ReadTimeout", "ConnectTimeout", "ConnectionError",
                          "TimeoutError", "timed out", "timeout", "ConnectionRefused",
-                         "RemoteDisconnected", "NameResolutionError")
+                         "RemoteDisconnected", "NameResolutionError",
+                         # …and the site telling us, in its own words, that it is not
+                         # available right now. See AniworldSeries.__diagnose(): these are
+                         # the phrases it produces for an outage, a rate limit or a bot
+                         # wall. A layout change is deliberately NOT in this list — that
+                         # one is our bug and should be shouted about, not shrugged off.
+                         "is down or in maintenance", "rate-limiting us", "bot check",
+                         "empty response", "refused the request",
+                         "could not read the series page")
         _is_transient = any(kw.lower() in type(e).__name__.lower() or kw.lower() in str(e).lower()
                             for kw in _net_keywords)
+
+        # What telemetry gets to know. "error_type: RuntimeError" was true and told us
+        # nothing: it could not distinguish "aniworld was down for a minute" from "their
+        # layout changed and our parser is broken for everybody" — and those two want very
+        # different reactions from us. So we send the *class* of failure and the HTTP status
+        # instead, both derived from the message, never the message itself.
+        #
+        # Never the message itself, because it can contain a series URL, and never the job
+        # title, because that is what the user is watching. A failure class and a status
+        # code say everything we need and nothing about the person.
+        _err_text = str(e).lower()
+        if "layout" in _err_text:
+            _failure = "layout_changed"        # our bug — the one worth paging about
+        elif "is down or in maintenance" in _err_text or "empty response" in _err_text:
+            _failure = "site_down"
+        elif "rate-limiting" in _err_text:
+            _failure = "rate_limited"
+        elif "bot check" in _err_text:
+            _failure = "bot_wall"
+        elif "does not exist" in _err_text:
+            _failure = "series_gone"
+        elif _is_transient:
+            _failure = "network"
+        else:
+            _failure = "other"
+
+        _status_match = re.search(r"HTTP (\d{3})", str(e))
+        _telemetry_meta = {
+            "error_type": type(e).__name__,
+            "failure": _failure,
+            "provider": job.get("provider") or "aniworld",
+        }
+        if _status_match:
+            _telemetry_meta["http_status"] = int(_status_match.group(1))
+
         if _is_transient:
             logger.warning(
-                "Auto-sync network error for '%s' (transient, will retry next cycle): %s",
-                job.get("title", "?"), e,
+                "Auto-sync error for '%s' (%s, transient — will retry next cycle): %s",
+                job.get("title", "?"), _failure, e,
             )
             update_autosync_job(
                 job["id"],
                 last_check=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                last_error=f"[Netzwerkfehler] {e}",
+                # The user gets the plain sentence, not a category and not a stack trace:
+                # "aniworld.to is down or in maintenance (HTTP 503)" is something you can
+                # act on (wait), which "[Netzwerkfehler] RuntimeError" is not.
+                last_error=str(e),
             )
             telemetry_client.submit(telemetry_events.build_feature_detail_event(
                 "detail.autosync", action="run", status="transient_error",
-                metadata={"error_type": type(e).__name__},
+                metadata=_telemetry_meta,
             ))
         else:
             logger.error("Auto-sync failed for '%s': %s", job.get("title", "?"), e, exc_info=True)
@@ -624,7 +698,7 @@ def _run_autosync_for_job(job, force_notify=False):
             )
             telemetry_client.submit(telemetry_events.build_feature_detail_event(
                 "detail.autosync", action="run", status="failed",
-                metadata={"error_type": type(e).__name__},
+                metadata=dict(_telemetry_meta, retry_count=new_retry),
             ))
 
         # Only send error notifications for non-transient failures

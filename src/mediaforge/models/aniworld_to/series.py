@@ -76,6 +76,8 @@ class AniworldSeries:
         self.__season_count = None
 
         self.__html = None
+        self.__http_status = None   # set by _html; reported when a parse fails
+        self.__page_problem = None  # set by __extract_title() when it gives up; see page_problem
 
         logger.debug(f"Initialized {self.url}")
 
@@ -98,6 +100,10 @@ class AniworldSeries:
         if self.__html is None:
             logger.debug(f"fetching ({self.url})...")
             resp = GLOBAL_SESSION.get(self.url)
+            # Kept so a parse failure can say whether we were even served the page. A
+            # scraper that reports "no title" without saying "…and by the way, that was a
+            # 403 of 1.2 KB" is making you guess at the one thing it knows.
+            self.__http_status = getattr(resp, "status_code", None)
             self.__html = resp.text
         return self.__html
 
@@ -227,20 +233,150 @@ class AniworldSeries:
 
         html = self._html
 
-        start = html.find('<div class="series-title">')
-        if start == -1:
+        # Four strategies, most specific first. The old code had one, and it was
+        # ``html.find('<div class="series-title">')`` — an exact substring match against a
+        # tag. That holds until the day the site adds an attribute, a second CSS class or
+        # a line break inside that tag, and then it returns -1 for *every series at once*.
+        # Which is what happened: the title came back None across the board, and the
+        # damage surfaced three modules away as a TypeError inside html.unescape().
+        #
+        # A scraper cannot be robust against a site that changes; it can be robust against
+        # a site that changes *a little*. So: match the tag with a pattern that survives
+        # extra attributes, and keep fallbacks for when the block moves entirely.
+        for name, extractor in (
+            ("series-title block", self.__title_from_block),
+            ("h1[itemprop=name]", self.__title_from_h1),
+            ("og:title", self.__title_from_og),
+        ):
+            title = extractor(html)
+            if title:
+                if name != "series-title block":
+                    # Not fatal, but somebody should know the primary path is dead.
+                    logger.warning(
+                        "AniWorld: the series-title block did not match — fell back to %s "
+                        "for %s. The site's markup has probably changed; the title may be "
+                        "less accurate until the parser is updated.", name, self.url)
+                return title
+
+        # Nothing matched. Work out *why*, here, where the evidence is — the status code,
+        # the body, the page itself. An outage, a rate limit and a layout change all look
+        # identical from the outside ("title is None") and have three different fixes, and
+        # the person reading the job card should not have to go and find out which.
+        self.__page_problem = self.__diagnose(html)
+        snippet = " ".join((html or "")[:300].split())
+        logger.error("AniWorld: %s (%s) — HTTP %s, %d bytes. First 300 chars: %s",
+                     self.__page_problem, self.url, self.__http_status, len(html or ""),
+                     snippet or "<empty body>")
+        return None
+
+    # Signs that we were handed a wall rather than a page.
+    _BLOCK_SIGNS = ("just a moment", "checking your browser", "cf-browser-verification",
+                    "captcha", "attention required", "access denied", "ddos-guard",
+                    "rate limit", "too many requests")
+
+    def __diagnose(self, html) -> str:
+        """One sentence naming the actual problem — this is what ends up in the UI.
+
+        "Could not read the series page" is true and useless. "aniworld.to is down (HTTP
+        503)" tells you to go and do something else for ten minutes, and that difference is
+        the whole point of a message.
+        """
+        status = self.__http_status
+        body = (html or "").strip()
+        low = body.lower()
+
+        # Status first, body second: a 503 with an empty body is a 503, and saying so is
+        # more useful than reporting the symptom ("empty response") and leaving the reader
+        # to guess whether that means down, blocked or broken.
+        if status and status >= 500:
+            return (f"aniworld.to is down or in maintenance (HTTP {status})"
+                    + ("" if body else " — empty response"))
+        if not body:
+            return (f"aniworld.to returned an empty response (HTTP {status}) — the host is not "
+                    "responding")
+        if status == 429 or "too many requests" in low or "rate limit" in low:
+            return "aniworld.to is rate-limiting us (too many requests) — it will pass on its own"
+        if status == 403 or any(sign in low for sign in self._BLOCK_SIGNS):
+            return "aniworld.to served a bot check / block page instead of the series"
+        if status == 404:
+            return "aniworld.to says this series does not exist (HTTP 404) — the URL may have changed"
+        if status and status >= 400:
+            return f"aniworld.to refused the request (HTTP {status})"
+        # 200 OK, real body, no title anywhere: now it really is on us.
+        return ("the page loaded but contains no title in any known form — AniWorld's layout "
+                "has probably changed and the parser needs updating")
+
+    @property
+    def page_problem(self):
+        """Why the last parse failed, in a sentence, or None if nothing went wrong.
+
+        Set by __extract_title(); read by callers (see web/autosync_worker.py) that would
+        otherwise have to invent their own, vaguer, explanation.
+        """
+        return self.__page_problem
+
+    # -- title strategies ---------------------------------------------------
+    # Each returns a cleaned-up string, or None if its markup isn't there.
+
+    _SERIES_TITLE_BLOCK = re.compile(
+        r'<div[^>]*\bclass\s*=\s*["\'][^"\']*\bseries-title\b[^"\']*["\'][^>]*>(.*?)</div>',
+        re.IGNORECASE | re.DOTALL)
+    _H1_NAME = re.compile(
+        r'<h1[^>]*\bitemprop\s*=\s*["\']name["\'][^>]*>(.*?)</h1>',
+        re.IGNORECASE | re.DOTALL)
+    _ANY_H1 = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+    _FIRST_SPAN = re.compile(r"<span[^>]*>(.*?)</span>", re.IGNORECASE | re.DOTALL)
+    _OG_TITLE = re.compile(
+        r'<meta[^>]*\bproperty\s*=\s*["\']og:title["\'][^>]*\bcontent\s*=\s*["\'](.*?)["\']',
+        re.IGNORECASE)
+    _TAGS = re.compile(r"<[^>]+>")
+
+    @staticmethod
+    def __text(fragment):
+        """Tags out, entities decoded, whitespace collapsed."""
+        if not fragment:
             return None
+        text = unescape(AniworldSeries._TAGS.sub(" ", fragment))
+        text = " ".join(text.split())
+        return text or None
 
-        span_start = html.find("<span>", start)
-        span_end = html.find("</span>", span_start)
-
-        if span_start == -1 or span_end == -1:
+    @classmethod
+    def __title_from_block(cls, html):
+        block = cls._SERIES_TITLE_BLOCK.search(html)
+        if not block:
             return None
+        inner = block.group(1)
+        # The title sits in the first <span> of the block's <h1>; fall back to the whole
+        # h1, then to the block itself, in case the span is gone but the block isn't.
+        h1 = cls._ANY_H1.search(inner)
+        if h1:
+            span = cls._FIRST_SPAN.search(h1.group(1))
+            return cls.__text(span.group(1) if span else h1.group(1))
+        span = cls._FIRST_SPAN.search(inner)
+        return cls.__text(span.group(1) if span else inner)
 
-        title = html[span_start + len("<span>") : span_end].strip()
-        title = unescape(title)
+    @classmethod
+    def __title_from_h1(cls, html):
+        h1 = cls._H1_NAME.search(html)
+        if not h1:
+            return None
+        span = cls._FIRST_SPAN.search(h1.group(1))
+        return cls.__text(span.group(1) if span else h1.group(1))
 
-        return title
+    @classmethod
+    def __title_from_og(cls, html):
+        # Last resort, and the least trustworthy: og:title carries site branding on many
+        # pages ("Title - Anime online ansehen | AniWorld"). Cut the branding, keep the
+        # part before it — a title with a colon in it (there are plenty) must survive, so
+        # only " - " and " | " with surrounding spaces count as separators.
+        meta = cls._OG_TITLE.search(html)
+        text = cls.__text(meta.group(1)) if meta else None
+        if not text:
+            return None
+        for sep in (" | ", " - "):
+            if sep in text:
+                text = text.split(sep, 1)[0].strip()
+        return text or None
 
     def __extract_description(self):
         """Extract the full (unclamped) description from the data-full-description attribute. Sample markup:
