@@ -4056,6 +4056,7 @@ CREATE TABLE IF NOT EXISTS devinfo_posts (
     title             TEXT,
     body              TEXT,
     type              TEXT,
+    author            TEXT,
     remote_created_at TEXT,
     fetched_at        INTEGER
 )
@@ -4068,6 +4069,12 @@ def init_devinfos_db():
     conn = get_db()
     try:
         conn.execute(_CREATE_DEVINFO_TABLE)
+        # Migration: add author column for existing DBs (this table predates the
+        # devInfo server exposing who wrote each post via /api/posts).
+        try:
+            conn.execute("ALTER TABLE devinfo_posts ADD COLUMN author TEXT")
+        except Exception:
+            pass  # column already exists
         conn.commit()
     finally:
         conn.close()
@@ -4079,7 +4086,7 @@ def replace_devinfo_posts(posts):
     Small, low-frequency dataset fetched wholesale from the remote server, so
     a clear-and-reinsert transaction is simpler and just as correct as an
     upsert-by-id. ``posts`` is a list of dicts with keys: id, title, body,
-    type, remote_created_at (already mapped from the remote payload's
+    type, author, remote_created_at (already mapped from the remote payload's
     ``created_at`` by the caller).
     """
     import time as _t
@@ -4090,13 +4097,14 @@ def replace_devinfo_posts(posts):
         for p in posts or []:
             conn.execute(
                 "INSERT OR REPLACE INTO devinfo_posts "
-                "(id, title, body, type, remote_created_at, fetched_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "(id, title, body, type, author, remote_created_at, fetched_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(p.get("id")),
                     p.get("title"),
                     p.get("body"),
                     p.get("type"),
+                    p.get("author"),
                     p.get("remote_created_at"),
                     now,
                 ),
@@ -4111,7 +4119,7 @@ def get_devinfo_posts():
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT id, title, body, type, remote_created_at, fetched_at "
+            "SELECT id, title, body, type, author, remote_created_at, fetched_at "
             "FROM devinfo_posts ORDER BY remote_created_at DESC, fetched_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]

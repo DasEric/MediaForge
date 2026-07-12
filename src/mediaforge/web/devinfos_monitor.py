@@ -69,6 +69,7 @@ def _devinfos_fetch_and_store():
                 "title": rp.get("title"),
                 "body": rp.get("body"),
                 "type": rp.get("type"),
+                "author": rp.get("author"),
                 "remote_created_at": rp.get("created_at"),
             })
         replace_devinfo_posts(posts)

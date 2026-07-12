@@ -55,7 +55,10 @@
         '<div class="devinfo-card" data-type="' + escapeHtml(type) + '">' +
           '<div class="devinfo-card-head">' +
             '<span class="devinfo-tag devinfo-tag-' + escapeHtml(type) + '">' + typeLabel(type) + '</span>' +
-            '<span class="devinfo-time">' + escapeHtml(post.remote_created_at || "") + '</span>' +
+            '<span class="devinfo-meta">' +
+              (post.author ? '<span class="devinfo-author">' + escapeHtml(post.author) + '</span>' : '') +
+              '<span class="devinfo-time">' + escapeHtml(post.formatted_time || post.remote_created_at || "") + '</span>' +
+            '</span>' +
           '</div>' +
           '<h3 class="devinfo-title">' + escapeHtml(post.title) + '</h3>' +
           '<div class="devinfo-body devinfo-markdown">' + (post.body_html != null ? post.body_html : escapeHtml(post.body)) + '</div>' +

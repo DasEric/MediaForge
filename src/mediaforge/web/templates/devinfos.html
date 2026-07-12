@@ -25,7 +25,10 @@
             {% else %}{{ _('Announcement') }}
             {% endif %}
           </span>
-          <span class="devinfo-time" data-ts="{{ post.remote_created_at or '' }}">{{ post.remote_created_at or '' }}</span>
+          <span class="devinfo-meta">
+            {% if post.author %}<span class="devinfo-author">{{ post.author }}</span>{% endif %}
+            <span class="devinfo-time" data-ts="{{ post.remote_created_at or '' }}">{{ post.formatted_time or post.remote_created_at or '' }}</span>
+          </span>
         </div>
         <h3 class="devinfo-title">{{ post.title }}</h3>
         <div class="devinfo-body devinfo-markdown">{{ post.body_html|default(post.body, true)|safe }}</div>
