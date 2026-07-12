@@ -92,7 +92,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from . import PENDING_DIR, pending_changes, stage_removal
+from . import PENDING_DIR, RESERVED_NAMES, modules_dir, pending_changes, stage_removal
 from .registry import (
     REGISTRY_API_VERSION, check_api_compatibility, check_app_compatibility,
     module_entries,
@@ -623,7 +623,16 @@ def install(module_id: str, force: bool = False) -> dict:
         # guarantee to the unverified one.
         return {"ok": False, "error": f"{entry['trust']} module without sha256 — refused"}
 
-    pending_root = Path(__file__).parent / PENDING_DIR
+    # A folder name that would collide with this package's own submodules must never
+    # reach the disk — see RESERVED_NAMES. Checked here as well as at discovery,
+    # because "refused at install" is a message an admin can act on, while "installed
+    # but silently ignored forever" is not.
+    if entry["folder"] in RESERVED_NAMES:
+        return {"ok": False,
+                "error": f"'{entry['folder']}' is a reserved name in MediaForge's module "
+                         f"system and cannot be installed"}
+
+    pending_root = modules_dir() / PENDING_DIR
     try:
         staged = _safe_extract(data, entry["folder"], pending_root)
     except Exception as exc:
@@ -676,7 +685,7 @@ def uninstall(folder: str) -> dict:
     folder = (folder or "").strip()
     if not folder or folder.startswith("_") or "/" in folder or "\\" in folder:
         return {"ok": False, "error": "invalid module folder"}
-    if not (Path(__file__).parent / folder).is_dir():
+    if not (modules_dir() / folder).is_dir():
         return {"ok": False, "error": f"no such module folder: {folder}"}
     try:
         stage_removal(folder)
@@ -692,7 +701,7 @@ def cancel_pending() -> dict:
     button next to the restart-required banner. Deletes _pending/ entirely,
     which is safe precisely because nothing in it is live yet.
     """
-    pending_root = Path(__file__).parent / PENDING_DIR
+    pending_root = modules_dir() / PENDING_DIR
     try:
         if pending_root.is_dir():
             shutil.rmtree(pending_root)

@@ -33,6 +33,7 @@ is configurable, and neither can promote anything to Official.
 from flask import jsonify, render_template, request
 
 from ..thirdparties import (
+    MODULES_DIR,
     install_staged_live,
     pending_changes,
     rescan_new_modules,
@@ -53,6 +54,11 @@ def _page_context():
         "extra_urls": module_store.extra_urls(),
         "allow_unverified": module_store.allow_unverified(),
         "pending": pending_changes(),
+        # Where modules actually live now — outside the source tree, next to the
+        # database and image_cache. Worth showing: "drop a folder here" is the whole
+        # manual-install procedure, and an admin should not have to read the source to
+        # find out where "here" is.
+        "modules_dir": str(MODULES_DIR),
         # Read-only: the keys this *build* ships (thirdparties/trusted_keys.py). Shown
         # so an admin can see why a module is (or isn't) official — not so they can
         # change it. There is deliberately no route that writes this list; a trust root

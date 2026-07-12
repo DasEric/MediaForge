@@ -150,9 +150,95 @@ from .registry import (
     purge_module_settings, get_thirdparty, module_entry, unregister_module,
 )
 from .signing import verify_module
+from ...config import MEDIAFORGE_CONFIG_DIR
 from ...logger import get_logger
 
 logger = get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Where modules live: NOT in here.
+#
+# This package (web/thirdparties/) is core code — registry.py, store.py,
+# signing.py, trusted_keys.py — and it ships inside MediaForge, wherever that
+# happens to be installed: a virtualenv's site-packages, a PyInstaller bundle, a
+# git checkout. Installed modules have no business in any of those. They are the
+# user's data, like image_cache/ and the database, and they belong where the rest
+# of the user's data already is:
+#
+#     ~/.mediaforge/thirdparties/<module>/
+#     ~/.mediaforge/thirdparties/_pending/     (staged installs, see below)
+#
+# Which means: a module survives reinstalling MediaForge, a developer can drop a
+# folder in there without touching the source tree, and pip never has an opinion
+# about it.
+#
+# The trick that makes this cost nothing: the modules stay *members of this
+# package*. Appending the data directory to __path__ means
+# `mediaforge.web.thirdparties.mediacalendar` is found there, while the module's
+# own `from ..registry import register_thirdparty` and `from ....logger import
+# get_logger` keep resolving exactly as before — because its package is still
+# this one. Not a single existing module needs a line changed.
+#
+# Core stays FIRST in __path__ on purpose: a folder in the data directory called
+# "registry" or "store" must never be able to shadow the real thing. Discovery
+# refuses those names outright (RESERVED_NAMES) rather than relying on the
+# ordering alone, but defence in depth is cheap here.
+# ---------------------------------------------------------------------------
+MODULES_DIR = Path(MEDIAFORGE_CONFIG_DIR) / "thirdparties"
+
+# Names a module folder may not have: they are this package's own submodules, and
+# a module allowed to take one would either shadow core code or be shadowed by it.
+# Both outcomes are silent and awful, so an install under one of these names is
+# refused (see store.py) and a folder already sitting there is skipped, loudly.
+RESERVED_NAMES = frozenset({"registry", "store", "signing", "trusted_keys"})
+
+
+def modules_dir() -> Path:
+    """The directory installed modules live in, created if missing.
+
+    Every path in this file goes through here rather than Path(__file__).parent —
+    that was the old home, and it was the wrong one.
+    """
+    try:
+        MODULES_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        logger.exception("[Thirdparties] Could not create %s", MODULES_DIR)
+    return MODULES_DIR
+
+
+# Make it part of this package's search path. Import time, before any submodule is
+# imported, or an already-imported package would keep the old path.
+if str(MODULES_DIR) not in __path__:
+    __path__.append(str(MODULES_DIR))
+
+
+def discovered_module_names(package_dir=None) -> list:
+    """Folder names in the modules directory that are candidates for import.
+
+    The one place that decides what counts as a module folder, so every scan in
+    this file agrees. Skips ``_pending``/``_remove.txt`` (anything starting with an
+    underscore) and refuses RESERVED_NAMES loudly — a module folder called
+    "registry" would be a genuinely baffling thing to debug, so it gets a log line
+    rather than a silent skip.
+
+    Note what is NOT scanned: this package's own directory in the source tree. A
+    module folder dropped in there is ignored by design — modules live in the data
+    directory, one place, whether they were installed by the store or copied in by
+    hand.
+    """
+    package_dir = Path(package_dir or modules_dir())
+    names = []
+    for _finder, name, is_pkg in pkgutil.iter_modules([str(package_dir)]):
+        if not is_pkg or name.startswith("_"):
+            continue
+        if name in RESERVED_NAMES:
+            logger.error(
+                "[Thirdparties] Ignoring '%s': that name belongs to MediaForge's own "
+                "module system (%s). Rename the folder.",
+                name, ", ".join(sorted(RESERVED_NAMES)))
+            continue
+        names.append(name)
+    return sorted(names)
 
 # Successfully imported module objects, keyed by folder name -- kept so the
 # lifecycle hooks (on_enable/on_disable, fired from registry.py's generic
@@ -213,7 +299,7 @@ def apply_pending_changes() -> dict:
     request" -- exactly here. The store client downloads into _pending/ and
     tells the admin a restart is needed; this is the other half of that.
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     pending_dir = package_dir / PENDING_DIR
     result = {"installed": [], "removed": [], "failed": []}
     if not pending_dir.is_dir():
@@ -304,7 +390,7 @@ def stage_removal(name: str) -> None:
     its files out from under it mid-request is a good way to produce a very
     confusing traceback.
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     pending_dir = package_dir / PENDING_DIR
     pending_dir.mkdir(exist_ok=True)
     manifest = pending_dir / REMOVE_MANIFEST
@@ -326,7 +412,7 @@ def pending_changes() -> dict:
     (in which case _pending/ is empty again and the banner disappears on its
     own).
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     pending_dir = package_dir / PENDING_DIR
     out = {"install": [], "remove": []}
     if not pending_dir.is_dir():
@@ -462,7 +548,7 @@ def discover_translation_dirs() -> list:
     app.py can call this *before* ``Babel.init_app()``, which is when
     Flask-Babel reads that config and it's too late to change afterwards.
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     dirs = []
     for entry in sorted(package_dir.iterdir()):
         if not entry.is_dir() or entry.name.startswith("_"):
@@ -526,7 +612,7 @@ def _import_folders(names: list) -> dict:
     for this part. An import failure is logged and that folder is left out
     of the returned dict entirely (:func:`_resolve_load_order` never sees
     it, so nothing can depend on it)."""
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     modules = {}
     for name in names:
         try:
@@ -695,11 +781,7 @@ def discover_and_register(app) -> None:
     is what rescan_new_modules() is for instead -- it never touches an
     already-registered folder.
     """
-    package_dir = Path(__file__).parent
-    names = sorted(
-        name for _finder, name, is_pkg in pkgutil.iter_modules([str(package_dir)])
-        if is_pkg and not name.startswith("_")
-    )
+    names = discovered_module_names()
     modules = _import_folders(names)
     _register_modules(app, modules, set())
 
@@ -751,7 +833,7 @@ def rescan_new_modules(app) -> list:
     if nothing new was found, or everything new failed to import/register
     -- check the Extensions overview page for why).
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     # Without this, a folder copied in after the process started can stay
     # invisible to pkgutil.iter_modules() indefinitely: Python's import
     # machinery caches each directory's listing (importlib.machinery.
@@ -763,10 +845,7 @@ def rescan_new_modules(app) -> list:
     # exactly that case, every time this is called.
     importlib.invalidate_caches()
     known = known_module_names()
-    names = sorted(
-        name for _finder, name, is_pkg in pkgutil.iter_modules([str(package_dir)])
-        if is_pkg and not name.startswith("_") and name not in known
-    )
+    names = [name for name in discovered_module_names(package_dir) if name not in known]
     if not names:
         return []
     modules = _import_folders(names)
@@ -810,7 +889,7 @@ def _add_module_translations(app, name) -> None:
     shape simply leaves the module untranslated, which is not worth failing an
     install over.
     """
-    tdir = Path(__file__).parent / name / "translations"
+    tdir = modules_dir() / name / "translations"
     if not tdir.is_dir():
         return
     try:
@@ -850,7 +929,7 @@ def install_staged_live(app, folder=None) -> dict:
     imported yet, so there is no window in which half a module is importable:
     rescan_new_modules() only looks at the folder after it is fully in place.
     """
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     pending_dir = package_dir / PENDING_DIR
     result = {"live": [], "staged": [], "failed": []}
     if not pending_dir.is_dir():
@@ -932,7 +1011,7 @@ def uninstall_module_live(app, name) -> dict:
         return {"ok": False, "error": "invalid module folder", "live": False,
                 "restart_required": False}
 
-    package_dir = Path(__file__).parent
+    package_dir = modules_dir()
     target = package_dir / name
     if not target.is_dir():
         return {"ok": False, "error": f"no such module folder: {name}", "live": False,

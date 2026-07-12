@@ -1,26 +1,59 @@
 # Third-party integrations — how the plug-in system works
 
-This document explains `src/mediaforge/web/thirdparties/`, MediaForge's
-plug-in system for optional, self-contained features (Crunchyroll-style
-external-API integrations, extra Discover pages, etc.). It also explains
-`example_integration/` next to this file — a complete, working, heavily
-commented reference implementation you can copy as a starting point.
+This document explains MediaForge's plug-in system for optional,
+self-contained features (Crunchyroll-style external-API integrations, extra
+Discover pages, etc.). It also explains `example_integration/` next to this
+file — a complete, working, heavily commented reference implementation you can
+copy as a starting point.
 
 Read this file top to bottom once; after that it should work as a checklist.
 
+## Where modules live
+
+**Not in the source tree.** Installed modules live in MediaForge's data
+directory, next to the database and the image cache:
+
+```
+~/.mediaforge/thirdparties/<your_module>/     # your module
+~/.mediaforge/thirdparties/_pending/          # staged installs, applied at the next start
+```
+
+(On Windows that is `C:\Users\<you>\.mediaforge\thirdparties\`.)
+
+This is the whole manual-install procedure: **drop the folder in there and
+restart.** The module store installs into exactly the same place — there is one
+directory, and both routes lead to it.
+
+`src/mediaforge/web/thirdparties/` is core code — `registry.py`, `store.py`,
+`signing.py`, `trusted_keys.py`, `__init__.py` — and nothing else. A module
+folder placed there is *ignored*: it would be inside MediaForge's program files,
+where it would be wiped by the next update and, in a pip install, would be
+sitting in `site-packages`. Your code is not part of MediaForge's installation.
+
+The two directories are stitched together by one line in
+`web/thirdparties/__init__.py`: the data directory is appended to the package's
+`__path__`. So your module is imported as
+`mediaforge.web.thirdparties.<your_module>` even though it lives outside the
+source tree — which is why `from ..registry import register_thirdparty` and
+`from ....logger import get_logger` work in your code exactly as they always
+have. Nothing about writing a module changed; only where it is put.
+
+Four folder names are refused, because they are the core files' own: `registry`,
+`store`, `signing`, `trusted_keys`.
+
 ## The contract, in one sentence
 
-Every folder under `src/mediaforge/web/thirdparties/` that contains an
-`__init__.py` exposing a `register(app)` function is imported and wired up
-automatically when the app starts. Nothing else in the codebase — not
-`app.py`, not `base.html`, not `integrations.html` — needs to change.
+Every folder under `~/.mediaforge/thirdparties/` that contains an `__init__.py`
+exposing a `register(app)` function is imported and wired up automatically when
+the app starts. Nothing else in the codebase — not `app.py`, not `base.html`,
+not `integrations.html` — needs to change.
 
 ## What "automatically" means, concretely
 
 At startup, `web/thirdparties/__init__.py`'s `discover_and_register(app)`:
 
-1. Lists every subfolder of `web/thirdparties/` (skipping ones starting
-   with `_`, so `__pycache__` etc. are ignored).
+1. Lists every subfolder of the module directory (skipping ones starting
+   with `_`, so `_pending` and `__pycache__` are ignored).
 2. Imports each one as a Python package and calls its `register(app)`.
 3. Registers one shared `/api/settings/thirdparty/<id>` GET/PUT pair that
    every integration's simple enable/disable toggle uses for free (see
@@ -39,7 +72,7 @@ file to edit, no import to add anywhere.
 ## Folder layout
 
 ```
-web/thirdparties/<your_integration>/
+~/.mediaforge/thirdparties/<your_integration>/
   __init__.py            # required — must define register(app)
   routes.py               # a Flask Blueprint with your pages/API routes
   service.py               # optional — your business logic / external API client
@@ -264,7 +297,7 @@ MODULE_ENABLED_DEFAULT = False
 All six are purely descriptive except `MODULE_ENABLED_DEFAULT` — they
 power the admin **Modulmanager** page (`/extensions`, linked from the
 sidebar as "Module Manager"), which shows every discovered
-`web/thirdparties/<name>/` folder with its name, description and author,
+`~/.mediaforge/thirdparties/<name>/` folder with its name, description and author,
 plus a fully working enable/disable toggle for whatever it registered
 (the exact same card — and the exact same toggle — that would otherwise
 only be reachable by finding its tab on Integrations or Notifications;
@@ -535,7 +568,7 @@ extension's resolver.
 
 ## Modulmanager (Extensions overview)
 
-Every discovered `web/thirdparties/<name>/` folder — including ones that
+Every discovered `~/.mediaforge/thirdparties/<name>/` folder — including ones that
 failed to import, have no `register(app)`, or were skipped for an unmet
 `DEPENDS_ON` or an unsupported MediaForge version — shows up on the admin
 **Module Manager** page (`/extensions`,
@@ -634,27 +667,30 @@ name interpolated into a label — the string still has to exist as a
 `msgid` in your `.po` file; `pybabel extract` would normally find these
 calls for you automatically if you scope a `babel.cfg` to your own folder
 (see the one next to this README) and run `pybabel extract -F
-src/mediaforge/web/thirdparties/<your_integration>/babel.cfg -o messages.pot
-src/mediaforge/web/thirdparties/<your_integration>`, then `pybabel update`
+~/.mediaforge/thirdparties/<your_integration>/babel.cfg -o messages.pot
+~/.mediaforge/thirdparties/<your_integration>`, then `pybabel update`
 against your `.po`. In practice, for a small integration, hand-editing the
 `.po` file directly (like `example_integration/translations/...` does) is
 usually faster than running the extract/update pipeline.
 
 ## Packaging
 
-`pyproject.toml`'s `[tool.setuptools.package-data]` and `MANIFEST.in`
-already contain recursive globs for `web/thirdparties/**` covering
-`*.py`, `*.html`, `*.css`, `*.js`, `*.po`, `*.mo`, and `babel.cfg`. A new
-integration folder is included in a built wheel/installer automatically —
-you don't need to add anything there either.
+Nothing to do. A module is not part of MediaForge's build any more: it lives in
+the data directory, so it is neither shipped in the wheel nor wiped by an
+update. To hand it to someone else, zip the folder as a `.mfmod` (see
+`MediaForge_Modulestore`'s `mfstore pack`) or upload it to the module store —
+which puts it in the same `~/.mediaforge/thirdparties/` on their machine.
 
 ## How to actually create a new integration
 
 1. Pick the closest-matching example from "Reference implementations, by
    pattern" above and copy *that* folder (next to this README) to
-   `src/mediaforge/web/thirdparties/<your_name>/` — `example_integration/`
+   `~/.mediaforge/thirdparties/<your_name>/` — `example_integration/`
    for anything with a real page, `example_attach_tab/` or
    `example_new_tab/` for a settings-only extension with no page.
+   (Developing from a git checkout? Symlink your working copy into
+   `~/.mediaforge/thirdparties/` — it is imported from wherever the link
+   points, and you keep editing in your repo.)
 2. Rename the Blueprint name (`"example_integration"` → `"<your_name>"`)
    everywhere it appears: `routes.py`'s `Blueprint(...)` call, every
    `url_for(...)` reference in the templates, `static_url_path`, and the

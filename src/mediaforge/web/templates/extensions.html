@@ -373,6 +373,20 @@
            ("add this key and my module shows up as Official"), and the badge would
            stop meaning anything at all. So this row exists to answer "why is that
            module official?" — not to change the answer. -->
+      <!-- Where modules live. Not a setting — a fact, and one an admin needs when
+           installing a module by hand or looking for one the store put there. -->
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">{{ _('Module folder') }}</div>
+          <div class="settings-row-desc">
+            {{ _('Installed modules live here, outside MediaForge\'s program files — next to your database and cache, so they survive an update. A module installed by hand is simply a folder dropped in here; it is picked up on the next start.') }}
+          </div>
+        </div>
+        <div class="settings-row-right">
+          <code style="opacity:.8;">{{ modules_dir }}</code>
+        </div>
+      </div>
+
       <div class="settings-row" id="extStoreKeysRow">
         <div class="settings-row-left">
           <div class="settings-row-label">{{ _('Trusted signing keys') }}</div>
