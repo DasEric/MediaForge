@@ -4563,3 +4563,121 @@ msgstr "Datenlöschung beantragen"
 msgid "Telemetry active at all"
 msgstr "Telemetrie grundsätzlich aktiv"
 
+
+# ── integrations.html (added 2026-07-12) ──────────
+msgid "↳ Show Media Library series in calendar"
+msgstr "↳ Serien aus Mediathek im Kalender anzeigen"
+
+msgid "Adds series from your Media Library to the calendar."
+msgstr "Fügt Serien aus deiner Mediathek zum Kalender hinzu."
+
+msgid "↳ Calendar refresh interval"
+msgstr "↳ Kalender-Aktualisierungsintervall"
+
+msgid "How often to refresh existing calendar data from TMDB (in hours)."
+msgstr "Wie oft vorhandene Kalenderdaten von TMDB aktualisiert werden (in Stunden)."
+
+msgid "Hours"
+msgstr "Stunden"
+
+msgid "Cache Options"
+msgstr "Cache-Optionen"
+
+msgid "ATTENTION"
+msgstr "ACHTUNG"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Which account profile to use for watchlist and calendar sync."
+msgstr "Welches Konto-Profil für die Watchlist- und Kalendersynchronisierung verwendet werden soll."
+
+msgid "German only"
+msgstr "Nur Deutsch"
+
+msgid "Calendar sync requires a TMDB API key — configure it in CineInfo above."
+msgstr "Die Kalendersynchronisierung benötigt einen TMDB-API-Key — richte ihn oben unter CineInfo ein."
+
+msgid "Adds the current Crunchyroll simulcast lineup to the calendar. Episode air dates are resolved via TMDB (CineInfo API key required)."
+msgstr "Fügt das aktuelle Crunchyroll-Simulcast-Programm zum Kalender hinzu. Ausstrahlungstermine werden über TMDB aufgelöst (CineInfo-API-Key erforderlich)."
+
+msgid "Country (Providers &amp; Age Rating)"
+msgstr "Land (Anbieter &amp; Altersfreigabe)"
+
+# ── settings.html (added 2026-07-12) ──────────
+msgid "AutoSync jobs — status overview (all users)"
+msgstr "AutoSync-Jobs — Statusübersicht (alle Benutzer)"
+
+msgid "UpTime monitor — current status per source"
+msgstr "UpTime-Monitor — aktueller Status pro Quelle"
+
+msgid "Self-update progress / state"
+msgstr "Fortschritt / Status des Selbst-Updates"
+
+msgid "MediaScan run status"
+msgstr "MediaScan-Laufstatus"
+
+msgid "Upscale queue, badge count & progress"
+msgstr "Upscale-Warteschlange, Badge-Anzahl & Fortschritt"
+
+msgid "Download history — all users"
+msgstr "Download-Verlauf — alle Benutzer"
+
+msgid "Your installation"
+msgstr "Deine Installation"
+
+msgid "This ID is generated once per installation and is pseudonymous, not anonymous, from stage 2 onward -- it lets usage over time be linked to this one installation. It is never linked to your MediaForge account or username."
+msgstr "Diese ID wird einmal pro Installation erzeugt und ist ab Stufe 2 pseudonym, nicht anonym -- sie erlaubt es, die Nutzung über die Zeit dieser einen Installation zuzuordnen. Sie wird nie mit deinem MediaForge-Konto oder Benutzernamen verknüpft."
+
+msgid "Installation ID"
+msgstr "Installations-ID"
+
+msgid "Manage my data"
+msgstr "Meine Daten verwalten"
+
+msgid "Email (for contact only)"
+msgstr "E-Mail (nur für Rückfragen)"
+
+msgid "Data collection stages"
+msgstr "Datenerfassungsstufen"
+
+msgid "Nothing here is sent unless you actively enable it. Turning a stage on enables every data point in it at once; you can then switch individual points back off -- the stage switch always reflects the combined state of its data points."
+msgstr "Hier wird nichts gesendet, solange du es nicht aktiv einschaltest. Eine Stufe zu aktivieren schaltet alle ihre Datenpunkte auf einmal ein; du kannst einzelne Punkte danach wieder ausschalten -- der Schalter der Stufe zeigt immer den kombinierten Status ihrer Datenpunkte."
+
+# ── extensions.html (added 2026-07-12) ──────────
+msgid "Browse the module store"
+msgstr "Modul-Store durchsuchen"
+
+msgid "Restart now"
+msgstr "Jetzt neu starten"
+
+msgid "Restart MediaForge to apply — this process cannot restart itself (debug mode)."
+msgstr "MediaForge neu starten, um die Änderungen zu übernehmen — dieser Prozess kann sich nicht selbst neu starten (Debug-Modus)."
+
+msgid "Official store"
+msgstr "Offizieller Store"
+
+msgid "Ships with MediaForge and cannot be changed here — this is the one repository whose modules this build is willing to call official."
+msgstr "Wird mit MediaForge ausgeliefert und kann hier nicht geändert werden — dies ist das eine Repository, dessen Module dieser Build als offiziell anerkennt."
+
+msgid "This build ships no official store."
+msgstr "Dieser Build liefert keinen offiziellen Store aus."
+
+msgid "Module folder"
+msgstr "Modul-Ordner"
+
+msgid "Installed modules live here, outside MediaForge's program files — next to your database and cache, so they survive an update. A module installed by hand is simply a folder dropped in here; it is picked up on the next start."
+msgstr "Installierte Module liegen hier, außerhalb der Programmdateien von MediaForge — neben deiner Datenbank und deinem Cache, sodass sie ein Update überstehen. Ein von Hand installiertes Modul ist einfach ein hier abgelegter Ordner; er wird beim nächsten Start erkannt."
+
+msgid "Trusted signing keys"
+msgstr "Vertrauenswürdige Signaturschlüssel"
+
+msgid "Built into MediaForge and not configurable. A module is \"Official\" because one of these keys signed it — neither a store nor a setting can decide that."
+msgstr "Fest in MediaForge eingebaut und nicht konfigurierbar. Ein Modul ist „Offiziell\", weil einer dieser Schlüssel es signiert hat — das entscheidet weder ein Store noch eine Einstellung."
+
+msgid "This build trusts no signing keys — nothing can be official."
+msgstr "Dieser Build vertraut keinen Signaturschlüsseln — nichts kann offiziell sein."
+
+msgid "Available modules"
+msgstr "Verfügbare Module"
+
