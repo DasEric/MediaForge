@@ -3495,6 +3495,331 @@ def reset_running_upscale_items():
         conn.close()
 
 
+# ===========================================================================
+# Encoding Queue
+#
+# Mirrors the Upscale Queue above exactly (same columns, same function
+# shapes) — see that section's comments for the reasoning. Used to defer
+# H.264/H.265 transcoding out of the download queue when
+# encoding_timing == "after_download" (see web/encoding_worker.py and
+# models/common/common.py's _get_ffmpeg_codec_opts_for_download()).
+# ===========================================================================
+
+_CREATE_ENCODING_QUEUE_TABLE = """
+CREATE TABLE IF NOT EXISTS encoding_queue (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    title            TEXT    NOT NULL,
+    file_path        TEXT    NOT NULL,
+    output_path      TEXT,
+    files            TEXT,
+    total_files      INTEGER NOT NULL DEFAULT 1,
+    current_file_idx INTEGER NOT NULL DEFAULT 0,
+    status           TEXT    NOT NULL DEFAULT 'queued'
+                         CHECK(status IN ('queued','running','completed','failed','cancelled')),
+    progress_pct     REAL    NOT NULL DEFAULT 0.0,
+    error            TEXT,
+    source           TEXT    NOT NULL DEFAULT 'manual',
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+    completed_at     TEXT,
+    position         INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+
+def init_encoding_queue_db():
+    MEDIAFORGE_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    conn = get_db()
+    try:
+        conn.execute(_CREATE_ENCODING_QUEUE_TABLE)
+        conn.execute("UPDATE encoding_queue SET position = id WHERE position = 0")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def add_to_encoding_queue(title, file_path, output_path=None, source="manual", files=None):
+    """Add one encoding job.
+    files: list of {file_path, output_path} for multi-file (batch) jobs.
+    When files is set, file_path/output_path are taken from files[0].
+    """
+    import json as _json
+    conn = get_db()
+    try:
+        if files:
+            fp  = files[0]["file_path"]
+            out = files[0].get("output_path") or fp
+            files_json = _json.dumps(files)
+            total = len(files)
+        else:
+            fp  = str(file_path)
+            out = str(output_path) if output_path else fp
+            files_json = None
+            total = 1
+        cur = conn.execute(
+            "INSERT INTO encoding_queue (title, file_path, output_path, files, total_files, source) VALUES (?, ?, ?, ?, ?, ?)",
+            (title, fp, out, files_json, total, source),
+        )
+        new_id = cur.lastrowid
+        conn.execute("UPDATE encoding_queue SET position = ? WHERE id = ?", (new_id, new_id))
+        conn.commit()
+        return new_id
+    finally:
+        conn.close()
+
+
+def get_encoding_queue():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM encoding_queue ORDER BY position ASC, id ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_encoding_item(item_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM encoding_queue WHERE id = ?", (item_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_next_encoding_queued():
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM encoding_queue WHERE status = 'queued' ORDER BY position ASC, id ASC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def claim_next_encoding_queued():
+    """Atomically claim the next encoding item and mark it as running.
+
+    Uses BEGIN IMMEDIATE for the same reason as claim_next_upscale_queued —
+    prevents double-processing when multiple threads call the worker
+    simultaneously. Returns the claimed item dict, or None if nothing is
+    available.
+
+    Used by: mediaforge/web/encoding_worker.py (background encoding worker loop).
+    """
+    conn = sqlite3.connect(str(DB_PATH), timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        running = conn.execute(
+            "SELECT id FROM encoding_queue WHERE status = 'running' LIMIT 1"
+        ).fetchone()
+        if running:
+            conn.execute("ROLLBACK")
+            return None
+        row = conn.execute(
+            "SELECT * FROM encoding_queue WHERE status = 'queued' ORDER BY position ASC, id ASC LIMIT 1"
+        ).fetchone()
+        if not row:
+            conn.execute("ROLLBACK")
+            return None
+        item = dict(row)
+        conn.execute(
+            "UPDATE encoding_queue SET status = 'running' WHERE id = ?",
+            (item["id"],),
+        )
+        conn.execute("COMMIT")
+        return item
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
+def get_encoding_running():
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM encoding_queue WHERE status = 'running' LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def set_encoding_status(item_id, status):
+    conn = get_db()
+    try:
+        if status in ("completed", "failed"):
+            conn.execute(
+                "UPDATE encoding_queue SET status = ?, completed_at = datetime('now') WHERE id = ?",
+                (status, item_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE encoding_queue SET status = ? WHERE id = ?",
+                (status, item_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_encoding_progress(item_id, progress_pct, current_file_idx=None):
+    conn = get_db()
+    try:
+        if current_file_idx is not None:
+            conn.execute(
+                "UPDATE encoding_queue SET progress_pct = ?, current_file_idx = ? WHERE id = ?",
+                (round(float(progress_pct), 1), current_file_idx, item_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE encoding_queue SET progress_pct = ? WHERE id = ?",
+                (round(float(progress_pct), 1), item_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def set_encoding_error(item_id, error_msg):
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE encoding_queue SET error = ? WHERE id = ?",
+            (str(error_msg), item_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def remove_from_encoding_queue(item_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT status FROM encoding_queue WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not row:
+            return False, "Item not found"
+        if row["status"] == "running":
+            return False, "Cannot remove a running item (cancel it first)"
+        conn.execute("DELETE FROM encoding_queue WHERE id = ?", (item_id,))
+        conn.commit()
+        return True, None
+    finally:
+        conn.close()
+
+
+def cancel_encoding_item(item_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT status FROM encoding_queue WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not row:
+            return False, "Item not found"
+        if row["status"] not in ("running", "queued"):
+            return False, "Can only cancel queued or running items"
+        conn.execute(
+            "UPDATE encoding_queue SET status = 'cancelled' WHERE id = ?", (item_id,)
+        )
+        conn.commit()
+        return True, None
+    finally:
+        conn.close()
+
+
+def is_encoding_cancelled(item_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT status FROM encoding_queue WHERE id = ?", (item_id,)
+        ).fetchone()
+        return row and row["status"] == "cancelled"
+    finally:
+        conn.close()
+
+
+def clear_encoding_completed():
+    conn = get_db()
+    try:
+        conn.execute(
+            "DELETE FROM encoding_queue WHERE status IN ('completed', 'failed', 'cancelled')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_encoding_badge_count():
+    """Return number of queued + running encoding items (for sidebar badge)."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM encoding_queue WHERE status IN ('queued', 'running')"
+        ).fetchone()
+        return row["cnt"] if row else 0
+    finally:
+        conn.close()
+
+
+def move_encoding_queue_item(item_id, direction):
+    """Swap position of a queued encoding item with its neighbor."""
+    conn = get_db()
+    try:
+        item = conn.execute(
+            "SELECT id, position FROM encoding_queue WHERE id = ? AND status = 'queued'",
+            (item_id,),
+        ).fetchone()
+        if not item:
+            return False, "Item not found or not queued"
+        if direction == "up":
+            neighbor = conn.execute(
+                "SELECT id, position FROM encoding_queue "
+                "WHERE status = 'queued' AND position < ? "
+                "ORDER BY position DESC LIMIT 1",
+                (item["position"],),
+            ).fetchone()
+        else:
+            neighbor = conn.execute(
+                "SELECT id, position FROM encoding_queue "
+                "WHERE status = 'queued' AND position > ? "
+                "ORDER BY position ASC LIMIT 1",
+                (item["position"],),
+            ).fetchone()
+        if not neighbor:
+            return False, "Already at edge"
+        conn.execute("UPDATE encoding_queue SET position = ? WHERE id = ?", (neighbor["position"], item["id"]))
+        conn.execute("UPDATE encoding_queue SET position = ? WHERE id = ?", (item["position"], neighbor["id"]))
+        conn.commit()
+        return True, None
+    finally:
+        conn.close()
+
+
+def reset_running_encoding_items():
+    """On startup: reset any stuck 'running' items back to 'queued'."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE encoding_queue SET status = 'queued', progress_pct = 0 WHERE status = 'running'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 # ============================================================
 # Browse list cache (persistent, survives restart)
 # ============================================================

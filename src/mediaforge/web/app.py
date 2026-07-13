@@ -43,6 +43,7 @@ from .db import (
     init_browse_cache_db,
     init_notification_db,
     init_upscale_queue_db,
+    init_encoding_queue_db,
     init_mediascan_db,
     init_watch_progress_db,
     init_uptime_db,
@@ -74,6 +75,7 @@ from .queue_worker import _ensure_queue_worker
 from .mediascan import _start_mediascan_scheduler
 from .autosync_worker import _ensure_autosync_worker
 from .upscale_worker import _ensure_upscale_worker
+from .encoding_worker import _ensure_encoding_worker
 from .version_info import _get_display_version, _update_cache
 from .pwa_icons import _generate_pwa_icons
 from .settings_migration import (
@@ -413,6 +415,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     init_browse_cache_db()
     init_notification_db()
     init_upscale_queue_db()
+    init_encoding_queue_db()
     init_mediascan_db()
     init_watch_progress_db()
     init_uptime_db()
@@ -504,6 +507,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
         _ensure_queue_worker()
         _ensure_autosync_worker()
         _ensure_upscale_worker()
+        _ensure_encoding_worker()
         _ensure_tmdb_keywords_sync_worker()
         # Auto-download mpv.exe on Windows if missing
         try:

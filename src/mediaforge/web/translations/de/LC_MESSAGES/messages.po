@@ -1569,6 +1569,50 @@ msgstr "Ersetzen"
 msgid "Suffix (upscale)"
 msgstr "Suffix (upscale)"
 
+msgid "Queues"
+msgstr "Warteschlangen"
+
+msgid "Encoding"
+msgstr "Encoding"
+
+msgid "Upscaling"
+msgstr "Upscaling"
+
+msgid "Inactive"
+msgstr "Inaktiv"
+
+msgid "Encoding"
+msgstr "Encoding"
+
+msgid ""
+"Only relevant for H.264/H.265 — decides whether the transcode runs "
+"immediately after each download (part of the download queue) or later in "
+"its own separate queue, so a heavy re-encode never holds up other "
+"downloads."
+msgstr ""
+"Nur relevant für H.264/H.265 — entscheidet, ob die Umwandlung direkt nach "
+"jedem Download läuft (Teil der Download-Warteschlange) oder später in "
+"einer eigenen Warteschlange, damit ein aufwändiges Encoding andere "
+"Downloads nie blockiert."
+
+msgid "Timing"
+msgstr "Zeitpunkt"
+
+msgid "When should H.264/H.265 encoding happen?"
+msgstr "Wann soll H.264/H.265-Encoding stattfinden?"
+
+msgid "After download (own queue)"
+msgstr "Nach Download (eigene Warteschlange)"
+
+msgid "Overwrite original or create new file with a codec suffix."
+msgstr "Original überschreiben oder neue Datei mit Codec-Suffix erstellen."
+
+msgid "Suffix"
+msgstr "Suffix"
+
+msgid "Queue timing:"
+msgstr "Warteschlange:"
+
 msgid "Preset (Mode)"
 msgstr "Preset (Mode)"
 

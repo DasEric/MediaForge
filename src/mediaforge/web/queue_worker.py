@@ -31,6 +31,7 @@ from .runtime_state import (
     is_queue_paused,
 )
 from .upscale_worker import _trigger_batch_after_download_upscale
+from .encoding_worker import _trigger_after_download_encode
 
 logger = get_logger(__name__)
 
@@ -659,6 +660,18 @@ def _queue_worker():
                                 _upscale_after_paths.append(str(episode._episode_path))
                         except Exception:
                             pass
+
+                        # Trigger after_download encoding for THIS episode right away
+                        # (not batched at the end of the whole queue item) so encoding
+                        # starts as soon as this episode finishes downloading while the
+                        # next episode keeps downloading in parallel. The encoding
+                        # worker only processes one item at a time, so if it's already
+                        # busy this episode's entry simply waits its turn in the queue.
+                        try:
+                            if hasattr(episode, "_episode_path") and episode._episode_path.exists():
+                                _trigger_after_download_encode([str(episode._episode_path)], item.get("title", ""))
+                        except Exception as _ee:
+                            logger.warning(f"[Encoding] Trigger Fehler: {_ee}")
 
                         break  # success — stop retrying
                     except Exception as e:

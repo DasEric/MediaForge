@@ -631,7 +631,8 @@ body.icon-move .sidebar-link[data-page="integrations"]:hover svg {
 }
 
 body.icon-move .sidebar-link[data-page="seerr"]:hover svg,
-body.icon-move .sidebar-link[data-page="encoding"]:hover svg {
+body.icon-move .sidebar-link[data-page="encoding"]:hover svg,
+body.icon-move #sidebarEncodingBtn:hover svg {
   animation: screen-breathe 2s ease-in-out infinite;
 }
 

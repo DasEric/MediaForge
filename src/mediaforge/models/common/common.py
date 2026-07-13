@@ -202,6 +202,27 @@ def _get_ffmpeg_codec_opts():
     return c, c, {}, []
 
 
+def _get_ffmpeg_codec_opts_for_download():
+    """Wrapper around _get_ffmpeg_codec_opts() used at every codec-options call
+    site inside download().
+
+    When the user has set encoding_timing to "after_download" and picked an
+    actual transcode mode (h264/h265), this returns a plain stream-copy
+    result instead so the download step stays fast — the real transcode is
+    deferred to the encoding queue (see web/encoding_worker.py), which reads
+    the live encoding_* settings itself when it processes the job, so the
+    end result is identical either way, just deferred out of the download
+    queue. "copy" and "expert" modes are returned unchanged since there is
+    nothing worth deferring for those.
+    """
+    s = _read_encoding_settings()
+    if s is not None:
+        mode = s.get("encoding_mode", "copy") or "copy"
+        timing = s.get("encoding_timing", "during_download") or "during_download"
+        if timing == "after_download" and mode in ("h264", "h265"):
+            return "copy", "copy", {}, []
+    return _get_ffmpeg_codec_opts()
+
 
 def _get_encoder_label():
     """Return a short human-readable label for the active encoder, e.g. 'H.265 · CRF 28'."""
@@ -1069,7 +1090,7 @@ def download(self, cancel_event=None):
             if (not wants_clean_video) and sub_video_code:
                 stream_metadata["metadata:s:v:0"] = f"language={sub_video_code}"
 
-            _enc_vcodec, _enc_acodec, _enc_vopts, _enc_global = _get_ffmpeg_codec_opts()
+            _enc_vcodec, _enc_acodec, _enc_vopts, _enc_global = _get_ffmpeg_codec_opts_for_download()
             _enc_node = ffmpeg.input(str(raw_full)).output(
                 str(temp_full),
                 vcodec=_enc_vcodec,
@@ -1116,7 +1137,7 @@ def download(self, cancel_event=None):
                 impersonate=_impersonate, audio_lang=audio_code,
             )
             # 2. Extract audio + apply language tag via ffmpeg (local → fast copy)
-            _enc_vcodec_a, _enc_acodec_a, _enc_vopts_a, _enc_global_a = _get_ffmpeg_codec_opts()
+            _enc_vcodec_a, _enc_acodec_a, _enc_vopts_a, _enc_global_a = _get_ffmpeg_codec_opts_for_download()
             _run_ffmpeg_with_progress(
                 ffmpeg.input(str(raw_audio)).output(
                     str(temp_audio),
@@ -1139,7 +1160,7 @@ def download(self, cancel_event=None):
                 impersonate=_impersonate,
             )
             # 2. Extract video + apply language tag via ffmpeg (local → fast copy)
-            _enc_vcodec_v, _enc_acodec_v, _enc_vopts_v, _enc_global_v = _get_ffmpeg_codec_opts()
+            _enc_vcodec_v, _enc_acodec_v, _enc_vopts_v, _enc_global_v = _get_ffmpeg_codec_opts_for_download()
             _enc_node_v = ffmpeg.input(str(raw_video)).output(
                 str(temp_video),
                 vcodec=_enc_vcodec_v,

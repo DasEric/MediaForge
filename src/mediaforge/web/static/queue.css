@@ -218,6 +218,12 @@
   box-shadow: 0 0 10px rgba(236, 72, 153, 0.45);
 }
 
+/* Encoding queue phase: blue → cyan gradient */
+.queue-progress-fill--encoding {
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.45);
+}
+
 .queue-progress-footer {
   display: flex;
   justify-content: space-between;

@@ -31,6 +31,40 @@
     </button>
   </div>
 
+  <!-- Encoding Queue Timing (applies to H.264/H.265 real transcodes) -->
+  <div class="settings-section">
+    <div class="settings-section-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      {{ _('Encoding Queue') }}
+    </div>
+    <div class="settings-hint" style="padding:12px 24px 0;font-size:0.81rem;color:var(--text-muted);">
+      {{ _('Only relevant for H.264/H.265 — decides whether the transcode runs immediately after each download (part of the download queue) or later in its own separate queue, so a heavy re-encode never holds up other downloads.') }}
+    </div>
+    <div class="settings-row" style="flex-wrap:wrap;">
+      <div class="settings-row-left">
+        <div class="settings-row-label">{{ _('Timing') }}</div>
+        <div class="settings-row-desc">{{ _('When should H.264/H.265 encoding happen?') }}</div>
+      </div>
+      <div class="settings-row-right" style="gap:8px;flex-wrap:wrap;">
+        <span class="hw-badge" id="enc-timing-during_download" onclick="selectEncTiming('during_download',this)">{{ _('During download') }}</span>
+        <span class="hw-badge" id="enc-timing-after_download" onclick="selectEncTiming('after_download',this)">{{ _('After download (own queue)') }}</span>
+      </div>
+    </div>
+    <div class="settings-row" id="enc-replace-row">
+      <div class="settings-row-left">
+        <div class="settings-row-label">{{ _('Replace original') }}</div>
+        <div class="settings-row-desc">{{ _('Overwrite original or create new file with a codec suffix.') }}</div>
+      </div>
+      <div class="settings-row-right" style="gap:8px;">
+        <span class="hw-badge" id="enc-replace-yes" onclick="selectEncReplace(true,this)">{{ _('Replace') }}</span>
+        <span class="hw-badge" id="enc-replace-no"  onclick="selectEncReplace(false,this)">{{ _('Suffix') }}</span>
+      </div>
+    </div>
+    <div style="padding:16px 24px;">
+      <button class="btn btn-primary" onclick="saveEncTiming()">{{ _('Save &amp; activate') }}</button>
+    </div>
+  </div>
+
   <!-- ═══ COPY ═══ -->
   <div class="service-panel active" id="panel-copy">
     <div class="settings-section">
@@ -448,6 +482,7 @@
   <!-- Active mode indicator -->
   <div id="active-mode-hint" style="margin-top:12px;padding:10px 18px;border-radius:8px;background:var(--bg-secondary);font-size:0.82rem;color:var(--text-muted);display:none;">
     {{ _('Active encoding mode:') }} <strong id="active-mode-label">–</strong>
+    &nbsp;·&nbsp; {{ _('Queue timing:') }} <strong id="active-timing-label">{{ _('During download') }}</strong>
     &nbsp;·&nbsp; {{ _('Upscaling:') }} <strong id="active-upscale-label">{{ _('Disabled') }}</strong>
   </div>
 
@@ -629,6 +664,7 @@ function showToast(msg) {
 const _hwSel = { h264: "cpu", h265: "cpu" };
 const _audioSel = { h264: "copy", h265: "copy" };
 const _hwDetected = { h264: null, h265: null };
+const _encTimingSel = { timing: "during_download", replace: true };
 
 /* ── Panel switcher ── */
 function showMode(id, pill) {
@@ -765,6 +801,58 @@ function updateActiveModeHint(mode) {
   hint.style.display = 'block';
 }
 
+/* ── Encoding queue timing ── */
+function selectEncTiming(v, el) {
+  _encTimingSel.timing = v;
+  document.querySelectorAll('[id^="enc-timing-"]').forEach(b => b.classList.remove('selected'));
+  const target = el || document.getElementById('enc-timing-' + v);
+  if (target) target.classList.add('selected');
+}
+function selectEncReplace(v, el) {
+  _encTimingSel.replace = v;
+  document.querySelectorAll('[id^="enc-replace-"]').forEach(b => b.classList.remove('selected'));
+  const id = v ? 'enc-replace-yes' : 'enc-replace-no';
+  const target = el || document.getElementById(id);
+  if (target) target.classList.add('selected');
+}
+async function saveEncTiming() {
+  try {
+    const r = await fetch('/api/encoding/timing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timing: _encTimingSel.timing, replace_original: _encTimingSel.replace }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast({{ _('✓ Settings saved') | tojson }});
+      updateEncTimingHint(_encTimingSel.timing);
+    } else {
+      showToast({{ _('Error:') | tojson }} + ' ' + (d.error || {{ _('unknown') | tojson }}));
+    }
+  } catch(e) { showToast({{ _('Network error while saving') | tojson }}); }
+}
+async function loadEncTiming() {
+  try {
+    const r = await fetch('/api/encoding/timing');
+    const d = await r.json();
+    if (!d.ok) return;
+    const s = d.settings;
+    _encTimingSel.timing = s.timing || 'during_download';
+    _encTimingSel.replace = s.replace_original !== '0';
+    selectEncTiming(_encTimingSel.timing, null);
+    selectEncReplace(_encTimingSel.replace, null);
+    updateEncTimingHint(_encTimingSel.timing);
+  } catch(e) { /* ignore */ }
+}
+function updateEncTimingHint(timing) {
+  const labels = {
+    during_download: {{ _('During download') | tojson }},
+    after_download:  {{ _('After download (own queue)') | tojson }},
+  };
+  const el = document.getElementById('active-timing-label');
+  if (el) el.textContent = labels[timing] || timing;
+}
+
 /* ── Load settings on page load ── */
 async function loadSettings() {
   try {
@@ -847,6 +935,7 @@ async function loadSettings() {
 
 document.addEventListener('DOMContentLoaded', async function() {
   await loadSettings();
+  await loadEncTiming();
   await loadUpscaleSettings();
   // Check mpv auto-download status and start polling if in progress
   try {

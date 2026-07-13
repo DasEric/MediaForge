@@ -264,6 +264,12 @@ def trigger_layout_backoff(minutes: float = LAYOUT_BACKOFF_MINUTES) -> bool:
 _upscale_active_cancel_events: dict = {}
 _upscale_cancel_lock = threading.Lock()
 
+# Encoding worker cancel-events registry — same pattern as
+# _upscale_active_cancel_events, but for the separate H.264/H.265 encoding
+# queue. Used by encoding_worker.py and routes/encoding.py's cancel endpoint.
+_encoding_active_cancel_events: dict = {}
+_encoding_cancel_lock = threading.Lock()
+
 # Library move job tracking, read/written by routes/library.py's move-job
 # start/status/cleanup endpoints.
 _move_jobs: dict = {}  # job_id -> {status, copied_bytes, total_bytes, current_file, error}

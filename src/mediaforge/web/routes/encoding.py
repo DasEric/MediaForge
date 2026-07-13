@@ -8,8 +8,16 @@ Extracted from create_app as a plain route-registration function
 # Registry-only for now.
 """
 
+from ..db import cancel_encoding_item
+from ..db import clear_encoding_completed
+from ..db import get_encoding_badge_count
+from ..db import get_encoding_queue
 from ..db import get_setting
+from ..db import move_encoding_queue_item
+from ..db import remove_from_encoding_queue
 from ..db import set_setting
+from ..runtime_state import _encoding_active_cancel_events
+from ..runtime_state import _encoding_cancel_lock
 from flask import jsonify
 from flask import render_template
 from flask import request
@@ -85,6 +93,118 @@ def register_encoding_routes(app):
         elif mode == "expert":
             set_setting("encoding_expert_video", data.get("expert_video", ""))
             set_setting("encoding_expert_audio", data.get("expert_audio", ""))
+        return jsonify({"ok": True})
+    @app.route("/api/encoding/queue")
+    def api_encoding_queue():
+        """Return all encoding queue items plus the badge count.
+
+        GET /api/encoding/queue. Called from encoding_queue.js's
+        loadEncodingQueue() to render the encoding queue modal.
+        """
+        items = get_encoding_queue()
+        badge = get_encoding_badge_count()
+        return jsonify({"ok": True, "items": items, "badge": badge})
+    @app.route("/api/encoding/queue/progress")
+    def api_encoding_queue_progress():
+        """Return the progress of the currently running encoding job, if any.
+
+        GET /api/encoding/queue/progress. Called from encoding_queue.js's
+        loadEncodingQueue().
+        """
+        try:
+            from ..encoding_worker import get_encoding_progress
+            return jsonify({"ok": True, "progress": get_encoding_progress()})
+        except Exception:
+            return jsonify({"ok": True, "progress": {"active": False, "percent": 0}})
+    @app.route("/api/encoding/queue/badge")
+    def api_encoding_queue_badge():
+        """Return just the encoding queue badge count (pending + running items).
+
+        GET /api/encoding/queue/badge. Polled from encoding_queue.js and
+        base.html to refresh the nav badge.
+        """
+        return jsonify({"ok": True, "count": get_encoding_badge_count()})
+    @app.route("/api/encoding/queue/<int:item_id>", methods=["DELETE"])
+    def api_encoding_queue_delete(item_id):
+        """Remove a single item from the encoding queue.
+
+        DELETE /api/encoding/queue/<item_id>. Called from encoding_queue.js's
+        removeEncodingItem().
+        """
+        ok, err = remove_from_encoding_queue(item_id)
+        if ok:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": err}), 400
+    @app.route("/api/encoding/queue/<int:item_id>/cancel", methods=["POST"])
+    def api_encoding_queue_cancel(item_id):
+        """Cancel a running or queued encoding job.
+
+        POST /api/encoding/queue/<item_id>/cancel. Called from
+        encoding_queue.js's cancelEncodingItem().
+        """
+        ok, err = cancel_encoding_item(item_id)
+        if ok:
+            with _encoding_cancel_lock:
+                ev = _encoding_active_cancel_events.get(item_id)
+            if ev:
+                ev.set()
+        if ok:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": err}), 400
+    @app.route("/api/encoding/queue/clear", methods=["POST"])
+    def api_encoding_queue_clear():
+        """Remove all completed items from the encoding queue.
+
+        POST /api/encoding/queue/clear. Called from encoding_queue.js's
+        clearEncodingQueue().
+        """
+        clear_encoding_completed()
+        return jsonify({"ok": True})
+    @app.route("/api/encoding/queue/<int:item_id>/move", methods=["POST"])
+    def api_encoding_queue_move(item_id):
+        """Move an encoding queue item up or down in the queue order.
+
+        POST /api/encoding/queue/<item_id>/move. Called from
+        encoding_queue.js's moveEncodingItem(id, direction).
+        """
+        data = request.get_json(force=True, silent=True) or {}
+        direction = data.get("direction", "up")
+        ok, err = move_encoding_queue_item(item_id, direction)
+        if ok:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": err}), 400
+    @app.route("/api/encoding/timing", methods=["GET"])
+    def api_encoding_timing_get():
+        """Return the encoding queue timing settings (separate from mode settings above).
+
+        GET /api/encoding/timing. Called from templates/encoding.html's
+        loadEncTiming(). Mirrors /api/upscale/settings' "mode" field, but for
+        deciding when H.264/H.265 transcoding runs (see
+        web/encoding_worker.py / models/common/common.py's
+        _get_ffmpeg_codec_opts_for_download()).
+        """
+        return jsonify({
+            "ok": True,
+            "settings": {
+                "timing":           get_setting("encoding_timing", "during_download"),
+                "replace_original": get_setting("encoding_replace_original", "1"),
+            }
+        })
+    @app.route("/api/encoding/timing", methods=["POST"])
+    def api_encoding_timing_post():
+        """Persist the encoding queue timing settings.
+
+        POST /api/encoding/timing. Called from templates/encoding.html's
+        saveEncTiming(). Kept as its own endpoint (rather than folding into
+        /api/encoding/settings) so it can be saved independently of the
+        active codec mode.
+        """
+        data = request.get_json(force=True) or {}
+        timing = data.get("timing", "during_download")
+        if timing not in ("during_download", "after_download"):
+            timing = "during_download"
+        set_setting("encoding_timing", timing)
+        set_setting("encoding_replace_original", "1" if data.get("replace_original", True) else "0")
         return jsonify({"ok": True})
     @app.route("/api/encoding/detect-hw", methods=["POST"])
     def api_encoding_detect_hw():

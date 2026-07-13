@@ -149,30 +149,6 @@
             <span>{{ _('Library') }}</span>
             <span class="queue-badge" id="streamBadge" style="display:none">0</span>
           </a>
-          <button class="sidebar-link sidebar-queue-btn" id="sidebarQueueBtn" onclick="openQueueModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round">
-              <line class="moving-line line-1" x1="8" y1="6" x2="21" y2="6"></line>
-              <line class="moving-line line-2" x1="8" y1="12" x2="21" y2="12"></line>
-              <line class="moving-line line-3" x1="8" y1="18" x2="21" y2="18"></line>
-              
-              <line class="moving-line line-1" x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line class="moving-line line-2" x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line class="moving-line line-3" x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-            <span>{{ _('Queue') }}</span>
-            <span class="queue-badge" id="queueBadge" style="display:none">0</span>
-          </button>
-          <button class="sidebar-link sidebar-queue-btn" id="sidebarUpscaleBtn" onclick="openUpscaleModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8" class="moving-arrow arrow-head"/>
-              <line x1="12" y1="3" x2="12" y2="15" class="moving-arrow arrow-shift"/>
-            </svg>
-            <span>Upscaling</span>
-            <span class="queue-badge" id="upscaleBadge" style="display:none">0</span>
-          </button>
-
           <a href="{{ url_for('advanced_search_page') }}" class="sidebar-link" data-page="advanced_search" id="sidebarAdvancedSearch" style="display: {% if cineinfo_advanced_search %}flex{% else %}none{% endif %};">
             <svg viewBox="0 0 24 24" fill="none" class="advancedSearchIcon" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
@@ -205,6 +181,44 @@
             <span class="sidebar-module-pill" title="{{ _('Module') }}: {{ item.module_name }}">M</span>
           </a>
           {% endfor %}
+        </div>
+      </div>
+      <span class="sidebar-category">{{ _('Queues') }}</span>
+      <div class="sidebar-category-group">
+        <div class="sidebar-category-inner">
+          <button class="sidebar-link sidebar-queue-btn" id="sidebarQueueBtn" onclick="openQueueModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <line class="moving-line line-1" x1="8" y1="6" x2="21" y2="6"></line>
+              <line class="moving-line line-2" x1="8" y1="12" x2="21" y2="12"></line>
+              <line class="moving-line line-3" x1="8" y1="18" x2="21" y2="18"></line>
+
+              <line class="moving-line line-1" x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line class="moving-line line-2" x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line class="moving-line line-3" x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            <span>{{ _('Downloads') }}</span>
+            <span class="queue-badge" id="queueBadge" style="display:none">0</span>
+          </button>
+          <button class="sidebar-link sidebar-queue-btn" id="sidebarEncodingBtn" onclick="openEncodingQueueModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <span>{{ _('Encoding') }}</span>
+            <span class="queue-badge" id="encodingBadge" style="display:none">0</span>
+          </button>
+          <button class="sidebar-link sidebar-queue-btn" id="sidebarUpscaleBtn" onclick="openUpscaleModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8" class="moving-arrow arrow-head"/>
+              <line x1="12" y1="3" x2="12" y2="15" class="moving-arrow arrow-shift"/>
+            </svg>
+            <span>{{ _('Upscaling') }}</span>
+            <span class="queue-badge" id="upscaleBadge" style="display:none">0</span>
+          </button>
         </div>
       </div>
       <span class="sidebar-category">{{ _('Management') }}</span>
@@ -571,6 +585,39 @@
     </div>
   </div>
 
+  <!-- ===== Encoding Queue Modal ===== -->
+  <div class="queue-overlay" id="encodingOverlay" onclick="if(event.target===this)closeEncodingQueueModal();" style="display:none">
+    <div class="queue-modal">
+      <div class="modal-header">
+        <h2 class="modal-title">{{ _('Encoding') }}<span id="encodingDisabledBadge" style="display:none;margin-left:8px;font-size:0.7rem;font-weight:600;color:var(--text-muted);background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.25);border-radius:999px;padding:2px 8px;vertical-align:middle;letter-spacing:0.04em;text-transform:uppercase;">{{ _('Inactive') }}</span></h2>
+        <div class="modal-header-actions">
+          <button class="btn btn-ghost btn-sm queue-clear-btn" onclick="clearEncodingQueue()"
+            title="{{ _('Remove completed, failed and cancelled entries') }}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>{{ _('Clear entries') }}
+          </button>
+          <button class="modal-close" onclick="closeEncodingQueueModal()" aria-label="{{ _('Close') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+              stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="queue-toolbar">
+        <div class="queue-filter-tabs" role="tablist">
+          <button class="queue-filter-tab active" id="eqfTab-all"       onclick="setEncodingFilter('all')"       role="tab">{{ _('All') }}<span class="qf-count" id="eqfCount-all"></span></button>
+          <button class="queue-filter-tab"         id="eqfTab-active"    onclick="setEncodingFilter('active')"    role="tab">{{ _('Running') }}<span class="qf-count" id="eqfCount-active"></span></button>
+          <button class="queue-filter-tab"         id="eqfTab-queued"    onclick="setEncodingFilter('queued')"    role="tab">{{ _('Queued') }}<span class="qf-count" id="eqfCount-queued"></span></button>
+          <button class="queue-filter-tab"         id="eqfTab-completed" onclick="setEncodingFilter('completed')" role="tab">{{ _('Done') }}<span class="qf-count" id="eqfCount-completed"></span></button>
+          <button class="queue-filter-tab"         id="eqfTab-failed"    onclick="setEncodingFilter('failed')"    role="tab">{{ _('Failed') }}<span class="qf-count" id="eqfCount-failed"></span></button>
+        </div>
+      </div>
+      <div id="encodingQueueList" class="queue-list"></div>
+    </div>
+  </div>
+
   <!-- ===== Self-update overlay ===== -->
   <div id="updateOverlay" class="update-overlay" role="dialog" aria-modal="true" aria-live="polite">
     <div class="update-overlay-card">
@@ -740,6 +787,7 @@
   <script src="{{ url_for('static', filename='queue.js') }}"></script>
   <script src="{{ url_for('static', filename='devinfos.js') }}"></script>
   <script src="{{ url_for('static', filename='upscale_queue.js') }}"></script>
+  <script src="{{ url_for('static', filename='encoding_queue.js') }}"></script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
   <script>
     // Global image proxy helper — routes cover images through the server so
