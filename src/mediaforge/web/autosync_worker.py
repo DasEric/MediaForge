@@ -662,6 +662,15 @@ def _run_autosync_for_job(job, force_notify=False):
         _err_text = str(e).lower()
         if "layout" in _err_text:
             _failure = "layout_changed"        # our bug — the one worth paging about
+        elif "isn't valid text" in _err_text:
+            # See AniworldSeries.__diagnose(): a 200 with a real body that isn't
+            # decodable text (usually a Content-Encoding we can't decompress, e.g.
+            # Brotli without the niquests[brotli] extra) looks identical to a layout
+            # change from here — title extraction fails either way — but the fix is
+            # completely different (a dependency, not a parser update). Still "our
+            # bug" and still every job's next attempt fails the same way, so it gets
+            # the same shared-backoff treatment below, just with an accurate message.
+            _failure = "decode_error"
         elif "is down or in maintenance" in _err_text or "empty response" in _err_text:
             _failure = "site_down"
         elif "rate-limiting" in _err_text:
@@ -684,25 +693,28 @@ def _run_autosync_for_job(job, force_notify=False):
         if _status_match:
             _telemetry_meta["http_status"] = int(_status_match.group(1))
 
-        # A layout change is "our bug" (see the _net_keywords comment above), but it is
-        # also, by nature, everybody's bug at once: if AniWorld's markup changed, every
-        # job's next attempt fails the exact same way. Left alone, that means a burst of
-        # jobs due around the same time (e.g. right after startup with 50 jobs configured)
-        # each hit the broken parse within seconds of each other and each fire their own
+        # A layout change (or a body we can't decode — see the decode_error branch
+        # above) is "our bug" (see the _net_keywords comment above), but it is also, by
+        # nature, everybody's bug at once: whatever the cause, every job's next attempt
+        # fails the exact same way. Left alone, that means a burst of jobs due around
+        # the same time (e.g. right after startup with 50 jobs configured) each hit the
+        # same failure within seconds of each other and each fire their own
         # "Sync-Fehler" Pushover notification — a wall of duplicate alerts for one event.
         #
-        # So this one failure class gets handled before the transient/non-transient split
+        # So both failure classes get handled before the transient/non-transient split
         # below: log it once as a warning (not an error — nothing here needs a stack
         # trace, the message already says exactly what's wrong), open a shared backoff
         # window that holds back every job due in the next few minutes by a few more
         # (see runtime_state.trigger_layout_backoff() and the check at the top of this
         # function), and notify only once per window instead of once per job.
-        if _failure == "layout_changed":
+        if _failure in ("layout_changed", "decode_error"):
             _is_new_backoff = trigger_layout_backoff()
             logger.warning(
-                "Auto-sync: AniWorld's layout appears to have changed (parser needs "
-                "updating) while checking '%s' — holding back sync jobs due in the next "
-                "%d min by another %d min: %s",
+                "Auto-sync: %s while checking '%s' — holding back sync jobs due in the "
+                "next %d min by another %d min: %s",
+                ("AniWorld's layout appears to have changed (parser needs updating)"
+                 if _failure == "layout_changed" else
+                 "AniWorld sent a response this build could not decode (see message)"),
                 job.get("title", "?"), LAYOUT_BACKOFF_MINUTES, LAYOUT_BACKOFF_MINUTES, e,
             )
             update_autosync_job(
@@ -715,13 +727,19 @@ def _run_autosync_for_job(job, force_notify=False):
                 metadata=_telemetry_meta,
             ))
             if _is_new_backoff:
+                _notif_body = (
+                    f"⚠️ AniWorld-Layout hat sich vermutlich geändert — Parser muss "
+                    f"aktualisiert werden. Sync-Jobs pausieren für {LAYOUT_BACKOFF_MINUTES} Minuten."
+                    if _failure == "layout_changed" else
+                    f"⚠️ AniWorld hat eine Antwort geschickt, die nicht dekodiert werden "
+                    f"konnte (fehlt evtl. Brotli-Unterstützung) — Sync-Jobs pausieren für "
+                    f"{LAYOUT_BACKOFF_MINUTES} Minuten."
+                )
                 try:
                     from .notifications import notify_all
                     notify_all(
                         title="Auto-Sync",
-                        body=(f"⚠️ AniWorld-Layout hat sich vermutlich geändert — Parser "
-                              f"muss aktualisiert werden. Sync-Jobs pausieren für "
-                              f"{LAYOUT_BACKOFF_MINUTES} Minuten."),
+                        body=_notif_body,
                         event="on_sync_error",
                         username=job.get("added_by"),
                     )

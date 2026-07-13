@@ -6,6 +6,30 @@ from ..common import clean_title
 from .season import AniworldSeason
 
 
+def _looks_like_text(sample: str, min_printable_ratio: float = 0.85) -> bool:
+    """Whether *sample* is plausibly decoded text rather than raw bytes that
+    got force-decoded into mojibake.
+
+    ``resp.text`` never raises: if the body is Brotli/gzip-compressed and the
+    HTTP client can't decompress it (see the __diagnose() docstring — this
+    project doesn't currently declare the ``brotli`` extra), charset-normalizer
+    still happily guesses *some* string out of the raw compressed bytes. The
+    result decodes without error and is indistinguishable from real text as
+    far as Python is concerned, but it is a wall of unprintable/control
+    characters with no natural word breaks — worthless as a diagnostic
+    snippet and, pasted anywhere with fixed-width or no-wrap styling, a wall
+    that breaks the layout because there's nowhere for it to wrap.
+
+    Used by: __diagnose() and __extract_title() to decide whether the "First
+    N chars" debug snippet is safe/useful to show, or whether to say plainly
+    that the body isn't text instead of dumping it.
+    """
+    if not sample:
+        return True  # empty body is handled separately by the empty-response check
+    printable = sum(1 for c in sample if c.isprintable() or c in "\t\n\r")
+    return (printable / len(sample)) >= min_printable_ratio
+
+
 class AniworldSeries:
     """
     Represents an anime series on AniWorld.
@@ -76,7 +100,8 @@ class AniworldSeries:
         self.__season_count = None
 
         self.__html = None
-        self.__http_status = None   # set by _html; reported when a parse fails
+        self.__http_status = None      # set by _html; reported when a parse fails
+        self.__content_encoding = None  # set by _html; used by __diagnose() to spot undecoded bodies
         self.__page_problem = None  # set by __extract_title() when it gives up; see page_problem
 
         logger.debug(f"Initialized {self.url}")
@@ -104,6 +129,10 @@ class AniworldSeries:
             # scraper that reports "no title" without saying "…and by the way, that was a
             # 403 of 1.2 KB" is making you guess at the one thing it knows.
             self.__http_status = getattr(resp, "status_code", None)
+            # Kept for __diagnose(): if .text turns out to be unprintable garbage despite
+            # a 200 and a real body, this says why — a Content-Encoding this build has no
+            # decoder for, rather than an actual layout change.
+            self.__content_encoding = getattr(resp, "headers", {}).get("Content-Encoding")
             self.__html = resp.text
         return self.__html
 
@@ -263,10 +292,20 @@ class AniworldSeries:
         # identical from the outside ("title is None") and have three different fixes, and
         # the person reading the job card should not have to go and find out which.
         self.__page_problem = self.__diagnose(html)
-        snippet = " ".join((html or "")[:300].split())
+        raw_head = (html or "")[:300]
+        # Only show the snippet when it's plausibly text: __diagnose() already told us
+        # (via page_problem) when the body is undecoded binary, and dumping 300 characters
+        # of that here would be doubly useless — it doesn't help anyone fix anything, and
+        # a run of unprintable characters with no word breaks doesn't wrap, so it can blow
+        # out the width of whatever ends up displaying this log line (or the crash report
+        # built from it, see telemetry/events.py:build_log_error_event()).
+        if _looks_like_text(raw_head):
+            snippet = " ".join(raw_head.split()) or "<empty body>"
+        else:
+            snippet = "<not shown — body is not valid text, see reason above>"
         logger.error("AniWorld: %s (%s) — HTTP %s, %d bytes. First 300 chars: %s",
                      self.__page_problem, self.url, self.__http_status, len(html or ""),
-                     snippet or "<empty body>")
+                     snippet)
         return None
 
     # Signs that we were handed a wall rather than a page.
@@ -302,7 +341,22 @@ class AniworldSeries:
             return "aniworld.to says this series does not exist (HTTP 404) — the URL may have changed"
         if status and status >= 400:
             return f"aniworld.to refused the request (HTTP {status})"
-        # 200 OK, real body, no title anywhere: now it really is on us.
+
+        # A real byte count with a 200 but a body that isn't actually text is a different
+        # bug from a layout change, and worth telling apart: resp.text never raises, so a
+        # compressed body this build can't decompress (typically Brotli — see
+        # pyproject.toml, the niquests[brotli] extra) still "succeeds" and produces a wall
+        # of unprintable characters that *looks* like an empty title block from here. Blaming
+        # AniWorld's layout for that sends whoever reads it chasing the wrong fix.
+        if not _looks_like_text(body[:2000]):
+            enc = self.__content_encoding
+            return (f"the response body isn't valid text (Content-Encoding: {enc}) — this "
+                    "build most likely can't decompress it; install the 'brotli' extra "
+                    "(niquests[brotli]) if the encoding is br" if enc else
+                    "the response body isn't valid text (no Content-Encoding header) — the "
+                    "connection or a proxy in front of it may be mangling the response")
+
+        # 200 OK, real (readable) body, no title anywhere: now it really is on us.
         return ("the page loaded but contains no title in any known form — AniWorld's layout "
                 "has probably changed and the parser needs updating")
 

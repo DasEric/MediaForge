@@ -9,7 +9,14 @@ description = "MediaForge is a WebUI-only tool for downloading anime and series 
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "niquests",
+  # [brotli] extra: aniworld.to (Cloudflare) can serve Brotli-encoded (Content-Encoding: br)
+  # responses. niquests advertises "br" in Accept-Encoding regardless (see config.py's
+  # _DEFAULT_HEADERS), but without this extra it has no decoder for it: resp.text still
+  # "succeeds" — charset-normalizer force-decodes the still-compressed bytes into unprintable
+  # mojibake instead of raising — which then reads as an empty/garbled page and gets
+  # misdiagnosed as an AniWorld layout change. See models/aniworld_to/series.py's
+  # AniworldSeries.__diagnose() for the detection and the accurate error message.
+  "niquests[brotli]",
   "ffmpeg-python",
   "yt-dlp",
   "python-dotenv",
