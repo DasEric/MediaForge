@@ -4229,6 +4229,11 @@ msgstr "Setup starten"
 msgid "Module Manager"
 msgstr "Modulmanager"
 
+# base.html sidebar "M" pill tooltip next to module-registered links (see
+# thirdparties/registry.py's resolve_menu_items()) -- "{{ _('Module') }}: <name>"
+msgid "Module"
+msgstr "Modul"
+
 msgid "Every discovered web/thirdparties/ folder, who made it, and a working on/off switch for what it registered"
 msgstr "Jeder gefundene web/thirdparties/-Ordner, wer ihn gemacht hat, und ein funktionierender Ein/Aus-Schalter für das, was er registriert hat"
 

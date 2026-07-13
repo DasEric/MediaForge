@@ -822,9 +822,16 @@ def admin_required_blueprints():
 def resolve_menu_items(section):
     """Return the currently-enabled sidebar entries for one sidebar
     category ("discover", "management", "syncplay" or "system"), ready for
-    base.html's per-category loop: [{url, label, icon, page}, ...], sorted
-    by priority (registration order among ties). Called from app.py's
-    context processors on every request.
+    base.html's per-category loop: [{url, label, icon, page, module_name},
+    ...], sorted by priority (registration order among ties). Called from
+    app.py's context processors on every request.
+
+    Every entry this returns came from a thirdparties/ module's
+    register_thirdparty() call -- base.html's built-in links are hardcoded
+    separately and never go through here -- so base.html renders a small
+    "M" pill (see shell.css's .sidebar-module-pill) next to every one of
+    these, using module_name as its tooltip, to visually tell a module's
+    sidebar entry apart from MediaForge's own.
     """
     from flask import url_for
     from flask_babel import gettext as _gt
@@ -844,6 +851,7 @@ def resolve_menu_items(section):
                 "label": _gt(item["label"]),
                 "icon": item["icon_svg"],
                 "page": item["page_id"],
+                "module_name": module_name_for_item(item["id"]) or item["id"],
             })
         except Exception:
             # A missing endpoint or a transient DB hiccup should never break

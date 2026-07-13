@@ -531,6 +531,34 @@
   margin-left: auto;
 }
 
+/* Module pill — a small accent-colored "M" next to any sidebar link that
+   came from a thirdparties/ module's register_thirdparty() call (see
+   thirdparties/registry.py's resolve_menu_items()), rather than one of
+   MediaForge's own built-in links. Same margin-left: auto trick as the
+   badges above to sit at the end of the .sidebar-link flex row; on an
+   .active link it switches to a light/inverted variant so it stays legible
+   against .sidebar-link.active's own accent-tinted background (see
+   .sidebar-link.active above) instead of blending into it. */
+.sidebar-module-pill {
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 99px;
+  margin-left: auto;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.sidebar-link.active .sidebar-module-pill {
+  background: #fff;
+  color: var(--accent, #7c3aed);
+}
+
 /* Dev Infos sidebar badge — sits inside .sidebar-action-btn (a flex row in
    the footer, alongside GitHub), not a .sidebar-link nav item, so it uses
    the same margin-left: auto trick as .seerr-badge/.update-badge to push
