@@ -20,12 +20,16 @@ from .queue_worker import _dl_lock
 from ..telemetry import client as telemetry_client
 from ..telemetry import events as telemetry_events
 from .runtime_state import (
+    LAYOUT_BACKOFF_MINUTES,
     SYNC_ADAPTIVE_PAUSE_MAP,
     SYNC_ADAPTIVE_UNIT_MAP,
     SYNC_RETRY_MAP,
     SYNC_SCHEDULE_MAP,
     _syncing_jobs,
     _syncing_jobs_lock,
+    is_layout_backoff_active,
+    layout_backoff_remaining,
+    trigger_layout_backoff,
 )
 
 logger = get_logger(__name__)
@@ -175,6 +179,20 @@ def _run_autosync_for_job(job, force_notify=False):
     from .autosync_filter import parse_filter, episode_included, movie_included
 
     job_id = job["id"]
+
+    # A layout-change backoff is currently open (see the exception handler
+    # below and runtime_state.trigger_layout_backoff()) — skip this job
+    # without even attempting a fetch. This is what keeps a burst of due
+    # jobs from each hitting the same broken parse and each firing their own
+    # notification: only the job that first detects the problem does that;
+    # everyone else due during the window just waits it out.
+    if is_layout_backoff_active():
+        logger.info(
+            "Auto-sync skipped '%s' — AniWorld layout-change backoff active for another %.0fs",
+            job.get("title", "?"), layout_backoff_remaining(),
+        )
+        return
+
     with _syncing_jobs_lock:
         if job_id in _syncing_jobs:
             logger.info("Auto-sync skipped job %d — already running", job_id)
@@ -665,6 +683,51 @@ def _run_autosync_for_job(job, force_notify=False):
         }
         if _status_match:
             _telemetry_meta["http_status"] = int(_status_match.group(1))
+
+        # A layout change is "our bug" (see the _net_keywords comment above), but it is
+        # also, by nature, everybody's bug at once: if AniWorld's markup changed, every
+        # job's next attempt fails the exact same way. Left alone, that means a burst of
+        # jobs due around the same time (e.g. right after startup with 50 jobs configured)
+        # each hit the broken parse within seconds of each other and each fire their own
+        # "Sync-Fehler" Pushover notification — a wall of duplicate alerts for one event.
+        #
+        # So this one failure class gets handled before the transient/non-transient split
+        # below: log it once as a warning (not an error — nothing here needs a stack
+        # trace, the message already says exactly what's wrong), open a shared backoff
+        # window that holds back every job due in the next few minutes by a few more
+        # (see runtime_state.trigger_layout_backoff() and the check at the top of this
+        # function), and notify only once per window instead of once per job.
+        if _failure == "layout_changed":
+            _is_new_backoff = trigger_layout_backoff()
+            logger.warning(
+                "Auto-sync: AniWorld's layout appears to have changed (parser needs "
+                "updating) while checking '%s' — holding back sync jobs due in the next "
+                "%d min by another %d min: %s",
+                job.get("title", "?"), LAYOUT_BACKOFF_MINUTES, LAYOUT_BACKOFF_MINUTES, e,
+            )
+            update_autosync_job(
+                job["id"],
+                last_check=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                last_error=str(e),
+            )
+            telemetry_client.submit(telemetry_events.build_feature_detail_event(
+                "detail.autosync", action="run", status="layout_change_backoff",
+                metadata=_telemetry_meta,
+            ))
+            if _is_new_backoff:
+                try:
+                    from .notifications import notify_all
+                    notify_all(
+                        title="Auto-Sync",
+                        body=(f"⚠️ AniWorld-Layout hat sich vermutlich geändert — Parser "
+                              f"muss aktualisiert werden. Sync-Jobs pausieren für "
+                              f"{LAYOUT_BACKOFF_MINUTES} Minuten."),
+                        event="on_sync_error",
+                        username=job.get("added_by"),
+                    )
+                except Exception as notif_exc:
+                    logger.warning("[AutoSync] Layout-change notification failed: %s", notif_exc)
+            return
 
         if _is_transient:
             logger.warning(

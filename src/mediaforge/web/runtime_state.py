@@ -199,6 +199,65 @@ def set_queue_paused(paused: bool):
 _syncing_jobs = set()
 _syncing_jobs_lock = threading.Lock()
 
+# AniWorld layout-change backoff.
+#
+# When the parser detects that the page loaded but none of the known title
+# markers are present (see AniworldSeries.__diagnose()), the site's HTML has
+# almost certainly changed and *every* job will fail the exact same way until
+# the parser is fixed — it is not one job's problem. Without shared state, an
+# autosync burst (many jobs due around the same time, e.g. right after
+# startup with dozens of jobs configured) hits that same broken parse over
+# and over within seconds and fires one Pushover notification per job — a
+# wall of identical alerts for what is, in the end, one event.
+#
+# Instead: the first job to hit this logs a warning and opens a backoff
+# window. Every other job that is due while the window is open is held back
+# without even attempting a fetch (see autosync_worker.py's
+# _run_autosync_for_job(), which checks this before doing any network work),
+# and only the job that opened the window sends a notification. Jobs that
+# come due after the window closes try again normally — if the layout is
+# still broken, that failure opens a fresh window instead of piling on the
+# old one.
+#
+# Guarded by _layout_backoff_lock; written by autosync_worker.py's exception
+# handler when a layout-change is diagnosed, read by the same module before
+# every job attempt.
+_layout_backoff_until = 0.0  # time.monotonic() deadline; 0 (default) = no active backoff
+_layout_backoff_lock = threading.Lock()
+
+LAYOUT_BACKOFF_MINUTES = 5
+
+
+def is_layout_backoff_active() -> bool:
+    """True while a layout-change backoff is holding jobs back."""
+    import time
+    with _layout_backoff_lock:
+        return time.monotonic() < _layout_backoff_until
+
+
+def layout_backoff_remaining() -> float:
+    """Seconds left in the active backoff window, or 0.0 if none is active."""
+    import time
+    with _layout_backoff_lock:
+        remaining = _layout_backoff_until - time.monotonic()
+    return max(0.0, remaining)
+
+
+def trigger_layout_backoff(minutes: float = LAYOUT_BACKOFF_MINUTES) -> bool:
+    """Open or renew the layout-change backoff window, `minutes` from now.
+
+    Returns True if this call opened a *new* window (no backoff was active a
+    moment ago) so the caller can notify only once per burst instead of once
+    per job that hits the same broken parse.
+    """
+    import time
+    global _layout_backoff_until
+    now = time.monotonic()
+    with _layout_backoff_lock:
+        was_active = _layout_backoff_until > now
+        _layout_backoff_until = now + minutes * 60
+    return not was_active
+
 # Upscale worker cancel-events registry (same pattern as _active_cancel_events,
 # but for the separate upscale queue). Used by upscale_worker.py and
 # routes/upscale.py's cancel endpoint.
