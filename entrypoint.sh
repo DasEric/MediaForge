@@ -14,6 +14,10 @@ if command -v dbus-launch >/dev/null 2>&1; then
     eval "$(dbus-launch --sh-syntax)" 2>/dev/null || true
 fi
 
+echo "[MediaForge] Cleaning up old Xvfb locks..."
+rm -f /tmp/.X99-lock
+rm -rf /tmp/.X11-unix/X99
+
 echo "[MediaForge] Starting virtual display (Xvfb)..."
 Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
 
