@@ -50,6 +50,8 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     libxtst6 \
     xdg-utils \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/* && \
     sed -i 's/^# *\(de_DE.UTF-8\)/\1/' /etc/locale.gen && locale-gen && \
@@ -77,6 +79,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Default download directory
 ENV MEDIAFORGE_DOWNLOAD_PATH=/app/Downloads \
     MEDIAFORGE_DOCKER=1
+
+# Force Mesa software rendering (llvmpipe) for the captcha browser's WebGL.
+# There is no GPU in a NAS/container, so Chromium would otherwise use its
+# bundled SwiftShader -- a strong Turnstile bot signal. llvmpipe is a common,
+# internally-consistent software renderer that looks far less automated.
+# The matching Chromium flags live in playwright/captcha.py (_stealth_launch_args);
+# disable the whole scheme with MEDIAFORGE_NO_LLVMPIPE=1 if it misbehaves.
+ENV LIBGL_ALWAYS_SOFTWARE=1 \
+    GALLIUM_DRIVER=llvmpipe
 
 # Realistic locale / timezone so the captcha browser doesn't look like a bare
 # UTC server (Turnstile evaluates these signals).

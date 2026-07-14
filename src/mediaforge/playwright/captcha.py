@@ -365,6 +365,18 @@ def _stealth_launch_args(offscreen: bool) -> list:
         "--window-size=1920,1080",
         "--lang=de-DE,de",
         "--disable-dev-shm-usage",
+        # Keep the renderer running at full speed even when the window is
+        # off-screen / not focused / considered "occluded".  Chromium otherwise
+        # throttles background & occluded windows: requestAnimationFrame and
+        # timers slow to a crawl, which makes Cloudflare Turnstile's challenge
+        # (it relies on rAF + precise timers) hang or fail verification.  This
+        # is the primary reason auto-solving fails under Xvfb/Docker, where the
+        # solve window is never the foreground window.  None of these flags are
+        # observable from page JavaScript, so they add no bot fingerprint.
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-background-timer-throttling",
+        "--disable-features=CalculateNativeWinOcclusion",
     ]
     # Route the captcha browser's DNS through the same resolver as the rest of
     # the app.  Chromium is a separate process and does NOT inherit Python's
@@ -380,13 +392,40 @@ def _stealth_launch_args(offscreen: bool) -> list:
         # capability-stripped container; --no-sandbox is the standard Docker
         # workaround and is NOT observable from the page (no JS fingerprint).
         args.append("--no-sandbox")
-    if offscreen:
+    if _in_docker() and not _env_flag("MEDIAFORGE_NO_LLVMPIPE"):
+        # No GPU on a NAS/container: by default Chromium renders WebGL with its
+        # bundled SwiftShader, whose "ANGLE (Google, SwiftShader ...)" renderer
+        # string is one of Turnstile's strongest bot signals.  Routing ANGLE
+        # through the system GL driver makes it use Mesa's llvmpipe instead
+        # (still CPU-only, but a common, internally-consistent renderer that
+        # real Linux servers/VMs report) -- a far weaker signal.  Requires the
+        # Mesa software DRI driver in the image (libgl1-mesa-dri) plus
+        # LIBGL_ALWAYS_SOFTWARE=1 / GALLIUM_DRIVER=llvmpipe (set in the
+        # Dockerfile).  Kill-switch: MEDIAFORGE_NO_LLVMPIPE=1 reverts to the
+        # previous SwiftShader behaviour if llvmpipe misbehaves on a given host.
+        args += [
+            "--use-gl=angle",
+            "--use-angle=gl",
+            "--ignore-gpu-blocklist",
+        ]
+    if offscreen and not _in_docker():
+        # Real desktop (Windows / Linux with a physical display): push the
+        # window far off-screen so a background/queue solve doesn't pop a
+        # visible window in the user's face.
+        #
         # -1920,0 (a "plausible second monitor" position) was tried here to
         # avoid the impossible screenX/screenY of a huge sentinel value, but
         # on a single-monitor machine Windows' own window manager detects
         # that position as unreachable and snaps the window back onto the
         # visible screen at full size — the opposite of hidden. Back to a
         # value large enough that Windows never "corrects" it.
+        #
+        # NOT applied under Docker/Xvfb: there the display is a virtual
+        # framebuffer nobody sees, so hiding is pointless -- and a window pushed
+        # entirely outside the 1920x1080 Xvfb screen has no valid on-screen
+        # backing area, which starves the renderer and the streamed screenshot.
+        # Leaving it at the default (on-screen, 0,0) keeps a valid render
+        # surface; the anti-occlusion flags above keep it painting regardless.
         args.insert(0, "--window-position=-32000,-32000")
     return args
 
@@ -425,8 +464,16 @@ def _focus_page(page) -> None:
     focus-stealing there is intentional, not a surprise interruption.
     Off-screen mode instead relies on _stealth_launch_args() keeping the
     window at a plausible (not physically-impossible) off-screen position
-    so Turnstile's screenX/screenY check doesn't fail regardless of focus."""
-    if not _env_flag("MEDIAFORGE_CAPTCHA_VISIBLE"):
+    so Turnstile's screenX/screenY check doesn't fail regardless of focus.
+
+    Exception: under Docker/Xvfb the display is a virtual framebuffer with no
+    human in front of it, so there is nothing to interrupt -- and a foregrounded
+    tab is what Turnstile expects from a real user (Page.bringToFront activates
+    the tab inside the browser via CDP; it does not require an OS window
+    manager). Bringing it to front there removes the unfocused-window bot
+    signal without any UX downside, which measurably helps auto-solving on
+    headless Linux/Docker."""
+    if not (_env_flag("MEDIAFORGE_CAPTCHA_VISIBLE") or _in_docker()):
         return
     try:
         page.bring_to_front()
