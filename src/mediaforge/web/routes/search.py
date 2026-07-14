@@ -18,6 +18,7 @@ from .browse import _browse_cache
 from .browse import _prefetch_cycle
 from ..db import get_custom_paths
 from ..db import get_setting
+from ..lang_folders import LANG_FOLDERS
 from ..queue_worker import _hanime_enabled
 from ..queue_worker import _is_filmpalast_url
 from ..queue_worker import _is_hanime_url
@@ -734,7 +735,7 @@ def register_search_routes(app):
                                 cpp = _P.home() / cpp
                             roots.append(cpp)
                         lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
-                        lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+                        lang_folders = LANG_FOLDERS
                         ep_re = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
                         bases = []
                         for root in roots:
@@ -790,7 +791,13 @@ def register_search_routes(app):
                                 cpp = _P.home() / cpp
                             roots.append(cpp)
                         ep_re = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
-                        for base in roots:
+                        # With language separation on, hanime lands in the
+                        # "japanese-dub" subfolder, not in the root itself.
+                        lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
+                        bases = []
+                        for root in roots:
+                            bases.extend([root / lf for lf in LANG_FOLDERS] if lang_sep else [root])
+                        for base in bases:
                             if not base.is_dir():
                                 continue
                             for folder in base.iterdir():
@@ -835,7 +842,7 @@ def register_search_routes(app):
             from pathlib import Path
 
             lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
-            lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+            lang_folders = LANG_FOLDERS
 
             raw = os.environ.get("MEDIAFORGE_DOWNLOAD_PATH", "")
             if raw:

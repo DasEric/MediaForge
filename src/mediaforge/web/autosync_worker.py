@@ -300,18 +300,15 @@ def _run_autosync_for_job(job, force_notify=False):
                 job.get("title", "?"),
             )
 
-        lang_folder_map = {
-            "German Dub": "german-dub",
-            "English Sub": "english-sub",
-            "German Sub": "german-sub",
-            "English Dub": "english-dub",
-            "English Dub (German Sub)": "english-dub-german-sub",
-        }
+        from .lang_folders import LANG_FOLDER_MAP
+        from .lang_folders import SYNC_ALL_LANGUAGES
+
+        lang_folder_map = LANG_FOLDER_MAP
 
         target_languages = []
         if job.get("language") == "All Languages":
             disable_eng_sub = os.environ.get("MEDIAFORGE_DISABLE_ENGLISH_SUB", "0") == "1"
-            for lang in lang_folder_map.keys():
+            for lang in SYNC_ALL_LANGUAGES:
                 if disable_eng_sub and lang == "English Sub":
                     continue
                 target_languages.append(lang)

@@ -1003,7 +1003,10 @@ function renderBrowseCards(grid, items, opts) {
       `<div class="browse-title">${esc(item.title)}</div>` +
       `<div class="browse-genre">${esc(item.genre)}</div>` +
       `</div>`;
-    addDownloadedBadge(card, item.title);
+    // hanime listing cards carry the per-episode title ("Foo 2") while the
+    // download folder is named after the franchise ("Foo") — pass both so the
+    // "Vorhanden" check matches either. Other providers only ever have .title.
+    addDownloadedBadgeMulti(card, [item.series_title, item.title]);
     addSyncBadge(card, item.url);
     grid.appendChild(card);
     // CineInfo (TMDB + Crunchyroll/Fernsehserien fallback pills) doesn't apply
@@ -1272,7 +1275,8 @@ function renderResultsBoth(aniResults, stoResults, fpResults, mkResults, hanResu
         (r.censored ? '<div class="hanime-pill hanime-pill-' + esc(String(r.censored).toLowerCase()) + '">' + esc(_hanimeCensLabel(r.censored)) + '</div>' : '') +
         '<img src="" alt="" style="width:100%;aspect-ratio:2/3;object-fit:cover;background:var(--bg-elevated);display:block">' +
         '<div class="browse-info"><div class="browse-title">' + esc(r.title) + '</div><div class="browse-genre">' + esc(r.genre || '') + '</div></div>';
-      addDownloadedBadge(card, r.title);
+      // Same franchise-vs-episode title split as renderBrowseCards (hanime).
+      addDownloadedBadgeMulti(card, [r.series_title, r.title]);
       addSyncBadge(card, r.url);
       grid.appendChild(card);
       loadPoster(r.url, card.querySelector("img"));

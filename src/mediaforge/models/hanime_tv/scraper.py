@@ -174,8 +174,15 @@ def _hit_to_card(hit):
     name = _clean(hit.get("name") or hit.get("title"))
     display_tags = _display_tags(hit)
     genres = ", ".join(display_tags[:3])
+    # Listing hits are per-episode ("Foo 2"), but a download folder is named
+    # after the franchise (HanimeSeries.title strips the episode suffix — see
+    # parse_meta). Ship that base title alongside the display title so the
+    # frontend's "already downloaded" check has something that can actually
+    # match a folder/library entry.
+    series_title = _EP_SUFFIX_RE.sub("", name).strip() or name
     return {
         "title": name,
+        "series_title": series_title,
         "url": series_url(slug) if slug else "",
         "poster_url": _poster(hit),
         "genre": genres,
@@ -483,16 +490,4 @@ def best_stream(detail):
     if detail.get("m3u8"):
         return detail["m3u8"]
     manifest = detail.get("videos_manifest") or {}
-    best_url, best_h = "", -1
-    for server in manifest.get("servers") or []:
-        for st in server.get("streams") or []:
-            url = st.get("url") or ""
-            if not url:
-                continue
-            try:
-                h = int(st.get("height") or 0)
-            except (TypeError, ValueError):
-                h = 0
-            if h > best_h:
-                best_h, best_url = h, url
-    return best_url or None
+ 

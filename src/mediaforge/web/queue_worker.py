@@ -468,17 +468,9 @@ def _queue_worker():
                     base = Path.home() / "Downloads"
 
             if lang_sep:
-                lang_folder_map = {
-                    "German Dub": "german-dub",
-                    "English Sub": "english-sub",
-                    "German Sub": "german-sub",
-                    "English Dub": "english-dub",
-                    "English Dub (German Sub)": "english-dub-german-sub",
-                }
-                lang_folder = lang_folder_map.get(
-                    item["language"], item["language"].lower().replace(" ", "-")
-                )
-                selected_path = str(base / lang_folder)
+                from .lang_folders import lang_folder_for
+
+                selected_path = str(base / lang_folder_for(item["language"]))
             elif custom_path_id:
                 selected_path = str(base)
 

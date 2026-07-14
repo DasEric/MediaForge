@@ -19,6 +19,7 @@ from ...search import random_anime
 from ..db import get_browse_cache_stale
 from ..db import get_custom_paths
 from ..db import get_setting
+from ..lang_folders import LANG_FOLDERS
 from ..db import get_tmdb_cache
 from ..db import set_browse_cache
 from ..queue_worker import _hanime_enabled
@@ -433,7 +434,7 @@ def register_browse_routes(app):
             dl_path = Path.home() / "Downloads"
 
         lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
-        lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+        lang_folders = LANG_FOLDERS
 
         # Collect all paths to scan (default + custom)
         scan_roots = [dl_path]

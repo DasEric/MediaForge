@@ -8,6 +8,7 @@ from ..db import get_all_library_cache
 from ..db import get_custom_path_by_id
 from ..db import get_custom_paths
 from ..db import get_setting
+from ..lang_folders import LANG_FOLDERS
 from ..db import invalidate_library_cache
 from ..db import set_library_cache
 from ..db import set_library_scanning
@@ -25,7 +26,7 @@ from ...logger import get_logger
 logger = get_logger(__name__)
 
 
-_LIB_LANG_FOLDERS = ["german-dub", "english-sub", "german-sub", "english-dub"]
+_LIB_LANG_FOLDERS = LANG_FOLDERS
 _LIB_VIDEO_EXTS = {".mkv", ".mp4", ".ts"}
 _LIB_EP_RE = re.compile(r"S(\d{2})E(\d{2,3})", re.IGNORECASE)
 _LIB_FALLBACK_EP_RE = re.compile(r"\bE(\d{2,3})\b", re.IGNORECASE)
@@ -716,7 +717,7 @@ def register_library_routes(app):
         dl_base = dl_base.resolve()
 
         lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
-        lang_folders = ["german-dub", "english-sub", "german-sub", "english-dub"]
+        lang_folders = LANG_FOLDERS
         lang_folder = data.get("lang_folder")  # str or null
 
         if lang_sep and lang_folder:
