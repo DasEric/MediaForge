@@ -1149,6 +1149,17 @@ def start_web_ui(
             except Exception:
                 pass
 
+            # Silence waitress's own death rattle. Closing the listening socket from this
+            # thread makes the worker threads still servicing other requests fail their next
+            # trigger pull — on Windows that surfaces as a stack of
+            # "OSError [WinError 10038] ... not a socket" logged by waitress itself. During a
+            # deliberate restart those are expected and meaningless; muting the logger keeps
+            # the console readable instead of alarming.
+            try:
+                logging.getLogger("waitress").setLevel(logging.CRITICAL)
+            except Exception:
+                pass
+
             # Free the port before the replacement tries to bind it.
             try:
                 server.close()

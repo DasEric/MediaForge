@@ -105,18 +105,37 @@ def request_restart(delay: float = 1.0) -> dict:
     return {"ok": True, "already": False}
 
 
+# The distribution's top-level package, derived (not hard-coded) from where this module
+# lives: mediaforge.web.restart → "mediaforge". Used as the last-resort re-exec form,
+# ``python -m mediaforge``, which works from anywhere the package is importable — which is
+# always, since we are running inside it.
+_ROOT_PACKAGE = (__package__ or __name__).split(".")[0]
+
+
 def reexec_argv() -> list:
     """The command line that starts this MediaForge again.
 
-    Three ways MediaForge gets started, and each needs its own reconstruction — this
-    is the part that quietly breaks if you guess:
+    FOUR ways MediaForge gets launched, and each rebuilds differently. Guessing one wrong is
+    silent until someone hits restart — which is exactly what happened with the console-script
+    case below.
 
-    - a frozen build (PyInstaller): ``sys.executable`` *is* MediaForge.
-    - ``python -m mediaforge``: re-running ``sys.argv[0]`` would run ``__main__.py``
-      as a script, with a different package context. ``__main__.__spec__.parent`` is
-      the only reliable way back to the ``-m`` form (this is what Werkzeug's reloader
-      does, for the same reason).
-    - ``python path/to/script.py``: the plain case.
+    1. **Frozen build (PyInstaller):** ``sys.executable`` *is* MediaForge. Re-run it with the
+       same arguments.
+
+    2. **``python -m mediaforge``:** re-running ``sys.argv[0]`` would run ``__main__.py`` as a
+       loose script with the wrong package context. ``__main__.__spec__.parent`` is the only
+       reliable way back to the ``-m`` form (Werkzeug's reloader does the same).
+
+    3. **``python path/to/run.py``:** a real script file. Re-run it under the interpreter.
+
+    4. **Console script (``mediaforge``, the pip entry point):** and this is the one that was
+       broken. ``sys.argv[0]`` is the wrapper's path *without* an extension —
+       ``C:\\Python312\\Scripts\\mediaforge`` — and there is no such *file*: on Windows the
+       real launcher is ``mediaforge.exe``. Prefixing it with ``sys.executable`` produced
+       ``python.exe C:\\...\\Scripts\\mediaforge``, and python cannot open that as a script:
+       *"can't open file 'mediaforge'"*. The fix does not try to guess the wrapper's extension
+       at all — it re-runs the package it belongs to, ``python -m mediaforge``, which is
+       exactly what the console script does anyway and works identically on Windows and Linux.
     """
     if getattr(sys, "frozen", False):
         return [sys.executable, *sys.argv[1:]]
@@ -126,7 +145,15 @@ def reexec_argv() -> list:
     if spec is not None and getattr(spec, "parent", ""):
         return [sys.executable, "-m", spec.parent, *sys.argv[1:]]
 
-    return [sys.executable, *sys.argv]
+    # A real script file the interpreter can open: python run.py.
+    argv0 = sys.argv[0] or ""
+    if argv0.endswith((".py", ".pyw")) and os.path.isfile(argv0):
+        return [sys.executable, argv0, *sys.argv[1:]]
+
+    # Anything else is the console-script launcher (no .py, or a bare "mediaforge" / an
+    # .exe stub). Do not reconstruct its path — re-enter the package by name. sys.argv[1:]
+    # carries the real CLI arguments (web, --web-port, …), so this reproduces the launch.
+    return [sys.executable, "-m", _ROOT_PACKAGE, *sys.argv[1:]]
 
 
 def replace_process() -> None:
