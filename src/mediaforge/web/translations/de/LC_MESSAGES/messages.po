@@ -4407,11 +4407,20 @@ msgstr "Store-Repository-URL"
 msgid "Base URL or index.json of a MediaForge module repository. Leave empty to disable the store entirely."
 msgstr "Basis-URL oder index.json eines MediaForge-Modul-Repositorys. Leer lassen, um den Store komplett zu deaktivieren."
 
+# The old wording, kept because an old .mo may still be in use somewhere. Superseded by the
+# pair below: the switch now also decides *which catalog is fetched* (index.json vs
+# index-all.json), so its label had to say so.
 msgid "Allow unverified modules"
 msgstr "Unverifizierte Module erlauben"
 
 msgid "Unverified entries are community links nobody reviewed — the code can change under the same URL at any time. Installing one runs it inside MediaForge with full access to your data."
 msgstr "Unverifizierte Einträge sind Community-Links, die niemand geprüft hat — der Code hinter derselben URL kann sich jederzeit ändern. Ein solches Modul läuft nach der Installation innerhalb von MediaForge mit vollem Zugriff auf deine Daten."
+
+msgid "Allow unverified and unreviewed modules"
+msgstr "Unverifizierte und ungeprüfte Module erlauben"
+
+msgid "Unverified entries carry no signature this build trusts, and unreviewed ones are submissions nobody has read yet — they are shown only while this is on. Installing one runs it inside MediaForge with full access to your data."
+msgstr "Unverifizierte Einträge tragen keine Signatur, der dieser Build vertraut; ungeprüfte sind Einreichungen, die noch niemand gelesen hat — sie werden nur angezeigt, solange das hier aktiv ist. Ein solches Modul läuft nach der Installation innerhalb von MediaForge mit vollem Zugriff auf deine Daten."
 
 msgid "Loading store…"
 msgstr "Lade Store…"

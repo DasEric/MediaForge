@@ -364,11 +364,17 @@
         </div>
       </div>
 
+      <!-- One switch, two consequences, and they belong together: it permits unverified
+           modules to be installed AND it makes the store list the ones nobody has reviewed
+           yet (its index-all.json — see thirdparties/store.py's fetch_index()). Splitting
+           them into two toggles would mean an admin could switch on "allow unverified" and
+           see no change whatsoever, because the catalog they are reading never mentions
+           any. -->
       <div class="settings-row" id="extStoreUnverifiedRow" {% if not store_enabled %}style="display:none;"{% endif %}>
         <div class="settings-row-left">
-          <div class="settings-row-label">{{ _('Allow unverified modules') }}</div>
+          <div class="settings-row-label">{{ _('Allow unverified and unreviewed modules') }}</div>
           <div class="settings-row-desc">
-            {{ _('Unverified entries are community links nobody reviewed — the code can change under the same URL at any time. Installing one runs it inside MediaForge with full access to your data.') }}
+            {{ _('Unverified entries carry no signature this build trusts, and unreviewed ones are submissions nobody has read yet — they are shown only while this is on. Installing one runs it inside MediaForge with full access to your data.') }}
           </div>
         </div>
         <div class="settings-row-right">

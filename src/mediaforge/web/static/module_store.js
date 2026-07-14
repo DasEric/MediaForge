@@ -120,6 +120,17 @@
       meta.push(`<a href="${esc(m.source_url)}" target="_blank" rel="noopener noreferrer">${esc(m.source_url)}</a>`);
     }
 
+    // Two different warnings, two badges. "Unverified" = nobody signed this. "Unreviewed" =
+    // nobody read it — it is a submission still sitting in the store's queue, visible only
+    // because this install asked to see the queue. Folding them into one word would throw
+    // away the more alarming half.
+    const unreviewed = m.unreviewed
+      ? `<span class="integ-subsection-badge badge-incompatible"
+               title="${esc(t("Von niemandem geprüft — liegt im Store noch in der Review-Warteschlange",
+                              "Reviewed by nobody — still sitting in the store's review queue"))}">${
+          esc(t("Ungeprüft", "Unreviewed"))}</span>`
+      : "";
+
     return `
       <div class="settings-row">
         <div class="settings-row-left">
@@ -127,6 +138,7 @@
             ${esc(m.name)}
             <span class="integ-subsection-badge badge-version">v${esc(m.version)}</span>
             <span class="integ-subsection-badge ${trust.cls}">${esc(t(trust.de, trust.en))}</span>
+            ${unreviewed}
           </div>
           ${desc ? `<div class="settings-row-desc">${esc(desc)}</div>` : ""}
           <div class="settings-row-desc" style="opacity:.7;">${meta.join(" · ")}</div>
@@ -330,6 +342,10 @@
       const data = await post("/api/store/config",
         { allow_unverified: unverified.checked ? "1" : "0" }, "PUT");
       if (data.error) { toast(t("Fehler: ", "Error: ") + data.error); return; }
+      // force=true, not a plain reload: this switch changes *which catalog file* is
+      // fetched (index.json vs index-all.json), so a cached answer from before the flip is
+      // the wrong answer. Getting the same list back after toggling is exactly how a
+      // setting earns a reputation for not working.
       loadCatalog(true);
     });
   }

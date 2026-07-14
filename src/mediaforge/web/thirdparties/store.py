@@ -217,13 +217,26 @@ def allow_unverified() -> bool:
     return (get_setting(ALLOW_UNVERIFIED_KEY, "0") or "0") == "1"
 
 
-def _index_url(url: str) -> str:
+def _index_url(url: str, include_unapproved: bool = False) -> str:
     """Accept either a full ``.../index.json`` or the store's base URL and
-    normalize to the former, so an admin can paste whichever they were given."""
+    normalize to the former, so an admin can paste whichever they were given.
+
+    With *include_unapproved*, ask for the store's second catalog — ``index-all.json`` —
+    which also lists modules nobody has reviewed yet. That is the file behind the "allow
+    unverified modules" switch: without it the switch would only permit unverified modules
+    to be *installed*, while the catalog it reads from never mentioned any, which is a
+    setting that appears to do nothing.
+
+    A pasted ``.../index.json`` is rewritten too. Somebody who typed the normal index and
+    then turned the switch on meant "show me everything from that store", not "show me
+    everything, except keep reading the file that has none of it".
+    """
     url = url.strip().rstrip("/")
     if url.endswith(".json"):
+        if include_unapproved and url.endswith("/index.json"):
+            return url[: -len("/index.json")] + "/index-all.json"
         return url
-    return url + "/index.json"
+    return url + ("/index-all.json" if include_unapproved else "/index.json")
 
 
 def _http_get(url: str, max_bytes: int, timeout: int = HTTP_TIMEOUT) -> bytes:
@@ -290,18 +303,35 @@ def _normalize(entry: dict, base_url: str) -> dict:
         "download_url": download_url,
         "sha256": str(entry.get("sha256") or "").lower(),
         "size": entry.get("size"),
+        # Only present in a store's index-all.json, and only on entries nobody has reviewed
+        # yet ("pending", "draft"). It is the store telling on itself, and it earns a badge
+        # of its own in the Modulmanager: "unverified" says nobody signed this, while
+        # "unreviewed" says nobody *read* it. Those are different warnings and a user
+        # deserves both.
+        "review_status": str(entry.get("review_status") or ""),
     }
 
 
-def fetch_index(url: str = None, force: bool = False) -> dict:
+def fetch_index(url: str = None, force: bool = False, include_unapproved: bool = None) -> dict:
     """Fetch (or return the cached) index of one repository: ``{"ok", "error",
     "name", "updated_at", "url", "modules": [...]}``.
 
-    Never raises: a store that's down, a firewall, a typo'd URL or a malformed
-    index all come back as ``ok: False`` with a message, because the only caller
-    is a page an admin is looking at, and "that repo is unreachable" is a
-    perfectly ordinary thing for it to say — especially with several repos
-    configured, where one being down must not take the others with it.
+    *include_unapproved* picks which of the store's two catalogs to read — the reviewed one
+    (``index.json``) or everything, unreviewed submissions included (``index-all.json``).
+    Defaults to whatever the admin's "allow unverified modules" setting says, because those
+    two things are the same decision wearing different hats: a switch that permits
+    unverified installs while the catalog it reads never lists any would appear to do
+    nothing at all.
+
+    A store that offers no ``index-all.json`` (an older one, or a third-party repo that
+    never had a review queue) is not an error — we fall back to the normal index and log it
+    once. "This repo doesn't have unreviewed modules" is an answer, not a failure.
+
+    Never raises: a store that's down, a firewall, a typo'd URL or a malformed index all
+    come back as ``ok: False`` with a message, because the only caller is a page an admin is
+    looking at, and "that repo is unreachable" is a perfectly ordinary thing for it to say —
+    especially with several repos configured, where one being down must not take the others
+    with it.
     """
     import time
 
@@ -309,15 +339,37 @@ def fetch_index(url: str = None, force: bool = False) -> dict:
     if not url:
         return {"ok": False, "error": "no store configured", "url": "", "modules": []}
 
-    cached = _CACHE.get(url)
+    if include_unapproved is None:
+        include_unapproved = allow_unverified()
+
+    # The variant is part of the cache key. Without that, flipping the switch would keep
+    # serving the catalog fetched under the old setting for up to fifteen minutes — the
+    # setting would look broken, and the obvious next move (click Refresh, see no change)
+    # would confirm it.
+    cache_key = (url, bool(include_unapproved))
+
+    cached = _CACHE.get(cache_key)
     if cached and not force:
         ttl = _CACHE_TTL if cached["index"].get("ok") else _FAIL_TTL
         if (time.time() - cached["fetched_at"]) < ttl:
             return cached["index"]
 
-    index_url = _index_url(url)
+    index_url = _index_url(url, include_unapproved)
     try:
-        raw = _http_get(index_url, 4 * 1024 * 1024, timeout=INDEX_TIMEOUT)
+        try:
+            raw = _http_get(index_url, 4 * 1024 * 1024, timeout=INDEX_TIMEOUT)
+        except Exception:
+            if not include_unapproved:
+                raise
+            # No index-all.json here. Read the reviewed catalog instead of showing this repo
+            # as broken — an old store, or one that simply has no review queue, still has
+            # modules to offer.
+            fallback = _index_url(url, include_unapproved=False)
+            logger.info("[ModuleStore] %s offers no index-all.json — falling back to %s",
+                        url, fallback)
+            index_url = fallback
+            raw = _http_get(index_url, 4 * 1024 * 1024, timeout=INDEX_TIMEOUT)
+
         data = json.loads(raw.decode("utf-8"))
         announced = int(data.get("store_api") or 0)
         if announced > STORE_API_VERSION:
@@ -333,14 +385,15 @@ def fetch_index(url: str = None, force: bool = False) -> dict:
             "updated_at": str(data.get("updated_at") or ""),
             "url": index_url,
             "store_url": url,
+            "includes_unapproved": bool(data.get("includes_unapproved")),
             "modules": modules,
         }
     except Exception as exc:
         logger.warning("[ModuleStore] Could not fetch index from %s: %s", index_url, exc)
         index = {"ok": False, "error": str(exc), "name": url, "url": index_url,
-                 "store_url": url, "modules": []}
+                 "store_url": url, "includes_unapproved": False, "modules": []}
 
-    _CACHE[url] = {"index": index, "fetched_at": time.time()}
+    _CACHE[cache_key] = {"index": index, "fetched_at": time.time()}
     return index
 
 
@@ -490,6 +543,17 @@ def catalog(force: bool = False) -> dict:
                 update = entry["version"] != installed_ver
         compat = _compat_reason(entry)
         blocked_by_trust = entry["trust"] == "unverified" and not unverified_ok
+
+        # Unreviewed is not the same as unverified, and conflating them would waste the one
+        # piece of information the store went out of its way to give us. "Unverified" means
+        # nobody signed this. "Unreviewed" means nobody *read* it — it is sitting in a queue
+        # waiting for a human, and it is on offer here only because this install asked to see
+        # the queue. It shows up as its own badge, and it is never installable while
+        # unverified modules are switched off (it cannot be: the store forces those entries
+        # to unverified, so blocked_by_trust already covers it — this is belt and braces on
+        # the one decision worth being paranoid about).
+        unreviewed = bool(entry.get("review_status")) and entry["review_status"] != "approved"
+
         modules.append({
             **entry,
             "installed": bool(local),
@@ -497,7 +561,10 @@ def catalog(force: bool = False) -> dict:
             "update_available": update,
             "compat_reason": compat,
             "blocked_by_trust": blocked_by_trust,
-            "installable": not compat and not blocked_by_trust and bool(entry["download_url"]),
+            "unreviewed": unreviewed,
+            "installable": (not compat and not blocked_by_trust
+                            and not (unreviewed and not unverified_ok)
+                            and bool(entry["download_url"])),
         })
     modules.sort(key=lambda m: (TRUST_LEVELS.index(m["trust"]), m["name"].lower()))
 
