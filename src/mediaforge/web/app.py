@@ -672,6 +672,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     from .routes.stream import register_stream_routes
     from .routes.progress import register_progress_routes
     from .routes.direct_link import register_direct_link_routes
+    from .routes.backup import register_backup_routes
 
     register_search_routes(app)
     register_queue_routes(app)
@@ -722,6 +723,7 @@ def create_app(auth_enabled=True, sso_enabled=False, force_sso=False):
     register_captcha_routes(app)
     register_stream_routes(app)
     register_progress_routes(app)
+    register_backup_routes(app)
 
     # ---- Background workers relocated into their feature modules ----
     from .routes.image_proxy import ensure_image_cache_cleanup

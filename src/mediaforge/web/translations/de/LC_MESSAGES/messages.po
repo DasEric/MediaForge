@@ -4750,10 +4750,45 @@ msgid "Downloads the package from PyPI into the MediaForge module folder and loa
 msgstr "Lädt das Paket von PyPI in den MediaForge-Modulordner und lädt das Modul anschließend."
 
 msgid "This build cannot install packages itself. Install the dependency into the environment MediaForge runs in."
-msgstr "Dieser Build kann keine Pakete selbst installieren. Installiere die Abhängigkeit in der Umgebung, in der MediaForge läuft."
+msgstr "Dieser Build kann keine Pak
 
-msgid "Install now"
-msgstr "Jetzt installieren"
-id "Available modules"
-msgstr "Verfügbare Module"
 
+# ── Backup (Full & Selective) ───────────────────────────────────────────────
+msgid "Backup"
+msgstr "Backup"
+
+msgid "Create backup"
+msgstr "Backup erstellen"
+
+msgid "Export your settings and data to a single backup file. Choose which categories to include. A password is required — it encrypts sensitive values such as API keys and passwords. Without the password the backup cannot be restored."
+msgstr "Exportiere deine Einstellungen und Daten in eine einzige Backup-Datei. Wähle, welche Kategorien enthalten sein sollen. Ein Passwort ist erforderlich — es verschlüsselt sensible Werte wie API-Schlüssel und Passwörter. Ohne das Passwort kann das Backup nicht wiederhergestellt werden."
+
+msgid "Loading…"
+msgstr "Lädt…"
+
+msgid "Backup password"
+msgstr "Backup-Passwort"
+
+msgid "Repeat password"
+msgstr "Passwort wiederholen"
+
+msgid "Restore backup"
+msgstr "Backup wiederherstellen"
+
+msgid "Restore a backup file. Select the file and enter its password to preview the contents, then choose which categories to restore."
+msgstr "Stelle eine Backup-Datei wieder her. Wähle die Datei und gib ihr Passwort ein, um den Inhalt in der Vorschau zu sehen, und wähle dann die wiederherzustellenden Kategorien."
+
+msgid "Backup file"
+msgstr "Backup-Datei"
+
+msgid "Preview"
+msgstr "Vorschau"
+
+msgid "Merge (keep existing, add/overwrite from backup)"
+msgstr "Zusammenführen (Vorhandenes behalten, aus Backup ergänzen/überschreiben)"
+
+msgid "Replace (clear selected data first)"
+msgstr "Ersetzen (ausgewählte Daten zuerst löschen)"
+
+msgid "Restore"
+msgstr "Wiederherstellen"

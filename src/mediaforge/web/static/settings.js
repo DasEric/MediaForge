@@ -2470,3 +2470,186 @@ async function resetMirrorHosts(siteId) {
     _renderMirrorSites();
   }
 }
+
+// ─── Full & Selective Backup (admin only) ─────────────────────────────────
+// Bilingual UI strings via the global t(de, en) helper from base.html.
+
+const BACKUP_CAT_LABELS = {
+  settings:       function () { return t("Einstellungen", "Settings"); },
+  favourites:     function () { return t("Favoriten & Bibliothek", "Favourites & library"); },
+  history:        function () { return t("Download-Verlauf", "Download history"); },
+  watch_progress: function () { return t("Wiedergabe-Fortschritt", "Watch progress"); },
+  custom_paths:   function () { return t("Eigene Pfade", "Custom paths"); },
+  users:          function () { return t("Benutzerkonten", "User accounts"); },
+  queues:         function () { return t("Warteschlangen & Jobs", "Queues & jobs"); },
+  calendar:       function () { return t("Kalender", "Calendar"); },
+  push:           function () { return t("Push-Abos", "Push subscriptions"); },
+};
+
+function _backupCatLabel(id) {
+  return BACKUP_CAT_LABELS[id] ? BACKUP_CAT_LABELS[id]() : id;
+}
+
+function _backupRenderCats(container, cats) {
+  container.innerHTML = "";
+  cats.forEach(function (c) {
+    const wrap = document.createElement("label");
+    wrap.className = "settings-checkbox-row backup-cat";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = c.id;
+    cb.className = "backup-cat-cb";
+    cb.checked = !!c.default;
+    const span = document.createElement("span");
+    let label = _backupCatLabel(c.id);
+    if (typeof c.count === "number") label += " (" + c.count + ")";
+    span.textContent = label;
+    wrap.appendChild(cb);
+    wrap.appendChild(span);
+    container.appendChild(wrap);
+  });
+}
+
+function _backupSelectedCats(container) {
+  return Array.prototype.map.call(
+    container.querySelectorAll(".backup-cat-cb:checked"),
+    function (cb) { return cb.value; }
+  );
+}
+
+async function backupLoadCats() {
+  const box = document.getElementById("backupExportCats");
+  if (!box) return;
+  try {
+    const res = await fetch("/api/backup/categories");
+    const data = await res.json();
+    if (data.error) { box.innerHTML = ""; showToast(data.error); return; }
+    _backupRenderCats(box, data.categories || []);
+  } catch (e) {
+    box.innerHTML = "";
+    showToast(t("Backup-Kategorien konnten nicht geladen werden", "Could not load backup categories"));
+  }
+}
+
+async function backupExport() {
+  const pw = (document.getElementById("backupExportPw") || {}).value || "";
+  const pw2 = (document.getElementById("backupExportPw2") || {}).value || "";
+  const msg = document.getElementById("backupExportMsg");
+  if (!pw) { showToast(t("Bitte ein Backup-Passwort setzen", "Please set a backup password")); return; }
+  if (pw !== pw2) { showToast(t("Passwörter stimmen nicht überein", "Passwords do not match")); return; }
+  const cats = _backupSelectedCats(document.getElementById("backupExportCats"));
+  if (!cats.length) { showToast(t("Keine Kategorie ausgewählt", "No category selected")); return; }
+  const btn = document.getElementById("backupExportBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch("/api/backup/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categories: cats, password: pw }),
+    });
+    if (!res.ok) {
+      let err = t("Export fehlgeschlagen", "Export failed");
+      try { const j = await res.json(); if (j.error) err = j.error; } catch (e) { }
+      showToast(err);
+      return;
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    let fname = "mediaforge-backup.mfbackup";
+    const m = /filename="?([^"]+)"?/.exec(cd);
+    if (m) fname = m[1];
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    if (msg) msg.textContent = t("Backup erstellt: ", "Backup created: ") + fname;
+  } catch (e) {
+    showToast(t("Export fehlgeschlagen: ", "Export failed: ") + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function backupOnFileChange() {
+  // Hide any stale preview when the selected file changes.
+  const box = document.getElementById("backupPreviewBox");
+  if (box) box.style.display = "none";
+}
+
+async function backupPreview() {
+  const fileInput = document.getElementById("backupImportFile");
+  const pw = (document.getElementById("backupImportPw") || {}).value || "";
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) { showToast(t("Bitte eine Backup-Datei wählen", "Please choose a backup file")); return; }
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("password", pw);
+  const btn = document.getElementById("backupPreviewBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch("/api/backup/preview", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); return; }
+    const info = document.getElementById("backupPreviewInfo");
+    const created = data.created_utc || "?";
+    const ver = data.app_version || "?";
+    let pwNote = "";
+    if (data.password_ok === false) pwNote = " — " + t("⚠ Passwort falsch oder fehlt", "⚠ wrong or missing password");
+    else if (data.password_ok === true) pwNote = " — " + t("✓ Passwort ok", "✓ password ok");
+    info.textContent = t("Erstellt: ", "Created: ") + created + " · " + t("Version: ", "Version: ") + ver + pwNote;
+    const cats = (data.categories || []).map(function (id) {
+      return { id: id, count: (data.counts || {})[id], default: true };
+    });
+    _backupRenderCats(document.getElementById("backupImportCats"), cats);
+    document.getElementById("backupPreviewBox").style.display = "";
+  } catch (e) {
+    showToast(t("Backup konnte nicht gelesen werden: ", "Could not read backup: ") + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function backupImport() {
+  const fileInput = document.getElementById("backupImportFile");
+  const pw = (document.getElementById("backupImportPw") || {}).value || "";
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) { showToast(t("Bitte eine Backup-Datei wählen", "Please choose a backup file")); return; }
+  if (!pw) { showToast(t("Bitte das Backup-Passwort eingeben", "Please enter the backup password")); return; }
+  const cats = _backupSelectedCats(document.getElementById("backupImportCats"));
+  if (!cats.length) { showToast(t("Keine Kategorie ausgewählt", "No category selected")); return; }
+  const mode = (document.querySelector('input[name="backupMode"]:checked') || {}).value || "merge";
+  if (mode === "replace" &&
+      !confirm(t("„Ersetzen“ löscht die ausgewählten Daten vor dem Import unwiderruflich. Fortfahren?",
+                 "'Replace' will irreversibly clear the selected data before import. Continue?"))) {
+    return;
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("password", pw);
+  fd.append("mode", mode);
+  fd.append("categories", cats.join(","));
+  const btn = document.getElementById("backupImportBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch("/api/backup/import", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); return; }
+    const msg = document.getElementById("backupImportMsg");
+    let total = 0;
+    Object.keys(data.imported || {}).forEach(function (k) { total += data.imported[k]; });
+    if (msg) msg.textContent = t("Wiederhergestellt: ", "Restored: ") + total + t(" Einträge", " entries");
+    showToast(t("Backup wiederhergestellt", "Backup restored"), "success");
+  } catch (e) {
+    showToast(t("Import fehlgeschlagen: ", "Import failed: ") + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  if (document.getElementById("tab-backup")) backupLoadCats();
+});

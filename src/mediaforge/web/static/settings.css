@@ -285,3 +285,16 @@
     font-size: 0.8rem;
   }
 }
+/* ─── Full & Selective Backup tab ─────────────────────────────────────── */
+.backup-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 18px;
+  margin-top: 8px;
+}
+.backup-cat {
+  margin: 0;
+}
+.backup-input {
+  min-width: 220px;
+}

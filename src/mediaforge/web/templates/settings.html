@@ -65,6 +65,7 @@ function setUiLanguage(lang) {
     <button class="settings-tab" data-tab="auth" onclick="switchTab('auth')">{{ _('Authentication') }}</button>
     <button class="settings-tab" data-tab="api" onclick="switchTab('api')">API</button>
     <button class="settings-tab" data-tab="privacy" onclick="switchTab('privacy')">{{ _('Privacy & Telemetry') }}</button>
+    <button class="settings-tab" data-tab="backup" onclick="switchTab('backup')">{{ _('Backup') }}</button>
     {% endif %}
     <button class="settings-tab" data-tab="updates" onclick="switchTab('updates')">{{ _('Updates') }}</button>
     {# Brand-new tabs a thirdparty registers with settings_host="settings"
@@ -1243,6 +1244,80 @@ function setUiLanguage(lang) {
       </div>
     </div>
   </div><!-- /tab-updates -->
+
+  {% if is_admin %}
+  {# Full & Selective Backup — admin-only tab (settings + user data). #}
+  <!-- ══════════════════════════════════════════════════════
+       Tab: Backup (admin only)
+  ══════════════════════════════════════════════════════ -->
+  <div class="settings-tab-panel" id="tab-backup">
+
+    <!-- Export -->
+    <div class="settings-section">
+      <h2>{{ _('Create backup') }}</h2>
+      <div class="settings-hint" style="margin-bottom:14px;">
+        {{ _('Export your settings and data to a single backup file. Choose which categories to include. A password is required — it encrypts sensitive values such as API keys and passwords. Without the password the backup cannot be restored.') }}
+      </div>
+      <div class="backup-cat-grid" id="backupExportCats">
+        <div class="settings-hint">{{ _('Loading…') }}</div>
+      </div>
+      <div class="settings-row" style="gap:16px;flex-wrap:wrap;margin-top:12px;">
+        <div>
+          <label class="settings-field-label" for="backupExportPw">{{ _('Backup password') }}</label>
+          <input type="password" id="backupExportPw" autocomplete="new-password" class="backup-input">
+        </div>
+        <div>
+          <label class="settings-field-label" for="backupExportPw2">{{ _('Repeat password') }}</label>
+          <input type="password" id="backupExportPw2" autocomplete="new-password" class="backup-input">
+        </div>
+      </div>
+      <div class="settings-row" style="margin-top:12px;">
+        <button type="button" id="backupExportBtn" onclick="backupExport()">{{ _('Create backup') }}</button>
+      </div>
+      <div id="backupExportMsg" class="settings-hint" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- Import -->
+    <div class="settings-section">
+      <h2>{{ _('Restore backup') }}</h2>
+      <div class="settings-hint" style="margin-bottom:14px;">
+        {{ _('Restore a backup file. Select the file and enter its password to preview the contents, then choose which categories to restore.') }}
+      </div>
+      <div class="settings-row" style="gap:16px;flex-wrap:wrap;">
+        <div>
+          <label class="settings-field-label" for="backupImportFile">{{ _('Backup file') }}</label>
+          <input type="file" id="backupImportFile" accept=".mfbackup,application/json" onchange="backupOnFileChange()">
+        </div>
+        <div>
+          <label class="settings-field-label" for="backupImportPw">{{ _('Backup password') }}</label>
+          <input type="password" id="backupImportPw" autocomplete="off" class="backup-input">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button type="button" id="backupPreviewBtn" onclick="backupPreview()">{{ _('Preview') }}</button>
+        </div>
+      </div>
+
+      <div id="backupPreviewBox" style="display:none;margin-top:16px;">
+        <div id="backupPreviewInfo" class="settings-hint" style="margin-bottom:10px;"></div>
+        <div class="backup-cat-grid" id="backupImportCats"></div>
+        <div class="settings-row" style="gap:20px;margin-top:12px;">
+          <label class="settings-checkbox-row" for="backupModeMerge">
+            <input type="radio" name="backupMode" id="backupModeMerge" value="merge" checked>
+            <span>{{ _('Merge (keep existing, add/overwrite from backup)') }}</span>
+          </label>
+          <label class="settings-checkbox-row" for="backupModeReplace">
+            <input type="radio" name="backupMode" id="backupModeReplace" value="replace">
+            <span>{{ _('Replace (clear selected data first)') }}</span>
+          </label>
+        </div>
+        <div class="settings-row" style="margin-top:12px;">
+          <button type="button" id="backupImportBtn" onclick="backupImport()">{{ _('Restore') }}</button>
+        </div>
+        <div id="backupImportMsg" class="settings-hint" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div><!-- /tab-backup -->
+  {% endif %}
 
   {# Brand-new tabs a thirdparty registers with settings_host="settings"
      (see the dynamic tab-button loop in the tab bar above and
