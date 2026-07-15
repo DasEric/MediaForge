@@ -42,17 +42,13 @@ from ...logger import get_logger
 logger = get_logger(__name__)
 
 
-# Site keys are persisted with a custom path and consumed by the download UI.
-SITE_KEYS = ("aniworld", "sto", "filmpalast", "megakino", "hanime")
-
-
 def _normalize_default_sites(value):
     """Return a validated, de-duplicated CSV of supported site keys."""
     raw = value if isinstance(value, (list, tuple)) else str(value or "").split(",")
     sites = []
     for item in raw:
         site = str(item).strip().lower()
-        if site in SITE_KEYS and site not in sites:
+        if site in _mirrors.SITE_LABELS and site not in sites:
             sites.append(site)
     return ",".join(sites)
 
@@ -1016,7 +1012,16 @@ def register_settings_routes(app):
         `loadCustomPaths()`, static/app.js, static/autosync.js,
         static/queue.js, static/library.js, and static/seerr.js."""
         paths = get_custom_paths()
-        return jsonify({"paths": paths})
+        return jsonify(
+            {
+                "paths": paths,
+                "site_options": [
+                    {"key": key, "label": label}
+                    for key, label in _mirrors.SITE_LABELS.items()
+                ],
+                "current_site": _mirrors.site_for_url(request.args.get("url", "")),
+            }
+        )
     @app.route("/api/custom-paths", methods=["POST"])
     def api_custom_paths_add():
         """Serve POST /api/custom-paths: add a named custom download path.
@@ -1031,7 +1036,15 @@ def register_settings_routes(app):
         return jsonify({"ok": True, "id": path_id})
     @app.route("/api/custom-paths/<int:path_id>", methods=["PUT"])
     def api_custom_paths_update(path_id):
-        """Update a custom path's optional site-default assignment."""
+        """Update a custom path's optional site-default assignment.
+
+        The app-wide endpoint wrapper also marks this endpoint admin-only.
+        Keeping this guard here prevents a direct registration or future
+        routing change from exposing custom-path updates to regular users.
+        """
+        _username, is_admin = _get_current_user_info()
+        if not is_admin:
+            return jsonify({"error": "admin access required"}), 403
         data = request.get_json(silent=True) or {}
         name = data.get("name")
         path = data.get("path")

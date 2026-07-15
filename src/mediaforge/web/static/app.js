@@ -324,27 +324,18 @@ async function loadAutoSyncJobs() {
 // Custom paths select
 const customPathSelect = document.getElementById("customPathSelect");
 
-function getDownloadSiteKey(url) {
-  const host = String(url || "").toLowerCase();
-  if (host.includes("aniworld")) return "aniworld";
-  if (host.includes("serienstream") || /:\/\/s\.to(?:\/|$)/.test(host)) return "sto";
-  if (host.includes("filmpalast")) return "filmpalast";
-  if (host.includes("megakino")) return "megakino";
-  if (host.includes("hanime")) return "hanime";
-  return "";
-}
-
 async function loadCustomPaths() {
   if (!customPathSelect) return;
   try {
-    const resp = await fetch("/api/custom-paths");
+    const url = currentSeriesUrl ? "?url=" + encodeURIComponent(currentSeriesUrl) : "";
+    const resp = await fetch("/api/custom-paths" + url);
     const data = await resp.json();
     const paths = data.paths || [];
     _customPathsCache = paths;
     // Remove old custom options (keep "Default")
     while (customPathSelect.options.length > 1) customPathSelect.remove(1);
     if (paths.length) {
-      const siteKey = getDownloadSiteKey(currentSeriesUrl);
+      const siteKey = data.current_site || "";
       let defaultForSite = "";
       paths.forEach(function (p) {
         const opt = document.createElement("option");
