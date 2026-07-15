@@ -274,35 +274,7 @@
   padding: 10px 14px;
 }.user-table td {
   padding: 10px 14px;
-}
-
-.path-site-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  min-width: 220px;
-}
-
-.path-site-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary, #c8cad0);
-  cursor: pointer;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.path-site-chip input {
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.path-site-chip input:disabled {
-  cursor: not-allowed;
-}
-
-@media (max-width: 640px) {.user-table {
+}@media (max-width: 640px) {.user-table {
     min-width: 560px;
   }
 
@@ -311,5 +283,65 @@
     padding: 8px 10px;
     white-space: nowrap;
     font-size: 0.8rem;
+  }
+}
+/* ─── Full & Selective Backup tab ─────────────────────────────────────── */
+.backup-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 18px;
+  margin-top: 8px;
+}
+.backup-cat {
+  margin: 0;
+}
+
+/* Aligns the Preview button with the bottom of the adjacent input fields. */
+.backup-preview-btn-wrap {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Styled file picker (label wraps a hidden <input type=file>) — matches the
+   MediaForge ghost-button look used by the Auto-Sync import control. */
+.backup-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+/* Keep file picker, password field and Preview button on one aligned line. */
+.backup-import-row .backup-preview-btn-wrap button {
+  height: 40px;
+}
+.backup-file-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.backup-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile: stack fields full-width and let the Preview button span the row. */
+@media (max-width: 640px) {
+  .backup-cat-grid {
+    grid-template-columns: 1fr;
+  }
+  .backup-preview-btn-wrap {
+    width: 100%;
+  }
+  .backup-preview-btn-wrap button {
+    width: 100%;
+  }
+  .backup-file-btn {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

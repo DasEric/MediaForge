@@ -523,6 +523,31 @@ MODULE_SENSITIVE_SETTINGS = (
 )
 ```
 
+## Backups (`register_backup_category`)
+
+MediaForge's admin **Backup** tab exports settings and user data to a portable,
+password-protected `.mfbackup` file (and restores it — merge or replace).
+
+Your module needs **no extra work for its settings**: every `module:<id>:<key>`
+row in `app_settings` is part of the `settings` category automatically, and your
+`"secret"` fields ride along inside the password-encrypted section (they are
+never written to the portable plaintext part — even if your module is disabled
+at export time).
+
+If your module owns **its own database tables**, register them as a backup
+category so admins can include them:
+
+```python
+from mediaforge.web.backup import register_backup_category
+
+# default=True → checked by default in the Backup UI
+register_backup_category("my_bot", ["my_bot_items", "my_bot_state"], default=True)
+```
+
+Call it from your `register(app)`. The category id must be unique (core ids like
+`settings` cannot be shadowed). Do **not** register cache/throwaway tables —
+backups are meant for data worth keeping.
+
 ## Python dependencies (`MODULE_REQUIREMENTS`)
 
 Declare what you need and stop there:

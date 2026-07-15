@@ -18,7 +18,11 @@
 
 WebUI (Landing Page) | WebUI (Auto-Sync)
 :-------------------------:|:-------------------------:
-![MediaForge - Demo](https://github.com/PD-Codes/MediaForge/blob/main/.github/assets/demo-menu.png?raw=true) | ![MediaForge - Demo](https://github.com/PD-Codes/MediaForge/blob/main/.github/assets/demo-sync.png?raw=true)
+![MediaForge - Demo](https://cdn.domekologe.eu/d6c3daa9-2e80-4cdb-8191-5c700b811e2e/6f0d3c9b-cc70-415d-a069-875585ff0886/8ca6cce9-911d-445e-a907-aebfdb7c95a8.png) | ![MediaForge - Demo](https://cdn.domekologe.eu/d6c3daa9-2e80-4cdb-8191-5c700b811e2e/6f0d3c9b-cc70-415d-a069-875585ff0886/b0741266-1687-4dd1-a8f5-0ea0150a4220.png)
+
+
+> [!NOTE]  
+> This images contains some modules and settings which can be enabled within the settings.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -51,6 +55,7 @@ Useful launch flags: `-wP <port>` (custom port) · `-wH 0.0.0.0` (expose to LAN/
 - **CineInfo (TMDB)** metadata, a **Calendar** of upcoming episodes, plus **Jellyfin/Plex** and **Jellyseerr/Overseerr** integration
 - **Notifications** via Web Push, Telegram, Pushover, Discord or WhatsApp
 - **Encoding** (Stream Copy / H.264 / H.265, with NVENC, VAAPI, VideoToolbox) and **Anime4K** upscaling
+- **Full & Selective Backup** — export/import settings and user data as a password-protected file to back up or migrate a MediaForge install (admin only)
 - **Multi-user auth & OIDC SSO**, a full **REST API**, **Docker**-ready, and a UI in **English & German**
 
 → Full feature tour in the **[Wiki](https://github.com/PD-Codes/MediaForge/wiki/Web-UI)**.
