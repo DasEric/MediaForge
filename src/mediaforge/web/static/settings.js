@@ -2476,7 +2476,7 @@ async function resetMirrorHosts(siteId) {
 
 const BACKUP_CAT_LABELS = {
   settings:       function () { return t("Einstellungen", "Settings"); },
-  favourites:     function () { return t("Favoriten & Bibliothek", "Favourites & library"); },
+  favourites:     function () { return t("Favoriten & Bibliothek", "Favorites & library"); },
   history:        function () { return t("Download-Verlauf", "Download history"); },
   watch_progress: function () { return t("Wiedergabe-Fortschritt", "Watch progress"); },
   custom_paths:   function () { return t("Eigene Pfade", "Custom paths"); },
@@ -2498,7 +2498,7 @@ function _backupRenderCats(container, cats) {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.value = c.id;
-    cb.className = "backup-cat-cb";
+    cb.className = "chb-main backup-cat-cb";
     cb.checked = !!c.default;
     const span = document.createElement("span");
     let label = _backupCatLabel(c.id);
@@ -2575,7 +2575,13 @@ async function backupExport() {
 }
 
 function backupOnFileChange() {
-  // Hide any stale preview when the selected file changes.
+  // Reflect the chosen filename in the styled picker and hide stale preview.
+  const input = document.getElementById("backupImportFile");
+  const label = document.getElementById("backupFileLabel");
+  if (label) {
+    const f = input && input.files && input.files[0];
+    label.textContent = f ? f.name : t("Datei wählen…", "Choose file…");
+  }
   const box = document.getElementById("backupPreviewBox");
   if (box) box.style.display = "none";
 }
@@ -2585,13 +2591,17 @@ async function backupPreview() {
   const pw = (document.getElementById("backupImportPw") || {}).value || "";
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (!file) { showToast(t("Bitte eine Backup-Datei wählen", "Please choose a backup file")); return; }
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("password", pw);
   const btn = document.getElementById("backupPreviewBtn");
   if (btn) btn.disabled = true;
   try {
-    const res = await fetch("/api/backup/preview", { method: "POST", body: fd });
+    // Upload as a JSON body (the .mfbackup file is JSON text) — every /api/
+    // POST must be application/json; see backup.py route docstring.
+    const text = await file.text();
+    const res = await fetch("/api/backup/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file: text, password: pw }),
+    });
     const data = await res.json();
     if (data.error) { showToast(data.error); return; }
     const info = document.getElementById("backupPreviewInfo");
@@ -2627,15 +2637,15 @@ async function backupImport() {
                  "'Replace' will irreversibly clear the selected data before import. Continue?"))) {
     return;
   }
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("password", pw);
-  fd.append("mode", mode);
-  fd.append("categories", cats.join(","));
   const btn = document.getElementById("backupImportBtn");
   if (btn) btn.disabled = true;
   try {
-    const res = await fetch("/api/backup/import", { method: "POST", body: fd });
+    const text = await file.text();
+    const res = await fetch("/api/backup/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file: text, password: pw, mode: mode, categories: cats }),
+    });
     const data = await res.json();
     if (data.error) { showToast(data.error); return; }
     const msg = document.getElementById("backupImportMsg");

@@ -48,7 +48,7 @@ def _dup_norm_movie_key(filename: str) -> str:
     return name or filename.strip().lower()
 
 
-def _compute_media_duplicates():
+def _compute_media_duplicates(cache=None):
     """Find media present more than once under the same identity.
 
     Two files are duplicates when their series/film title, season and episode
@@ -61,7 +61,8 @@ def _compute_media_duplicates():
     share episode 1 in the "movies" bucket — are keyed by a normalized filename
     so distinct films in one folder are not falsely grouped. Returns a list of
     duplicate groups (each with its individual files) sorted by title."""
-    cache = get_all_library_cache()
+    if cache is None:
+        cache = get_all_library_cache()
     groups = {}  # identity key tuple -> group dict
 
     for path_key, entry in cache.items():
@@ -154,7 +155,7 @@ def _media_missing_episodes(seasons: dict) -> list:
     return notes
 
 
-def _compute_media_stats():
+def _compute_media_stats(cache=None):
     """Build the Media statistics category from the library cache.
 
     The library cache is kept current by the library watcher, so these
@@ -162,7 +163,8 @@ def _compute_media_stats():
     multiple language folders (lang-separation mode) are merged by folder
     name so each logical series is counted once; their seasons are unioned
     so an episode present in any language counts as present."""
-    cache = get_all_library_cache()
+    if cache is None:
+        cache = get_all_library_cache()
     any_scanning = any(e.get("is_scanning") for e in cache.values())
     ignores = get_media_ignores()
 
@@ -280,13 +282,18 @@ def register_stats_routes(app):
         media_enabled = (get_setting("media_stats_enabled")
                          or os.environ.get("MEDIAFORGE_MEDIA_STATS_ENABLED", "0")) == "1"
         if media_enabled:
+            # Load the library cache once and reuse it for both the media stats
+            # and the duplicate scan, so the cache JSON is only decoded once per
+            # request instead of on every helper call.
+            cache = get_all_library_cache()
             # Kick off an initial library scan if nothing has been scanned yet,
             # so the Media category isn't permanently empty for fresh installs.
-            if not get_all_library_cache():
+            if not cache:
                 lang_sep = os.environ.get("MEDIAFORGE_LANG_SEPARATION", "0") == "1"
                 _lib_trigger_scan_async(_lib_build_scan_targets(), lang_sep)
-            payload["media"] = _compute_media_stats()
-            payload["media"]["duplicates"] = _compute_media_duplicates()
+            media = _compute_media_stats(cache)
+            media["duplicates"] = _compute_media_duplicates(cache)
+            payload["media"] = media
         return jsonify(payload)
     @app.route("/api/media/ignore", methods=["POST"])
     def api_media_ignore():

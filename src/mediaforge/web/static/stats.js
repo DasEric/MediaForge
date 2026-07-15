@@ -181,26 +181,41 @@ function _duplicatesTableHtml(duplicates) {
     return '<p class="stat-sub">' +
       t('Keine Duplikate gefunden. 🎉', 'No duplicates found. 🎉') + '</p>';
   }
-  let mh = '<div class="user-table-wrapper"><table class="user-table"><thead><tr>' +
-    '<th style="width:34%">' + t('Serie / Film', 'Series / Movie') + '</th>' +
-    '<th style="width:12%">' + t('Episode', 'Episode') + '</th>' +
-    '<th style="width:14%">' + t('Speicherort', 'Location') + '</th>' +
-    '<th style="width:auto">' + t('Vorhandene Versionen', 'Existing versions') + '</th>' +
+  let mh = '<div class="user-table-wrapper"><table class="user-table dup-table"><thead><tr>' +
+    '<th style="width:24%">' + t('Serie / Film', 'Series / Movie') + '</th>' +
+    '<th style="width:9%">' + t('Episode', 'Episode') + '</th>' +
+    '<th style="width:13%">' + t('Speicherort', 'Location') + '</th>' +
+    '<th style="width:16%">' + t('Vorhandene Versionen', 'Existing versions') + '</th>' +
+    '<th style="width:38%">' + t('Pfad', 'Path') + '</th>' +
     '</tr></thead><tbody>';
   duplicates.forEach((item) => {
     const files = item.files || [];
     const langBadge = item.language
       ? ` <span class="ignore-slot-chip">${escHtml(item.language)}</span>` : "";
+    // Render versions and paths as aligned, stacked rows so each resolution
+    // lines up with its file path in the column to the right.
     const versionChips = files.map((f) => {
       const res = f.resolution || t('unbekannt', 'unknown');
       const codec = f.video_codec ? ` · ${escHtml(f.video_codec)}` : "";
-      return `<span class="ignore-slot-chip" title="${escHtml(f.path || f.file || "")}">${escHtml(res)}${codec}</span>`;
-    }).join(" ");
+      // Show the container extension too, so copies that differ only by format
+      // (e.g. .mkv vs .mp4) are distinguishable at a glance.
+      const ext = f.file && f.file.includes(".") ? f.file.split(".").pop().toUpperCase() : "";
+      const cont = ext ? ` · ${escHtml(ext)}` : "";
+      return `<div class="dup-version-row"><span class="ignore-slot-chip">${escHtml(res)}${codec}${cont}</span></div>`;
+    }).join("");
+    const pathRows = files.map((f) => {
+      const p = f.path || f.file || "";
+      // Insert zero-width break opportunities after path separators so long
+      // paths wrap at folder boundaries instead of one character per line.
+      const pretty = escHtml(p).replace(/([\\/])/g, "$1<wbr>");
+      return `<div class="dup-path-row" title="${escHtml(p)}">${pretty}</div>`;
+    }).join("");
     mh += `<tr>
       <td class="speed-modal-title" title="${escHtml(item.title)}">${escHtml(item.title)}${langBadge}</td>
       <td>${escHtml(_dupSlotLabel(item))}</td>
       <td>${escHtml(item.location)}</td>
-      <td style="color:var(--warning,#f59e0b)"><div class="ignore-slot-wrap">${versionChips}</div></td>
+      <td style="color:var(--warning,#f59e0b)">${versionChips}</td>
+      <td class="dup-path-cell">${pathRows}</td>
     </tr>`;
   });
   mh += '</tbody></table></div>';

@@ -51,6 +51,7 @@ Useful launch flags: `-wP <port>` (custom port) · `-wH 0.0.0.0` (expose to LAN/
 - **CineInfo (TMDB)** metadata, a **Calendar** of upcoming episodes, plus **Jellyfin/Plex** and **Jellyseerr/Overseerr** integration
 - **Notifications** via Web Push, Telegram, Pushover, Discord or WhatsApp
 - **Encoding** (Stream Copy / H.264 / H.265, with NVENC, VAAPI, VideoToolbox) and **Anime4K** upscaling
+- **Full & Selective Backup** — export/import settings and user data as a password-protected file to back up or migrate a MediaForge install (admin only)
 - **Multi-user auth & OIDC SSO**, a full **REST API**, **Docker**-ready, and a UI in **English & German**
 
 → Full feature tour in the **[Wiki](https://github.com/PD-Codes/MediaForge/wiki/Web-UI)**.

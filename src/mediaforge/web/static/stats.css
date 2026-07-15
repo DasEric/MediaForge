@@ -216,3 +216,54 @@
   height: 100px;
   min-height: 100px;
 }
+
+/* Duplicate-media modal: version chips and their file paths are rendered as
+   stacked rows so each resolution lines up with its path in the next column. */
+.dup-version-row,
+.dup-path-row {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+}
+/* Fixed layout so the five columns keep their assigned widths — otherwise the
+   long file paths let the browser collapse the path column to a single
+   character wide and stack the text vertically. */
+.dup-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.dup-table th,
+.dup-table td {
+  vertical-align: top;
+}
+.dup-path-cell {
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Consolas, monospace);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.dup-path-row {
+  overflow-wrap: anywhere;   /* wrap long paths, preferring the <wbr> breaks */
+  line-height: 1.3;
+}
+
+/* Mobile: five columns don't fit a phone width, so give the table a minimum
+   width and let .user-table-wrapper scroll horizontally (the app-wide pattern),
+   rather than squashing the columns. */
+@media (max-width: 640px) {
+  .dup-table {
+    min-width: 640px;
+  }
+  .dup-table th,
+  .dup-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+  .dup-table .dup-path-cell {
+    font-size: 0.72rem;
+  }
+  .dup-version-row,
+  .dup-path-row {
+    min-height: 22px;
+  }
+}

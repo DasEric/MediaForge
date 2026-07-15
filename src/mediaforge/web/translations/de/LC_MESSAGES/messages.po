@@ -4792,3 +4792,9 @@ msgstr "Ersetzen (ausgewählte Daten zuerst löschen)"
 
 msgid "Restore"
 msgstr "Wiederherstellen"
+
+msgid "Choose backup file"
+msgstr "Backup-Datei wählen"
+
+msgid "Choose file…"
+msgstr "Datei wählen…"

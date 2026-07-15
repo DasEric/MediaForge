@@ -1262,13 +1262,13 @@ function setUiLanguage(lang) {
         <div class="settings-hint">{{ _('Loading…') }}</div>
       </div>
       <div class="settings-row" style="gap:16px;flex-wrap:wrap;margin-top:12px;">
-        <div>
+        <div class="settings-field">
           <label class="settings-field-label" for="backupExportPw">{{ _('Backup password') }}</label>
-          <input type="password" id="backupExportPw" autocomplete="new-password" class="backup-input">
+          <input type="password" id="backupExportPw" autocomplete="new-password">
         </div>
-        <div>
+        <div class="settings-field">
           <label class="settings-field-label" for="backupExportPw2">{{ _('Repeat password') }}</label>
-          <input type="password" id="backupExportPw2" autocomplete="new-password" class="backup-input">
+          <input type="password" id="backupExportPw2" autocomplete="new-password">
         </div>
       </div>
       <div class="settings-row" style="margin-top:12px;">
@@ -1283,16 +1283,20 @@ function setUiLanguage(lang) {
       <div class="settings-hint" style="margin-bottom:14px;">
         {{ _('Restore a backup file. Select the file and enter its password to preview the contents, then choose which categories to restore.') }}
       </div>
-      <div class="settings-row" style="gap:16px;flex-wrap:wrap;">
-        <div>
-          <label class="settings-field-label" for="backupImportFile">{{ _('Backup file') }}</label>
-          <input type="file" id="backupImportFile" accept=".mfbackup,application/json" onchange="backupOnFileChange()">
+      <div class="settings-row backup-import-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="settings-field">
+          <span class="settings-field-label">{{ _('Backup file') }}</span>
+          <label class="btn btn-ghost backup-file-btn" style="margin-bottom: unset !important;" title="{{ _('Choose backup file') }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="backup-file-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="17"/></svg>
+            <span id="backupFileLabel" class="backup-file-name">{{ _('Choose file…') }}</span>
+            <input type="file" id="backupImportFile" accept=".mfbackup,application/json" style="display:none;" onchange="backupOnFileChange()">
+          </label>
         </div>
-        <div>
+        <div class="settings-field">
           <label class="settings-field-label" for="backupImportPw">{{ _('Backup password') }}</label>
-          <input type="password" id="backupImportPw" autocomplete="off" class="backup-input">
+          <input type="password" id="backupImportPw" autocomplete="off">
         </div>
-        <div style="display:flex;align-items:flex-end;">
+        <div class="backup-preview-btn-wrap">
           <button type="button" id="backupPreviewBtn" onclick="backupPreview()">{{ _('Preview') }}</button>
         </div>
       </div>

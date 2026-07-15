@@ -1,7 +1,7 @@
 """Full & Selective Backup: export/import of settings and user data.
 
 This module owns the portable backup format used by the "Backup" settings tab.
-It serialises a chosen set of *categories* (settings + user-data tables, never
+It serializes a chosen set of *categories* (settings + user-data tables, never
 caches) into a single ``.mfbackup`` JSON envelope and restores them again.
 
 Design notes
@@ -42,7 +42,7 @@ _SETTING_DENYLIST = frozenset({
     "env_migrated",
 })
 
-# Category catalogue. "settings" is special-cased; every other category is a
+# Category catalog. "settings" is special-cased; every other category is a
 # set of concrete tables. Cache tables (tmdb_cache, provider_cache,
 # browse_cache, library_cache, mediascan_cache, uptime_heartbeats,
 # devinfo_posts) are deliberately absent -- they are never backed up.
@@ -66,6 +66,39 @@ BACKUP_CATEGORIES: dict = {
     "push":           {"kind": "tables", "default": False,
                        "tables": ["push_subscriptions"]},
 }
+
+# Categories registered at runtime by third-party modules (see
+# register_backup_category). Kept separate from the frozen core catalog above so
+# a module can add its own tables to the backup without a core release.
+# Module *settings* (keys prefixed ``module:<id>:``) are already covered by the
+# "settings" category, so this is only needed for modules that own extra tables.
+_MODULE_CATEGORIES: dict = {}
+
+
+def register_backup_category(category_id: str, tables, default: bool = False) -> bool:
+    """Let a third-party module add its own tables to the backup catalog.
+
+    ``category_id`` must be unique (a core id or an already-registered one is
+    rejected). ``tables`` is the list of table names to export/import for this
+    category. Returns True if newly registered.
+
+    Example (from a module's setup):
+        from mediaforge.web.backup import register_backup_category
+        register_backup_category("mymodule", ["mymodule_items"], default=True)
+    """
+    if not category_id or category_id in BACKUP_CATEGORIES or category_id in _MODULE_CATEGORIES:
+        return False
+    _MODULE_CATEGORIES[category_id] = {
+        "kind": "tables",
+        "default": bool(default),
+        "tables": list(tables or []),
+    }
+    return True
+
+
+def _all_categories() -> dict:
+    """Core catalog plus any module-registered categories."""
+    return {**BACKUP_CATEGORIES, **_MODULE_CATEGORIES}
 
 
 class BackupError(Exception):
@@ -92,7 +125,7 @@ def _derive_fernet_key(password: str, salt: bytes) -> bytes:
 
 
 def _encrypt_blob(obj, password: str, salt: bytes) -> str:
-    """Encrypt a JSON-serialisable *obj* into a Fernet token string."""
+    """Encrypt a JSON-serializable *obj* into a Fernet token string."""
     from cryptography.fernet import Fernet
 
     token = Fernet(_derive_fernet_key(password, salt)).encrypt(
@@ -122,7 +155,7 @@ def _decrypt_blob(token: str, password: str, salt: bytes):
 # ---------------------------------------------------------------------------
 
 def _encode_value(val):
-    """Make a SQLite cell value JSON-serialisable (bytes -> tagged base64)."""
+    """Make a SQLite cell value JSON-serializable (bytes -> tagged base64)."""
     if isinstance(val, (bytes, bytearray)):
         return {"__bytes__": base64.b64encode(bytes(val)).decode("ascii")}
     return val
@@ -145,10 +178,16 @@ def _collect_settings():
     ``plain`` holds non-sensitive keys as plain text; ``secret`` holds
     sensitive keys as plain text (they are encrypted under the backup password
     by the caller). Denylisted/derived keys are skipped.
+
+    A value is routed to ``secret`` if its key is registered sensitive *or* the
+    value is stored encrypted at rest (``enc:`` prefix). The second check is a
+    security guard: a secret left behind by a currently-disabled module is not
+    registered as sensitive this run, so without it the decrypted plaintext
+    would leak into the portable ``plain`` section.
     """
     conn = get_db()
     try:
-        rows = conn.execute("SELECT key FROM app_settings").fetchall()
+        rows = conn.execute("SELECT key, value FROM app_settings").fetchall()
     finally:
         conn.close()
 
@@ -158,10 +197,11 @@ def _collect_settings():
         key = row["key"]
         if key in _SETTING_DENYLIST:
             continue
+        raw = row["value"]
         value = get_setting(key)  # decrypts sensitive/enc: values transparently
         if value is None:
             continue
-        if is_sensitive_key(key):
+        if is_sensitive_key(key) or (raw or "").startswith(_db._ENC_PREFIX):
             secret[key] = value
         else:
             plain[key] = value
@@ -191,7 +231,7 @@ def list_categories() -> list:
     conn = get_db()
     try:
         out = []
-        for cid, meta in BACKUP_CATEGORIES.items():
+        for cid, meta in _all_categories().items():
             if meta["kind"] == "settings":
                 cnt = conn.execute("SELECT COUNT(*) AS c FROM app_settings").fetchone()["c"]
             else:
@@ -216,7 +256,8 @@ def export_backup(categories, password: str) -> bytes:
     if not password:
         raise BackupError("a backup password is required")
 
-    selected = [c for c in categories if c in BACKUP_CATEGORIES]
+    catalog = _all_categories()
+    selected = [c for c in categories if c in catalog]
     if not selected:
         raise BackupError("no valid categories selected")
 
@@ -226,7 +267,7 @@ def export_backup(categories, password: str) -> bytes:
     conn = get_db()
     try:
         for cid in selected:
-            meta = BACKUP_CATEGORIES[cid]
+            meta = catalog[cid]
             if meta["kind"] == "settings":
                 plain, secret = _collect_settings()
                 data["settings"] = plain
@@ -279,7 +320,7 @@ def preview_backup(file_bytes: bytes, password: str) -> dict:
 
     counts: dict = {}
     for cid in env.get("categories", []):
-        meta = BACKUP_CATEGORIES.get(cid)
+        meta = _all_categories().get(cid)
         if not meta:
             continue
         if meta["kind"] == "settings":
@@ -324,8 +365,9 @@ def import_backup(file_bytes: bytes, password: str, categories, mode: str = "mer
     salt = base64.b64decode(env["kdf"]["salt"])
     secrets = _decrypt_blob(env.get("secrets", ""), password, salt)
 
+    catalog = _all_categories()
     available = set(env.get("categories", []))
-    selected = [c for c in categories if c in BACKUP_CATEGORIES and c in available]
+    selected = [c for c in categories if c in catalog and c in available]
     if not selected:
         raise BackupError("no matching categories to import")
 
@@ -334,7 +376,7 @@ def import_backup(file_bytes: bytes, password: str, categories, mode: str = "mer
     try:
         conn.execute("BEGIN")
         for cid in selected:
-            meta = BACKUP_CATEGORIES[cid]
+            meta = catalog[cid]
             if meta["kind"] == "settings":
                 report[cid] = _restore_settings(conn, data.get("settings", {}), secrets)
             else:
@@ -375,7 +417,7 @@ def _restore_settings(conn, plain: dict, secrets: dict) -> int:
 def _restore_table(conn, table: str, rows, mode: str) -> int:
     """Insert *rows* into *table*, keeping only columns that exist locally.
 
-    Table names come exclusively from the fixed ``BACKUP_CATEGORIES`` catalogue,
+    Table names come exclusively from the fixed ``BACKUP_CATEGORIES`` catalog,
     so interpolating them into SQL is safe.
     """
     if not _table_exists(conn, table):
