@@ -16,6 +16,7 @@ from ..db import get_custom_paths
 from ..db import get_setting
 from ..db import remove_custom_path
 from ..db import set_setting
+from ..db import update_custom_path
 from ..dns_patch import _DNS_PRESETS
 from ..dns_patch import _apply_dns_patch
 from .. import dns_patch
@@ -39,6 +40,21 @@ from ...logger import get_logger
 
 
 logger = get_logger(__name__)
+
+
+# Site keys are persisted with a custom path and consumed by the download UI.
+SITE_KEYS = ("aniworld", "sto", "filmpalast", "megakino", "hanime")
+
+
+def _normalize_default_sites(value):
+    """Return a validated, de-duplicated CSV of supported site keys."""
+    raw = value if isinstance(value, (list, tuple)) else str(value or "").split(",")
+    sites = []
+    for item in raw:
+        site = str(item).strip().lower()
+        if site in SITE_KEYS and site not in sites:
+            sites.append(site)
+    return ",".join(sites)
 
 
 def register_settings_routes(app):
@@ -1010,8 +1026,27 @@ def register_settings_routes(app):
         path = (data.get("path") or "").strip()
         if not name or not path:
             return jsonify({"error": "name and path are required"}), 400
-        path_id = add_custom_path(name, path)
+        default_sites = _normalize_default_sites(data.get("default_sites"))
+        path_id = add_custom_path(name, path, default_sites)
         return jsonify({"ok": True, "id": path_id})
+    @app.route("/api/custom-paths/<int:path_id>", methods=["PUT"])
+    def api_custom_paths_update(path_id):
+        """Update a custom path's optional site-default assignment."""
+        data = request.get_json(silent=True) or {}
+        name = data.get("name")
+        path = data.get("path")
+        default_sites = (
+            _normalize_default_sites(data.get("default_sites"))
+            if "default_sites" in data
+            else None
+        )
+        update_custom_path(
+            path_id,
+            name=name.strip() if isinstance(name, str) else None,
+            path=path.strip() if isinstance(path, str) else None,
+            default_sites=default_sites,
+        )
+        return jsonify({"ok": True})
     @app.route("/api/custom-paths/<int:path_id>", methods=["DELETE"])
     def api_custom_paths_delete(path_id):
         """Serve DELETE /api/custom-paths/<path_id>: remove a custom download

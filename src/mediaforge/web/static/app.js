@@ -324,6 +324,16 @@ async function loadAutoSyncJobs() {
 // Custom paths select
 const customPathSelect = document.getElementById("customPathSelect");
 
+function getDownloadSiteKey(url) {
+  const host = String(url || "").toLowerCase();
+  if (host.includes("aniworld")) return "aniworld";
+  if (host.includes("serienstream") || /:\/\/s\.to(?:\/|$)/.test(host)) return "sto";
+  if (host.includes("filmpalast")) return "filmpalast";
+  if (host.includes("megakino")) return "megakino";
+  if (host.includes("hanime")) return "hanime";
+  return "";
+}
+
 async function loadCustomPaths() {
   if (!customPathSelect) return;
   try {
@@ -334,12 +344,17 @@ async function loadCustomPaths() {
     // Remove old custom options (keep "Default")
     while (customPathSelect.options.length > 1) customPathSelect.remove(1);
     if (paths.length) {
+      const siteKey = getDownloadSiteKey(currentSeriesUrl);
+      let defaultForSite = "";
       paths.forEach(function (p) {
         const opt = document.createElement("option");
         opt.value = p.id;
         opt.textContent = p.name;
         customPathSelect.appendChild(opt);
+        const sites = (p.default_sites || "").split(",").map((site) => site.trim()).filter(Boolean);
+        if (!defaultForSite && sites.includes(siteKey)) defaultForSite = String(p.id);
       });
+      customPathSelect.value = defaultForSite;
       customPathSelect.style.display = "";
     } else {
       customPathSelect.style.display = "none";

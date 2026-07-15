@@ -1228,11 +1228,18 @@ function renderCustomPaths(paths) {
   customPathsBody.innerHTML = "";
   if (!paths.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = t('<td colspan="3" style="color:#6b7280;text-align:center">Keine benutzerdefinierten Pfade</td>','<td colspan="3" style="color:#6b7280;text-align:center">No custom paths</td>');
+    tr.innerHTML = t('<td colspan="4" style="color:#6b7280;text-align:center">Keine benutzerdefinierten Pfade</td>','<td colspan="4" style="color:#6b7280;text-align:center">No custom paths</td>');
     customPathsBody.appendChild(tr);
     return;
   }
   paths.forEach(function (p) {
+    const active = (p.default_sites || "").split(",").map((site) => site.trim()).filter(Boolean);
+    const siteChips = PATH_SITE_OPTIONS.map(function ([key, label]) {
+      const checked = active.includes(key) ? "checked" : "";
+      const disabled = (typeof settingsCanEdit !== "undefined" && !settingsCanEdit) ? "disabled" : "";
+      return '<label class="path-site-chip"><input type="checkbox" ' + checked + " " + disabled +
+        " onchange=\"togglePathSite(" + p.id + ",'" + key + "',this.checked)\"> " + esc(label) + "</label>";
+    }).join("");
     const tr = document.createElement("tr");
     const delCell = (typeof settingsCanEdit !== "undefined" && settingsCanEdit)
       ? '<td><button class="btn-del" onclick="deleteCustomPath(' + p.id + ')">'+t("Löschen","Delete")+'</button></td>'
@@ -1240,9 +1247,40 @@ function renderCustomPaths(paths) {
     tr.innerHTML =
       "<td>" + esc(p.name) + "</td>" +
       "<td style=\"font-family:'SF Mono','Fira Code',monospace;font-size:.82rem\">" + esc(p.path) + "</td>" +
+      '<td><div class="path-site-chips">' + siteChips + "</div></td>" +
       delCell;
     customPathsBody.appendChild(tr);
   });
+}
+
+const PATH_SITE_OPTIONS = [
+  ["aniworld", "AniWorld"],
+  ["sto", "SerienStream"],
+  ["filmpalast", "FilmPalast"],
+  ["megakino", "MegaKino"],
+  ["hanime", "hanime"],
+];
+
+async function togglePathSite(pathId, siteKey, enabled) {
+  try {
+    const response = await fetch("/api/custom-paths");
+    const data = await response.json();
+    const path = (data.paths || []).find((item) => item.id === pathId);
+    const active = new Set((path && path.default_sites ? path.default_sites : "")
+      .split(",").map((site) => site.trim()).filter(Boolean));
+    if (enabled) active.add(siteKey);
+    else active.delete(siteKey);
+
+    const save = await fetch("/api/custom-paths/" + pathId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ default_sites: Array.from(active) }),
+    });
+    const result = await save.json();
+    if (result.error) showToast(result.error);
+  } catch (e) {
+    showToast(t("Standardseiten konnten nicht aktualisiert werden: " + e.message, "Default sites could not be updated: " + e.message));
+  }
 }
 
 async function addCustomPath() {
